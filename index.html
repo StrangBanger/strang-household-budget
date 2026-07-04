@@ -889,8 +889,8 @@ function showSavedBadge(msg,isErr){
 // Table: budget_data(id uuid pk, household_id text unique, data jsonb, updated_at timestamptz)
 // RLS: any authenticated user may select/update (see setup notes).
 // =============================================================
-var SUPABASE_URL='YOUR_SUPABASE_PROJECT_URL';       // e.g. https://xxxx.supabase.co
-var SUPABASE_ANON_KEY='YOUR_SUPABASE_ANON_KEY';
+var SUPABASE_URL='https://ldmoxearkzxhzjscprsh.supabase.co';
+var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
 var HOUSEHOLD_ID='strang';
 var LOCAL_BUFFER_KEY='strangBudget_offlineBuffer';
 var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
