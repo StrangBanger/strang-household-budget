@@ -261,6 +261,124 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .pie-leg-name{flex:1;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .pie-leg-vals{font-family:var(--mono);color:var(--text3);white-space:nowrap;}
 .pie-empty{font-size:12px;color:var(--text3);text-align:center;padding:2rem 0;}
+
+/* ── MOBILE RESPONSIVE ───────────────────────────────────────
+   Breakpoint: 640px — phone-sized screens
+   Strategy:
+   - Track tab: fully optimised for one-handed entry
+   - Other tabs: light improvements, wide tables stay scrollable
+   - Charts: untouched, horizontal scroll as needed
+──────────────────────────────────────────────────────────── */
+@media(max-width:640px){
+
+  /* Shell + header */
+  .shell{padding:1rem .875rem;}
+  header{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:1rem;}
+  header h1{font-size:17px;}
+  .header-btns{width:100%;display:flex;gap:6px;flex-wrap:wrap;}
+  .header-btns button{flex:1;font-size:11px;padding:6px 8px;text-align:center;}
+
+  /* Tabs — horizontal scroll, no wrapping */
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:0;margin-bottom:1.25rem;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{font-size:12px;padding:8px 14px;white-space:nowrap;flex-shrink:0;}
+
+  /* Summary cards — 2 column grid on mobile */
+  .cards{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .cards-5{grid-template-columns:repeat(2,1fr);}
+  .card{padding:.75rem .875rem;}
+  .card-v{font-size:16px;}
+  .card-l{font-size:10px;}
+
+  /* Seed bar */
+  .seed-bar{flex-wrap:wrap;}
+  .seed-bar input{width:100%;margin-top:4px;}
+
+  /* ── TRACK TAB — priority treatment ── */
+
+  /* Month header — bigger touch targets */
+  .month-hdr h2{font-size:18px;font-weight:600;}
+  .month-nav button{
+    padding:8px 16px;
+    font-size:18px;
+    min-width:44px;
+    min-height:44px;
+  }
+
+  /* Entry form — stack vertically for easy thumb use */
+  .entry-box{padding:1rem .875rem;}
+  .entry-grid{
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:auto auto auto;
+    gap:8px;
+  }
+  /* Budget line takes full width */
+  .entry-grid .field:first-child{grid-column:1/-1;}
+  /* Source and amount side by side */
+  /* Add button full width */
+  .entry-grid .add-btn{
+    grid-column:1/-1;
+    width:100%;
+    padding:12px;
+    font-size:15px;
+    min-height:48px;
+    border-radius:var(--radius);
+  }
+  .field select,.field input{
+    font-size:16px; /* prevents iOS zoom on focus */
+    padding:10px 12px;
+    min-height:44px;
+  }
+  .field label{font-size:11px;}
+
+  /* Source cards — single column on mobile */
+  .src-cards{grid-template-columns:1fr;}
+
+  /* Transaction rows — tighter, clearer */
+  .tx-row{padding:8px 12px;gap:6px;}
+  .tx-cat{font-size:13px;}
+  .tx-amt{font-size:13px;}
+  button.edit-tx{font-size:12px;padding:4px 8px;min-height:36px;}
+  button.del-tx{font-size:16px;padding:4px 6px;min-height:36px;opacity:.5;}
+
+  /* Inline edit row — stack on mobile */
+  .tx-edit-row{flex-wrap:wrap;gap:6px;}
+  .tx-edit-row select,.tx-edit-row input{font-size:16px;min-height:40px;}
+  button.save-tx{flex:1;padding:8px;min-height:40px;}
+
+  /* Actuals table — hide progress bars on mobile, keep numbers */
+  .bar-wrap{display:none;}
+  table.at th,table.at td{padding:5px 10px;font-size:12px;}
+  .delta{font-size:11px;}
+
+  /* ── INCOME TAB — light improvements ── */
+  .tax-grid{grid-template-columns:1fr;} /* stack tax cards */
+  .oti-entry{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;}
+  .oti-entry .field:nth-child(2){grid-column:1/-1;} /* description full width */
+  .oti-entry button{grid-column:1/-1;padding:10px;min-height:44px;}
+
+  /* ── DASHBOARD TAB — light improvements ── */
+  /* Balance + year-end side by side → stacked */
+  #tab-dash > div:first-child > div:first-child{
+    grid-template-columns:1fr!important;
+  }
+
+  /* ── MONTH DETAIL — stays scrollable ── */
+  .mo-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table.mt th,table.mt td{padding:6px 10px;font-size:12px;white-space:nowrap;}
+
+  /* ── PROJECTION range buttons ── */
+  #proj-range-btns{gap:4px;}
+  button.range-btn{font-size:11px;padding:4px 10px;}
+
+  /* General touch target improvement */
+  button.hbtn{min-height:40px;}
+  button.add-btn{min-height:44px;}
+  button.cal{width:32px;height:32px;}
+
+  /* Login card — full width on small screens */
+  .login-card{width:calc(100% - 2rem);padding:1.5rem 1.25rem;}
+}
 </style>
 </head>
 <body>
