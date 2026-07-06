@@ -521,7 +521,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   </div>
   <!-- Budget variance table -->
   <div style="margin-bottom:1.5rem;">
-    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;">Budget Variance (3-month avg vs budget)</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;">Budget Variance (Prior 3 Month Avg vs Budget) <span id="range-variance" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
     <div class="act-wrap" id="variance-table"></div>
   </div>
   <div style="margin-bottom:1.5rem;">
@@ -533,12 +533,12 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
         <div id="leg-line-1" style="margin-top:.75rem;"></div>
       </div>
       <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">3-month avg</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 3 Month Avg<br><span class="range-3" style="font-size:10px;font-weight:400;color:var(--text3);"></span></div>
         <canvas id="pie-line-3" height="220"></canvas>
         <div id="leg-line-3" style="margin-top:.75rem;"></div>
       </div>
       <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">12-month avg</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 12 Month Avg<br><span class="range-12" style="font-size:10px;font-weight:400;color:var(--text3);"></span></div>
         <canvas id="pie-line-12" height="220"></canvas>
         <div id="leg-line-12" style="margin-top:.75rem;"></div>
       </div>
@@ -553,12 +553,12 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
         <div id="leg-grp-1" style="margin-top:.75rem;"></div>
       </div>
       <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">3-month avg</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 3 Month Avg<br><span class="range-3" style="font-size:10px;font-weight:400;color:var(--text3);"></span></div>
         <canvas id="pie-grp-3" height="220"></canvas>
         <div id="leg-grp-3" style="margin-top:.75rem;"></div>
       </div>
       <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">12-month avg</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 12 Month Avg<br><span class="range-12" style="font-size:10px;font-weight:400;color:var(--text3);"></span></div>
         <canvas id="pie-grp-12" height="220"></canvas>
         <div id="leg-grp-12" style="margin-top:.75rem;"></div>
       </div>
@@ -731,6 +731,15 @@ var PS="2026-07";
 function ymx(ym){if(!ym||ym.length<7)return null;var p=ym.split('-');return parseInt(p[0])*12+parseInt(p[1])-1;}
 function xym(x){var y=Math.floor(x/12),m=(x%12)+1;return y+'-'+(m<10?'0':'')+m;}
 function ymlb(ym){var p=ym.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(p[1])-1]+' '+p[0];}
+// monthRangeLabel: compact "Apr–Jun 2026" (or "Jul 2025 – Jun 2026" if it spans years) for a list of "YYYY-MM" strings.
+function monthRangeLabel(months){
+  if(!months||!months.length)return'';
+  var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var fp=months[0].split('-'), lp=months[months.length-1].split('-');
+  var fLbl=MN[parseInt(fp[1])-1], lLbl=MN[parseInt(lp[1])-1];
+  if(fp[0]===lp[0])return fLbl+'–'+lLbl+' '+lp[0];
+  return fLbl+' '+fp[0]+' – '+lLbl+' '+lp[0];
+}
 function fmtC(n){return'$'+Math.abs(n).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtR(n){return'$'+Math.round(n).toLocaleString('en-CA');}
 function todayYM(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1);}
@@ -2073,6 +2082,8 @@ function renderVarianceTable(){
   var todym=todayYM(),todIdx=ymx(todym);
   // Prior 3 full months, excluding the current (partial-data) month
   var months3=[xym(todIdx-3),xym(todIdx-2),xym(todIdx-1)];
+  var rangeEl=document.getElementById('range-variance');
+  if(rangeEl)rangeEl.textContent='('+monthRangeLabel(months3)+')';
   var groups=['Household (Fixed)','Household (Variable)','Bryan','Ashley','Kids'];
   // Header row
   var colStyle='flex:0 0 90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 8px;';
@@ -2248,6 +2259,8 @@ function renderDashboard(){
   var months3=[xym(todIdx-3),xym(todIdx-2),xym(todIdx-1)];
   var months12=[];
   for(var i=12;i>=1;i--)months12.push(xym(todIdx-i));
+  document.querySelectorAll('.range-3').forEach(function(el){el.textContent=monthRangeLabel(months3);});
+  document.querySelectorAll('.range-12').forEach(function(el){el.textContent=monthRangeLabel(months12);});
 
   var lc=lineColours();
   var lineIds=LINES.map(function(l){return l.id;});
