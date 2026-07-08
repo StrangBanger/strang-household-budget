@@ -2258,6 +2258,9 @@ function delSnapshot(ym){
   scheduleCloudSave();
 }
 var CH_BALANCE=null;
+var CH_SPEND=null;
+var CH_CUM=null;
+var ACTIVE_RANGE="ytd"; // projection range: "ytd" or a year string; default YTD
 function renderSnapshots(allMonths){
   var el=document.getElementById('bal-history');if(!el)return;
   var keys=Object.keys(BAL_SNAPSHOTS).sort();
