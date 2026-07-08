@@ -425,7 +425,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   <button class="tab" id="t-budget" onclick="showTab('budget')">Budget</button>
   <button class="tab" id="t-income" onclick="showTab('income')">Income</button>
   <button class="tab" id="t-table" onclick="showTab('table')">Month detail</button>
-  <button class="tab" id="t-proj" onclick="showTab('proj')">Projection</button>
+  <button class="tab" id="t-proj" onclick="showTab('proj')">Monthly Summary</button>
   <button class="tab" id="t-dash" onclick="showTab('dash')">Dashboard</button>
 </div>
 
@@ -1909,10 +1909,10 @@ function renderTable(months){
       actNetCell='<span style="color:var(--text3)">\u2014</span>';
     } else if(isCurrent){
       netForCum=m.net;
-      // Current partial month — grey italic "in progress" for both spend and net (avoids mid-month skew)
-      actSpendCell=hasAct?'<span style="color:var(--text3);font-style:italic;">'+fmtR(act.total)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
+      // Current partial month — accent blue italic (matches "now" label), signals live/in-progress
+      actSpendCell=hasAct?'<span style="color:var(--accent);font-style:italic;">'+fmtR(act.total)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
       var actN=m.inc-act.total;
-      actNetCell=hasAct?'<span style="color:var(--text3);font-style:italic;">'+(actN>=0?'+':'')+fmtR(actN)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
+      actNetCell=hasAct?'<span style="color:var(--accent);font-style:italic;">'+(actN>=0?'+':'')+fmtR(actN)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
     } else {
       var actualSpend=hasAct?act.total:m.spend;
       netForCum=m.inc-actualSpend;
@@ -1947,13 +1947,13 @@ function renderTable(months){
   if(lastYr!==null&&yrData[lastYr])rows+=avgRow(lastYr);
   document.getElementById('mtbl').innerHTML=
     '<thead><tr>'
-    +'<th style="text-align:left;vertical-align:top;">Month<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">calendar month</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Income<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">proj. take-home + CCB + one-time</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Proj spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">sum of budgeted lines</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Proj net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">income − proj spend</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Actual spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">logged transactions</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Actual net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">income − actual spend</div></th>'
-    +'<th style="text-align:right;vertical-align:top;">Bank balance<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">recorded, or projected from last actual</div></th>'
+    +'<th style="text-align:left;vertical-align:top;">Month<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;">calendar month</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Income<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">proj. take-home + CCB + one-time</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Proj spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">sum of budgeted lines</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Proj net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">income − proj spend</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Actual spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">logged transactions</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Actual net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">income − actual spend</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Bank balance<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.25;white-space:normal;max-width:90px;margin-left:auto;">recorded, or projected from last actual</div></th>'
     +'</tr></thead><tbody>'+rows+'</tbody>';
 }
 
