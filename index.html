@@ -1909,9 +1909,10 @@ function renderTable(months){
       actNetCell='<span style="color:var(--text3)">\u2014</span>';
     } else if(isCurrent){
       netForCum=m.net;
-      actSpendCell=hasAct?fmtR(act.total):'<span style="color:var(--text3)">\u2014</span>';
+      // Current partial month — grey italic "in progress" for both spend and net (avoids mid-month skew)
+      actSpendCell=hasAct?'<span style="color:var(--text3);font-style:italic;">'+fmtR(act.total)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
       var actN=m.inc-act.total;
-      actNetCell=hasAct?'<span class="'+(actN>=0?'pos':'neg')+'">'+(actN>=0?'+':'')+fmtR(actN)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
+      actNetCell=hasAct?'<span style="color:var(--text3);font-style:italic;">'+(actN>=0?'+':'')+fmtR(actN)+'</span>':'<span style="color:var(--text3)">\u2014</span>';
     } else {
       var actualSpend=hasAct?act.total:m.spend;
       netForCum=m.inc-actualSpend;
@@ -1945,10 +1946,15 @@ function renderTable(months){
   });
   if(lastYr!==null&&yrData[lastYr])rows+=avgRow(lastYr);
   document.getElementById('mtbl').innerHTML=
-    '<thead><tr><th>Month</th><th>Income</th>'
-    +'<th>Proj spend</th><th>Proj net</th>'
-    +'<th>Actual spend</th><th>Actual net</th>'
-    +'<th>Bank balance</th></tr></thead><tbody>'+rows+'</tbody>';
+    '<thead><tr>'
+    +'<th style="text-align:left;vertical-align:top;">Month<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">calendar month</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Income<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">proj. take-home + CCB + one-time</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Proj spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">sum of budgeted lines</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Proj net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">income − proj spend</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Actual spend<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">logged transactions</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Actual net<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">income − actual spend</div></th>'
+    +'<th style="text-align:right;vertical-align:top;">Bank balance<div style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-top:2px;line-height:1.2;">recorded, or projected from last actual</div></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody>';
 }
 
 function renderOutliers(){
@@ -2319,6 +2325,11 @@ function renderYearEnd(allMonths){
   var bestNet=fullInc-(ytdActSpend+rs),maxA=0;
   yrMonths.forEach(function(m){var a=getActualsForMonth(m.ym).total;if(a>maxA)maxA=a;});
   var worstNet=fullInc-(ytdActSpend+(maxA*rm));
+  // Likely case: average of last 3 COMPLETED months (excluding current partial month)
+  var completed=yrMonths.filter(function(m){return m.ym<todym&&getActualsForMonth(m.ym).total>0;});
+  var last3=completed.slice(-3);
+  var avg3=last3.length>0?last3.reduce(function(s,m){return s+getActualsForMonth(m.ym).total;},0)/last3.length:0;
+  var likelyNet=fullInc-(ytdActSpend+(avg3*rm));
   el.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:.875rem;">'+rm+' months remaining in '+yr+'</div>'
     +'<div class="ye-row"><span class="ye-lbl">Full year income</span><span class="ye-val">'+fmtR(fullInc)+'</span></div>'
     +'<div class="ye-row"><span class="ye-lbl">Actual spend to date</span><span class="ye-val">'+fmtR(ytdActSpend)+'</span></div>'
@@ -2329,8 +2340,9 @@ function renderYearEnd(allMonths){
       +'<div style="font-size:24px;font-weight:700;letter-spacing:-.02em;" class="'+nc+'">'+(fullNet>=0?'+':'')+fmtR(fullNet)+'</div>'
       +'<div style="font-size:12px;margin-top:4px;" class="'+dc+'">'+( delta>=0?'↑ '+fmtR(delta)+' ahead of budget':'↓ '+fmtR(Math.abs(delta))+' behind budget')+'</div>'
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--radius);">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--radius);">'
       +'<div><div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin-bottom:2px;">Best case</div><div style="font-size:15px;font-weight:600;" class="'+(bestNet>=0?'pos':'neg')+'">'+(bestNet>=0?'+':'')+fmtR(bestNet)+'</div><div style="font-size:10px;color:var(--text3);">If rest hits budget</div></div>'
+      +'<div style="padding:0 10px;border-left:1px solid var(--border);border-right:1px solid var(--border);"><div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:2px;">Likely case</div><div style="font-size:15px;font-weight:700;" class="'+(likelyNet>=0?'pos':'neg')+'">'+(likelyNet>=0?'+':'')+fmtR(likelyNet)+'</div><div style="font-size:10px;color:var(--text3);">If last 3-month pace continues</div></div>'
       +'<div><div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;margin-bottom:2px;">Worst case</div><div style="font-size:15px;font-weight:600;" class="'+(worstNet>=0?'pos':'neg')+'">'+(worstNet>=0?'+':'')+fmtR(worstNet)+'</div><div style="font-size:10px;color:var(--text3);">If rest repeats worst month</div></div>'
     +'</div>';
 }
