@@ -177,6 +177,8 @@ button.add-btn:hover{opacity:.88;}
 .entry-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem;}
 .entry-grid{display:grid;grid-template-columns:1fr 160px 130px auto;gap:10px;align-items:end;}
 .act-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.25rem;}
+.act-wrap-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.act-wrap-scroll table.at{min-width:520px;}
 table.at{width:100%;border-collapse:collapse;font-size:13px;}
 table.at th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
 table.at th.r{text-align:right;}
@@ -232,6 +234,10 @@ table.mt tr.yr-sep td{background:var(--surface2);font-size:11px;font-weight:700;
 button.range-btn{font-size:12px;padding:4px 12px;border:1px solid var(--border-strong);border-radius:20px;background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;}
 button.range-btn:hover{background:var(--surface2);}
 button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.detail-toggle-wrap{display:inline-flex;border:1px solid var(--border-strong);border-radius:20px;overflow:hidden;background:var(--surface2);}
+.detail-toggle-btn{font-size:12px;padding:5px 16px;border:none;background:transparent;color:var(--text2);cursor:pointer;white-space:nowrap;}
+.detail-toggle-btn:hover{color:var(--text);}
+.detail-toggle-btn.on{background:var(--accent);color:#fff;border-radius:20px;}
 /* Dashboard legend */
 /* Balance snapshot history */
 .snap-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
@@ -456,36 +462,33 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
     </div>
     <div id="bal-hint" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
   </div>
-  <!-- Grouped entry zone: Budget → OTI → Balance -->
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.25rem;overflow:hidden;">
-    <!-- Log expense -->
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;">Log expense</div>
-      <div class="entry-grid">
-        <div class="field"><label>Budget line</label><select id="tx-cat" onchange=""><optgroup label="Household (Fixed)"><option value="1">House Mortgage</option><option value="3">Property Taxes (Jan-Oct)</option><option value="4">Life Insurance (Bryan &amp; Ashley)</option><option value="5">Home &amp; Auto Ins (Aug Rewl)</option><option value="6">Home Internet</option><option value="7">Cell Phones</option></optgroup><optgroup label="Household (Variable)"><option value="13">Amazon / Online Shopping</option><option value="12">Grocery</option><option value="11">Gas</option><option value="9">London Hydro</option><option value="10">Enbridge Gas</option><option value="14">Restaurants</option><option value="34">Automotive &amp; Parking</option><option value="15">Household &amp; Home Improvement</option><option value="16">Clothing &amp; Personal</option><option value="17">Alcohol &amp; Entertainment</option><option value="18">Medical &amp; Dental</option><option value="19">Miscellaneous &amp; Gifts</option><option value="20">Travel / Vacations</option><option value="33">Streaming Service</option></optgroup><optgroup label="Bryan"><option value="31">Personal</option><option value="22">Apple iCloud / G-Drive</option><option value="23">Software / AI / Website</option><option value="21">Retirement Saving (TFSA)</option></optgroup><optgroup label="Ashley"><option value="32">Personal</option><option value="25">Gym Membership</option><option value="24">Retirement Saving (TFSA)</option></optgroup><optgroup label="Kids"><option value="26">Daycare</option><option value="28">Before/After School Program</option><option value="27">Regan RESP</option><option value="29">Harrison RESP</option><option value="30">Kids Budget</option></optgroup></select></div>
-        <div class="field"><label>Source</label><select id="tx-src">
-          <option value="" selected="">— Select source —</option>
-          <option value="costco">Costco Credit</option>
-          <option value="wealthsimple">Wealthsimple Credit</option>
-          <option value="td">TD Credit</option>
-          <option value="bank">Bank</option>
-        </select></div>
-        <div class="field"><label>Amount ($)</label><input type="number" id="tx-amt" min="0" step="0.01" placeholder="0.00" onkeydown="if(event.key==='Enter')addTx()"></div>
-        <button class="add-btn" onclick="addTx()">+ Add</button>
-      </div>
-    </div>
-    <!-- One-time income -->
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;">One-time income — this month</div>
-      <div class="oti-entry" style="grid-template-columns:1fr 140px auto;">
-        <div class="field"><label>Description</label><input type="text" id="track-oti-desc" placeholder="e.g. Tax refund, Gift"></div>
-        <div class="field"><label>Amount ($)</label><input type="number" id="track-oti-amt" min="0" step="0.01" placeholder="0.00" onkeydown="if(event.key==='Enter')addOTITrack()"></div>
-        <button class="add-btn" onclick="addOTITrack()" style="align-self:end;">+ Add</button>
-      </div>
-      <div class="oti-list" id="track-oti-list"><div class="empty-tx">No one-time income logged yet.</div></div>
+    <!-- Card 1: Log expense -->
+  <div class="entry-box" style="margin-bottom:.75rem;">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;">Log expense</div>
+    <div class="entry-grid">
+      <div class="field"><label>Budget line</label><select id="tx-cat" onchange=""><optgroup label="Household (Fixed)"><option value="1">House Mortgage</option><option value="3">Property Taxes (Jan-Oct)</option><option value="4">Life Insurance (Bryan &amp; Ashley)</option><option value="5">Home &amp; Auto Ins (Aug Rewl)</option><option value="6">Home Internet</option><option value="7">Cell Phones</option></optgroup><optgroup label="Household (Variable)"><option value="13">Amazon / Online Shopping</option><option value="12">Grocery</option><option value="11">Gas</option><option value="9">London Hydro</option><option value="10">Enbridge Gas</option><option value="14">Restaurants</option><option value="34">Automotive &amp; Parking</option><option value="15">Household &amp; Home Improvement</option><option value="16">Clothing &amp; Personal</option><option value="17">Alcohol &amp; Entertainment</option><option value="18">Medical &amp; Dental</option><option value="19">Miscellaneous &amp; Gifts</option><option value="20">Travel / Vacations</option><option value="33">Streaming Service</option></optgroup><optgroup label="Bryan"><option value="31">Personal</option><option value="22">Apple iCloud / G-Drive</option><option value="23">Software / AI / Website</option><option value="21">Retirement Saving (TFSA)</option></optgroup><optgroup label="Ashley"><option value="32">Personal</option><option value="25">Gym Membership</option><option value="24">Retirement Saving (TFSA)</option></optgroup><optgroup label="Kids"><option value="26">Daycare</option><option value="28">Before/After School Program</option><option value="27">Regan RESP</option><option value="29">Harrison RESP</option><option value="30">Kids Budget</option></optgroup></select></div>
+      <div class="field"><label>Source</label><select id="tx-src">
+        <option value="" selected="">— Select source —</option>
+        <option value="costco">Costco Credit</option>
+        <option value="wealthsimple">Wealthsimple Credit</option>
+        <option value="td">TD Credit</option>
+        <option value="bank">Bank</option>
+      </select></div>
+      <div class="field"><label>Amount ($)</label><input type="number" id="tx-amt" min="0" step="0.01" placeholder="0.00" onkeydown="if(event.key==='Enter')addTx()"></div>
+      <button class="add-btn" onclick="addTx()">+ Add</button>
     </div>
   </div>
-  <div class="act-wrap"><table class="at" id="act-tbl"><thead><tr><th>Line item</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Remaining</th></tr></thead><tbody><tr class="ag"><td colspan="4">Household (Fixed)</td></tr><tr><td>House Mortgage</td><td class="amt-r">$2,441.50</td><td class="amt-r">$563.38</td><td class="amt-r"><span class="delta ok">$1,878.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:23%"></div></div></td></tr><tr><td>Property Taxes (Jan-Oct)</td><td class="amt-r">$580.64</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$580.64 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Life Insurance (Bryan &amp; Ashley)</td><td class="amt-r">$99.98</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$99.98 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Home &amp; Auto Ins (Aug Rewl)</td><td class="amt-r">$339.26</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$339.26 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Home Internet</td><td class="amt-r">$67.80</td><td class="amt-r">$67.80</td><td class="amt-r"><span class="delta ok">$0.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:100%"></div></div></td></tr><tr><td>Cell Phones</td><td class="amt-r">$140.12</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$140.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr class="ag"><td colspan="4">Household (Variable)</td></tr><tr><td>Amazon / Online Shopping</td><td class="amt-r">$650.00</td><td class="amt-r">$151.40</td><td class="amt-r"><span class="delta ok">$498.60 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:23%"></div></div></td></tr><tr><td>Grocery</td><td class="amt-r">$1,500.00</td><td class="amt-r">$249.61</td><td class="amt-r"><span class="delta ok">$1,250.39 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:17%"></div></div></td></tr><tr><td>Gas</td><td class="amt-r">$400.00</td><td class="amt-r">$168.09</td><td class="amt-r"><span class="delta ok">$231.91 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:42%"></div></div></td></tr><tr><td>London Hydro</td><td class="amt-r">$203.93</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$203.93 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Enbridge Gas</td><td class="amt-r">$106.35</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$106.35 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Restaurants</td><td class="amt-r">$200.00</td><td class="amt-r">$7.08</td><td class="amt-r"><span class="delta ok">$192.92 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:4%"></div></div></td></tr><tr><td>Automotive &amp; Parking</td><td class="amt-r">$100.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$100.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Household &amp; Home Improvement</td><td class="amt-r">$500.00</td><td class="amt-r">$70.06</td><td class="amt-r"><span class="delta ok">$429.94 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:14%"></div></div></td></tr><tr><td>Clothing &amp; Personal</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Alcohol &amp; Entertainment</td><td class="amt-r">$100.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$100.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Medical &amp; Dental</td><td class="amt-r">$150.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$150.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Miscellaneous &amp; Gifts</td><td class="amt-r">$75.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$75.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Travel / Vacations</td><td class="amt-r">$300.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$300.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Streaming Service</td><td class="amt-r">$83.03</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$83.03 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr class="ag"><td colspan="4">Bryan</td></tr><tr><td>Personal</td><td class="amt-r">$300.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$300.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Apple iCloud / G-Drive</td><td class="amt-r">$14.63</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$14.63 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Software / AI / Website</td><td class="amt-r">$54.81</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$54.81 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Retirement Saving (TFSA)</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr class="ag"><td colspan="4">Ashley</td></tr><tr><td>Personal</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Gym Membership</td><td class="amt-r">$67.17</td><td class="amt-r">$67.17</td><td class="amt-r"><span class="delta ok">$0.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:100%"></div></div></td></tr><tr><td>Retirement Saving (TFSA)</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr class="ag"><td colspan="4">Kids</td></tr><tr><td>Daycare</td><td class="amt-r">$946.00</td><td class="amt-r">$473.00</td><td class="amt-r"><span class="delta ok">$473.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:50%"></div></div></td></tr><tr><td>Before/After School Program</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Regan RESP</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Harrison RESP</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Kids Budget</td><td class="amt-r">$300.00</td><td class="amt-r">$14.88</td><td class="amt-r"><span class="delta ok">$285.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:5%"></div></div></td></tr><tr class="at-tot"><td>Total</td><td class="amt-r">$9,720.22</td><td class="amt-r">$1,832.47</td><td class="amt-r"><span class="delta ok">$7,887.75 left</span></td></tr></tbody></table></div>
+
+  <!-- Card 2: One-time income (input only — history appears in activity section below) -->
+  <div class="entry-box" style="margin-bottom:.75rem;">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;">One-time income</div>
+    <div style="display:grid;grid-template-columns:1fr 140px auto;gap:10px;align-items:end;">
+      <div class="field"><label>Description</label><input type="text" id="track-oti-desc" placeholder="e.g. Tax refund, Gift"></div>
+      <div class="field"><label>Amount ($)</label><input type="number" id="track-oti-amt" min="0" step="0.01" placeholder="0.00" onkeydown="if(event.key==='Enter')addOTITrack()"></div>
+      <button class="add-btn" onclick="addOTITrack()">+ Add</button>
+    </div>
+  </div>
+  <div class="act-wrap act-wrap-scroll"><table class="at" id="act-tbl"><thead><tr><th>Line item</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Remaining</th></tr></thead><tbody><tr class="ag"><td colspan="4">Household (Fixed)</td></tr><tr><td>House Mortgage</td><td class="amt-r">$2,441.50</td><td class="amt-r">$563.38</td><td class="amt-r"><span class="delta ok">$1,878.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:23%"></div></div></td></tr><tr><td>Property Taxes (Jan-Oct)</td><td class="amt-r">$580.64</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$580.64 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Life Insurance (Bryan &amp; Ashley)</td><td class="amt-r">$99.98</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$99.98 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Home &amp; Auto Ins (Aug Rewl)</td><td class="amt-r">$339.26</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$339.26 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Home Internet</td><td class="amt-r">$67.80</td><td class="amt-r">$67.80</td><td class="amt-r"><span class="delta ok">$0.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:100%"></div></div></td></tr><tr><td>Cell Phones</td><td class="amt-r">$140.12</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$140.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr class="ag"><td colspan="4">Household (Variable)</td></tr><tr><td>Amazon / Online Shopping</td><td class="amt-r">$650.00</td><td class="amt-r">$151.40</td><td class="amt-r"><span class="delta ok">$498.60 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:23%"></div></div></td></tr><tr><td>Grocery</td><td class="amt-r">$1,500.00</td><td class="amt-r">$249.61</td><td class="amt-r"><span class="delta ok">$1,250.39 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:17%"></div></div></td></tr><tr><td>Gas</td><td class="amt-r">$400.00</td><td class="amt-r">$168.09</td><td class="amt-r"><span class="delta ok">$231.91 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:42%"></div></div></td></tr><tr><td>London Hydro</td><td class="amt-r">$203.93</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$203.93 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Enbridge Gas</td><td class="amt-r">$106.35</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$106.35 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Restaurants</td><td class="amt-r">$200.00</td><td class="amt-r">$7.08</td><td class="amt-r"><span class="delta ok">$192.92 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:4%"></div></div></td></tr><tr><td>Automotive &amp; Parking</td><td class="amt-r">$100.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$100.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Household &amp; Home Improvement</td><td class="amt-r">$500.00</td><td class="amt-r">$70.06</td><td class="amt-r"><span class="delta ok">$429.94 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:14%"></div></div></td></tr><tr><td>Clothing &amp; Personal</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Alcohol &amp; Entertainment</td><td class="amt-r">$100.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$100.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Medical &amp; Dental</td><td class="amt-r">$150.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$150.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Miscellaneous &amp; Gifts</td><td class="amt-r">$75.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$75.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Travel / Vacations</td><td class="amt-r">$300.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$300.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Streaming Service</td><td class="amt-r">$83.03</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$83.03 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr class="ag"><td colspan="4">Bryan</td></tr><tr><td>Personal</td><td class="amt-r">$300.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$300.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Apple iCloud / G-Drive</td><td class="amt-r">$14.63</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$14.63 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Software / AI / Website</td><td class="amt-r">$54.81</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span class="delta ok">$54.81 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:0%"></div></div></td></tr><tr><td>Retirement Saving (TFSA)</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr class="ag"><td colspan="4">Ashley</td></tr><tr><td>Personal</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Gym Membership</td><td class="amt-r">$67.17</td><td class="amt-r">$67.17</td><td class="amt-r"><span class="delta ok">$0.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:100%"></div></div></td></tr><tr><td>Retirement Saving (TFSA)</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr class="ag"><td colspan="4">Kids</td></tr><tr><td>Daycare</td><td class="amt-r">$946.00</td><td class="amt-r">$473.00</td><td class="amt-r"><span class="delta ok">$473.00 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:50%"></div></div></td></tr><tr><td>Before/After School Program</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Regan RESP</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Harrison RESP</td><td class="amt-r">$0.00</td><td class="amt-r"><span style="color:var(--text3);">—</span></td><td class="amt-r"><span style="color:var(--text3);">—</span></td></tr><tr><td>Kids Budget</td><td class="amt-r">$300.00</td><td class="amt-r">$14.88</td><td class="amt-r"><span class="delta ok">$285.12 left</span><div class="bar-wrap"><div class="bar-fill ok" style="width:5%"></div></div></td></tr><tr class="at-tot"><td>Total</td><td class="amt-r">$9,720.22</td><td class="amt-r">$1,832.47</td><td class="amt-r"><span class="delta ok">$7,887.75 left</span></td></tr></tbody></table></div>
   <div class="tx-box">
     <div class="tx-hdr">
       <span>Transactions this month</span>
@@ -538,12 +541,8 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem;">
     <div class="chart-box" style="margin-bottom:0;">
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;">Monthly Balance Snapshot</div>
-      <div style="display:flex;gap:8px;align-items:end;margin-bottom:1rem;">
-        <div class="field" style="flex:0 0 120px;"><label>Month</label><input type="month" id="bal-month"></div>
-        <div class="field" style="flex:1;"><label>Balance ($)</label><input type="number" id="bal-amt" min="0" step="100" placeholder="0.00" onkeydown="if(event.key==='Enter')addSnapshot()"></div>
-        <button class="add-btn" onclick="addSnapshot()">+ Record</button>
-      </div>
-      <div id="bal-history"><div style="font-size:12px;color:var(--text3);padding:8px 0;">No balances recorded yet.</div></div>
+            <canvas id="ch-balance" height="80" style="margin-bottom:.75rem;display:none;"></canvas>
+      <div id="bal-history"></div>tyle="font-size:12px;color:var(--text3);padding:8px 0;">No balances recorded yet.</div></div>
     </div>
     <div class="chart-box" style="margin-bottom:0;">
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;">Year-End Projection</div>
@@ -557,12 +556,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   </div>
   <div style="margin-bottom:1.5rem;">
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;">Spend by line item</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-      <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">This month</div>
-        <canvas id="pie-line-1" height="601" style="box-sizing: border-box; display: block; height: 300px; width: 300px;" width="601"></canvas>
-        <div id="leg-line-1" style="margin-top:.75rem;"><div class="pie-legend"><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#1e3a5f"></div><span class="pie-leg-name">House Mortgage</span><span class="pie-leg-vals">$563 &nbsp;34.0%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#713f12"></div><span class="pie-leg-name">Daycare</span><span class="pie-leg-vals">$473 &nbsp;28.5%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#2563eb"></div><span class="pie-leg-name">Grocery</span><span class="pie-leg-vals">$211 &nbsp;12.7%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#1d4ed8"></div><span class="pie-leg-name">Amazon / Online Shopping</span><span class="pie-leg-vals">$111 &nbsp;6.7%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#3b82f6"></div><span class="pie-leg-name">Gas</span><span class="pie-leg-vals">$87 &nbsp;5.2%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#e0f2fe"></div><span class="pie-leg-name">Household &amp; Home Improvement</span><span class="pie-leg-vals">$70 &nbsp;4.2%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#7ab3e8"></div><span class="pie-leg-name">Home Internet</span><span class="pie-leg-vals">$68 &nbsp;4.1%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#7e22ce"></div><span class="pie-leg-name">Gym Membership</span><span class="pie-leg-vals">$67 &nbsp;4.1%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#bfdbfe"></div><span class="pie-leg-name">Restaurants</span><span class="pie-leg-vals">$7 &nbsp;0.4%</span></div></div></div>
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
       <div class="chart-box" style="margin-bottom:0;">
         <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 3 Month Avg<br><span class="range-3" style="font-size:10px;font-weight:400;color:var(--text3);">Apr–Jun 2026</span></div>
         <canvas id="pie-line-3" height="601" style="box-sizing: border-box; display: block; height: 300px; width: 300px;" width="601"></canvas>
@@ -577,12 +571,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   </div>
   <div>
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;">Spend by group</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-      <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">This month</div>
-        <canvas id="pie-grp-1" height="601" style="box-sizing: border-box; display: block; height: 300px; width: 300px;" width="601"></canvas>
-        <div id="leg-grp-1" style="margin-top:.75rem;"><div class="pie-legend"><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#185FA5"></div><span class="pie-leg-name">Household (Fixed)</span><span class="pie-leg-vals">$631 &nbsp;38.1%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#60A5FA"></div><span class="pie-leg-name">Household (Variable)</span><span class="pie-leg-vals">$486 &nbsp;29.3%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#EAB308"></div><span class="pie-leg-name">Kids</span><span class="pie-leg-vals">$473 &nbsp;28.5%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#9333EA"></div><span class="pie-leg-name">Ashley</span><span class="pie-leg-vals">$67 &nbsp;4.1%</span></div></div></div>
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
       <div class="chart-box" style="margin-bottom:0;">
         <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 3 Month Avg<br><span class="range-3" style="font-size:10px;font-weight:400;color:var(--text3);">Apr–Jun 2026</span></div>
         <canvas id="pie-grp-3" height="601" style="box-sizing: border-box; display: block; height: 300px; width: 300px;" width="601"></canvas>
@@ -601,8 +590,10 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 <div class="panel" id="tab-table">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
     <span style="font-size:13px;font-weight:500;color:var(--text2);flex:1;">Month detail</span>
-    <button class="detail-toggle-btn on" id="btn-month-view" onclick="setDetailView('months')">By month</button>
-    <button class="detail-toggle-btn" id="btn-outlier-view" onclick="setDetailView('outliers')">Outliers</button>
+    <div class="detail-toggle-wrap">
+      <button class="detail-toggle-btn on" id="btn-month-view" onclick="setDetailView('months')">By month</button>
+      <button class="detail-toggle-btn" id="btn-outlier-view" onclick="setDetailView('outliers')">Outliers</button>
+    </div>
   </div>
   <div id="detail-months-view">
     <div class="mo-wrap"><table class="mt" id="mtbl"></table></div>
@@ -625,7 +616,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
       <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.78);"></div>Bryan</div>
       <div class="leg-item"><div class="leg-dot" style="background:rgba(147,51,234,0.72);"></div>Ashley</div>
       <div class="leg-item"><div class="leg-dot" style="background:rgba(234,179,8,0.78);"></div>Kids</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(163,45,45,0.75);"></div>Over budget</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(80,80,80,0.4);border:1px dashed #888;"></div>Budget ceiling</div>
     </div>
     <canvas id="ch-spend" height="1357" style="display: block; box-sizing: border-box; height: 678px; width: 1018px;" width="2036"></canvas>
   </div>
@@ -1209,7 +1200,6 @@ async function initAppAfterAuth(){
   showAppScreen();
   currentYM=todayYM();
   document.getElementById('oti-month').value=currentYM;
-  document.getElementById('bal-month').value=currentYM;
   populateCatDropdown();
   renderBudget();
   renderIncome();
@@ -1739,7 +1729,6 @@ function renderTrack(){
       statusLbl.style.color='var(--text3)';
     }
   }
-  renderOTITrackList();
   renderBalWidget();
   var act=getActualsForMonth(currentYM);
   var projSpend=LINES.reduce(function(s,l){return s+getMonthAmount(l,currentYM);},0);
@@ -1778,10 +1767,12 @@ function renderTrack(){
   h+='</tbody>';
   document.getElementById('act-tbl').innerHTML=h;
   var mTx=TXNS.filter(function(t){return t.ym===currentYM;});
-  document.getElementById('tx-count').textContent=mTx.length+' transaction'+(mTx.length!==1?'s':'');
+  var mOTI=OTI.filter(function(o){return o.ym===currentYM;});
+  var txCount=mTx.length+mOTI.length;
+  document.getElementById('tx-count').textContent=txCount+' transaction'+(txCount!==1?'s':'');
 
-  // Render 4 source cards
-  if(!mTx.length){
+  // Render source cards + OTI as 5th card
+  if(!mTx.length&&!mOTI.length){
     document.getElementById('tx-list').innerHTML='<div class="empty-tx">No transactions logged for '+ymlb(currentYM)+' yet.</div>';
   } else {
     var srcHtml='<div class="src-cards">';
@@ -1805,10 +1796,28 @@ function renderTrack(){
       });
       srcHtml+='</div>';
     });
+    // 5th card: One-time income (only when entries exist this month)
+    if(mOTI.length){
+      var otiTotal=mOTI.reduce(function(s,o){return s+o.amount;},0);
+      srcHtml+='<div class="src-card">'
+        +'<div class="src-card-hdr">'
+          +'<span class="src-card-name" style="color:var(--green);">One-time income</span>'
+          +'<span class="src-card-total" style="color:var(--green);">+'+fmtC(otiTotal)+'</span>'
+        +'</div>';
+      mOTI.slice().reverse().forEach(function(o){
+        srcHtml+='<div class="tx-row" id="oti-row-'+o.id+'">'
+          +'<span class="tx-cat">'+o.description+'</span>'
+          +'<span class="tx-amt" style="color:var(--green);">+'+fmtC(o.amount)+'</span>'
+          +'<button class="del-tx" onclick="delOTI('+o.id+')" title="Delete">×</button>'
+          +'</div>';
+      });
+      srcHtml+='</div>';
+    }
     srcHtml+='</div>';
     document.getElementById('tx-list').innerHTML=srcHtml;
   }
 }
+
 
 // ── MONTH DETAIL TABLE ───────────────────────────────────────
 var DETAIL_VIEW='months';
@@ -1843,10 +1852,11 @@ function rowGradientBg(actual,budget){
 function renderTable(months){
   var seed=typeof getEffectiveSeed==='function'?getEffectiveSeed(months[0]?months[0].ym:'2026-01'):(parseFloat(document.getElementById('seed').value)||0);
   var todym=todayYM(),rows='',lastYr=null,cum=seed;
-  var curYr=parseInt(todym.split('-')[0]);
+  var curYr=parseInt(todym.split('-')[0]),yrData={};
   months.forEach(function(m){
     if(m.year!==lastYr){
       lastYr=m.year;
+      if(lastYr!==null&&yrData[lastYr]){var yd=yrData[lastYr],n=yd.count||1;rows+='<tr class="yr-rows-'+lastYr+'" style="'+(YR_EXPANDED[lastYr]?'':'display:none;')+'background:var(--surface2);font-style:italic;border-top:1px solid var(--border-strong);"><td style="padding:5px 14px;font-size:11px;font-weight:600;color:var(--text3);">'+lastYr+'avg/mo</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.inc/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.proj/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.net/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.act/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.actNet/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.lastCum)+'</td></tr>';}
       if(YR_EXPANDED[m.year]===undefined)YR_EXPANDED[m.year]=(m.year===curYr);
       var isExp=YR_EXPANDED[m.year];
       rows+='<tr class="yr-toggle-row" onclick="toggleYear('+m.year+')" style="background:var(--surface2);">'
@@ -1874,6 +1884,10 @@ function renderTable(months){
       actNetCell='<span class="'+(netForCum>=0?'pos':'neg')+'">'+(netForCum>=0?'+':'')+fmtR(netForCum)+'</span>';
     }
     cum+=netForCum;
+    if(!yrData[m.year])yrData[m.year]={inc:0,proj:0,net:0,act:0,actNet:0,actCount:0,count:0,lastCum:0};
+    yrData[m.year].inc+=m.inc;yrData[m.year].proj+=m.spend;yrData[m.year].net+=netForCum;
+    yrData[m.year].count++;yrData[m.year].lastCum=cum;
+    if(hasAct){yrData[m.year].act+=act.total;yrData[m.year].actNet+=netForCum;yrData[m.year].actCount++;}
     var nc=m.net>=0?'pos':'neg',cc=cum>=0?'pos':'neg';
     var rowBg=(!isFuture&&hasAct)?rowGradientBg(act.total,m.spend):'';
     var rowStyle=isCurrent?'background:var(--accent-bg);':(isFuture?'opacity:.75;':(rowBg?'background:'+rowBg+';':''));
@@ -1887,19 +1901,20 @@ function renderTable(months){
       +'<td>'+actNetCell+'</td>'
       +'<td class="'+cc+'">'+fmtR(cum)+'</td></tr>';
   });
+  if(lastYr!==null&&yrData[lastYr]){var yd=yrData[lastYr],n=yd.count||1;rows+='<tr class="yr-rows-'+lastYr+'" style="'+(YR_EXPANDED[lastYr]?'':'display:none;')+'background:var(--surface2);font-style:italic;border-top:1px solid var(--border-strong);"><td style="padding:5px 14px;font-size:11px;font-weight:600;color:var(--text3);">'+lastYr+'avg/mo</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.inc/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.proj/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.net/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.act/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.actNet/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.lastCum)+'</td></tr>';}
   document.getElementById('mtbl').innerHTML=
     '<thead><tr><th>Month</th><th>Income</th>'
     +'<th>Proj spend</th><th>Proj net</th>'
     +'<th>Actual spend</th><th>Actual net</th>'
-    +'<th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody>';
+    +'<th>Bank balance</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
 function renderOutliers(){
   var el=document.getElementById('outlier-list');if(!el)return;
   var todym=todayYM();
-  var outliers=[];
   var seed=typeof getEffectiveSeed==='function'?getEffectiveSeed(computePS()):(parseFloat(document.getElementById('seed').value)||0);
   var allMonths=computeProjection(seed);
+  var byCat={};
   allMonths.forEach(function(m){
     if(m.ym>todym)return;
     var act=getActualsForMonth(m.ym);
@@ -1910,45 +1925,59 @@ function renderOutliers(){
       var actual=act.byLine[l.id]||0;
       if(actual<=budget)return;
       var overpct=(actual-budget)/budget*100;
-      outliers.push({ym:m.ym,label:m.label,name:l.name,budget:budget,actual:actual,overpct:overpct,overamt:actual-budget});
+      var overamt=actual-budget;
+      if(!byCat[l.name])byCat[l.name]={totalOverAmt:0,months:[]};
+      byCat[l.name].totalOverAmt+=overamt;
+      byCat[l.name].months.push({ym:m.ym,label:m.label,budget:budget,actual:actual,overpct:overpct,overamt:overamt});
     });
   });
-  if(!outliers.length){
+  var cats=Object.keys(byCat);
+  if(!cats.length){
     el.innerHTML='<div class="empty-tx" style="padding:2rem;">No budget overruns found — great work! 🎉</div>';
     return;
   }
-  outliers.sort(function(a,b){return b.overpct-a.overpct;});
+  cats.sort(function(a,b){return byCat[b].totalOverAmt-byCat[a].totalOverAmt;});
   function sevColour(pct){
     if(pct>=50)return{bg:'rgba(163,45,45,0.15)',c:'var(--red)'};
     if(pct>=25)return{bg:'rgba(163,45,45,0.08)',c:'#C04040'};
     return{bg:'rgba(163,45,45,0.05)',c:'#A05050'};
   }
   var html='<div style="display:flex;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);">'
-    +'<div style="flex:1;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 0;">Category · Month</div>'
+    +'<div style="flex:1;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 0;">Category / Month</div>'
     +'<div style="width:80px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);padding:7px 0;">Budget</div>'
     +'<div style="width:80px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);padding:7px 0;">Actual</div>'
     +'<div style="width:90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);padding:7px 0;">Over</div>'
     +'</div>';
-  outliers.forEach(function(o){
-    var sc=sevColour(o.overpct);
-    html+='<div class="outlier-row">'
-      +'<div style="flex:1;min-width:0;">'
-        +'<span class="outlier-sev" style="background:'+sc.bg+';color:'+sc.c+';">+'+o.overpct.toFixed(0)+'%</span>'
-        +'<span style="font-size:13px;color:var(--text);">'+o.name+'</span>'
-        +'<span style="font-size:11px;color:var(--text3);margin-left:6px;">'+o.label+'</span>'
+  cats.forEach(function(catName){
+    var cat=byCat[catName];
+    cat.months.sort(function(a,b){return a.ym<b.ym?-1:1;});
+    var worstPct=Math.max.apply(null,cat.months.map(function(m){return m.overpct;}));
+    var sc=sevColour(worstPct);
+    html+='<div style="display:flex;align-items:center;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);border-top:2px solid var(--border-strong);">'
+      +'<div style="flex:1;display:flex;align-items:center;gap:8px;">'
+        +'<span class="outlier-sev" style="background:'+sc.bg+';color:'+sc.c+';">'+cat.months.length+'×</span>'
+        +'<span style="font-size:13px;font-weight:600;color:var(--text);">'+catName+'</span>'
+        +'<span style="font-size:11px;color:var(--text3);">'+cat.months.length+' month'+(cat.months.length>1?'s':'')+' over</span>'
       +'</div>'
-      +'<div style="width:80px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--text3);">'+fmtR(o.budget)+'</div>'
-      +'<div style="width:80px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--text);">'+fmtR(o.actual)+'</div>'
-      +'<div style="width:90px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--red);font-weight:500;">+'+fmtR(o.overamt)+'</div>'
+      +'<div style="width:80px;"></div><div style="width:80px;"></div>'
+      +'<div style="width:90px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--red);font-weight:600;">+'+fmtR(cat.totalOverAmt)+'</div>'
       +'</div>';
+    cat.months.forEach(function(mo){
+      var msc=sevColour(mo.overpct);
+      html+='<div class="outlier-row" style="padding-left:32px;">'
+        +'<div style="flex:1;display:flex;align-items:center;gap:6px;">'
+          +'<span class="outlier-sev" style="background:'+msc.bg+';color:'+msc.c+';">+'+mo.overpct.toFixed(0)+'%</span>'
+          +'<span style="font-size:13px;color:var(--text2);">'+mo.label+'</span>'
+        +'</div>'
+        +'<div style="width:80px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--text3);">'+fmtR(mo.budget)+'</div>'
+        +'<div style="width:80px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--text);">'+fmtR(mo.actual)+'</div>'
+        +'<div style="width:90px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--red);font-weight:500;">+'+fmtR(mo.overamt)+'</div>'
+        +'</div>';
+    });
   });
   el.innerHTML=html;
 }
 
-// ── PROJECTION ───────────────────────────────────────────────
-var CH_SPEND=null,CH_CUM=null,ACTIVE_RANGE='ytd';
-
-// buildRangeButtons: generates YTD + one button per calendar year in the projection
 function buildRangeButtons(months){
   var years=[...new Set(months.map(function(m){return m.year;}))].sort();
   var container=document.getElementById('proj-range-btns');
@@ -2029,30 +2058,13 @@ function renderProjection(allMonths){
   var groupActuals={};
   GROUPS_ORDER.forEach(function(g){groupActuals[g]=[];});
 
-  // Per-month totals for label dataset
   var actTotals=[];
   months.forEach(function(m){
     var act=getActualsForMonth(m.ym);
     var hasAct=act.total>0&&m.ym<=todym;
-    var proj=Math.round(m.spend);
-    var total=hasAct?Math.round(act.total):null;
-    projSpend.push(proj);
-    actTotals.push(total);
-
-    // Per-group actual spend, capped at projected for their stack
-    // Overage handled separately as red segment
-    var remaining=total!==null?total:0;
-    GROUPS_ORDER.forEach(function(g){
-      var ls=LINES.filter(function(l){return l.group===g;});
-      var groupAct=ls.reduce(function(s,l){return s+(act.byLine[l.id]||0);},0);
-      // Cap each group at its share — don't exceed total
-      groupActuals[g].push(hasAct?Math.min(Math.round(groupAct),proj):null);
-    });
-  });
-
-  // Red overage: amount by which actual exceeds projected
-  var actOverage=actTotals.map(function(t,i){
-    return t!==null?Math.max(0,t-projSpend[i]):null;
+    projSpend.push(Math.round(m.spend));
+    actTotals.push(hasAct?Math.round(act.total):null);
+    GROUPS_ORDER.forEach(function(g){var ls=LINES.filter(function(l){return l.group===g;});groupActuals[g].push(hasAct?Math.round(ls.reduce(function(s,l){return s+(act.byLine[l.id]||0);},0)):null);});
   });
 
   if(CH_SPEND){CH_SPEND.destroy();CH_SPEND=null;}
@@ -2070,14 +2082,6 @@ function renderProjection(allMonths){
       yAxisID:'y1',order:GROUPS_ORDER.length-i+1,stack:'actual'
     });
   });
-  // Red overage stacks above the coloured actuals
-  datasets.push({
-    type:'bar',label:'Over budget',data:actOverage,
-    backgroundColor:'rgba(163,45,45,0.75)',
-    yAxisID:'y1',order:0,stack:'actual'
-  });
-  // Transparent line at total height — used to show total label above each bar
-  // Points are invisible; only the label is visible via pointStyle and custom afterDraw
   datasets.push({
     type:'line',label:'Total',data:actTotals,
     borderColor:'transparent',backgroundColor:'transparent',
@@ -2112,40 +2116,13 @@ function renderProjection(allMonths){
       }
     },
     plugins:[{
-      id:'totalLabels',
+      id:'spendExtras',
       afterDatasetsDraw:function(chart){
-        var ctx=chart.ctx;
-        var totalDs=chart.data.datasets.findIndex(function(d){return d.label==='Total';});
-        if(totalDs<0)return;
-        var totalData=chart.data.datasets[totalDs].data;
-        // Walk all 'actual' stack datasets to find the highest pixel top for each month
-        // (lowest y value = highest on screen)
-        var actDatasetIndices=[];
-        chart.data.datasets.forEach(function(ds,idx){
-          if(ds.stack==='actual')actDatasetIndices.push(idx);
-        });
-        // Get center X from first actual dataset
-        var firstActMeta=actDatasetIndices.length?chart.getDatasetMeta(actDatasetIndices[0]):null;
-        totalData.forEach(function(val,i){
-          if(val===null||val===0)return;
-          if(!firstActMeta||!firstActMeta.data[i])return;
-          // Find the minimum y pixel across all actual stack segments for this month
-          var minY=Infinity;
-          actDatasetIndices.forEach(function(idx){
-            var meta=chart.getDatasetMeta(idx);
-            var el=meta.data[i];
-            if(el&&el.y!==undefined&&el.y<minY)minY=el.y;
-          });
-          var x=firstActMeta.data[i].x;
-          var y=minY-5; // 5px above the topmost actual segment
-          ctx.save();
-          ctx.font='bold 10px Inter,system-ui,sans-serif';
-          ctx.fillStyle='#1A1916';
-          ctx.textAlign='center';
-          ctx.textBaseline='bottom';
-          ctx.fillText('$'+Math.round(val).toLocaleString('en-CA'),x,y);
-          ctx.restore();
-        });
+        var ctx=chart.ctx,y1=chart.scales['y1'],cw=chart.canvas.offsetWidth||chart.width;
+        var pds=chart.data.datasets.findIndex(function(d){return d.label==='Projected spend';});
+        var tds=chart.data.datasets.findIndex(function(d){return d.label==='Total';});
+        if(cw>600&&pds>=0){var pm=chart.getDatasetMeta(pds);chart.data.datasets[pds].data.forEach(function(v,i){if(!v)return;var el=pm.data[i];if(!el)return;var bw=el.width||30,cx=el.x,py=y1.getPixelForValue(v);ctx.save();ctx.beginPath();ctx.moveTo(cx-bw*.6,py);ctx.lineTo(cx+bw*.6,py);ctx.strokeStyle='rgba(80,80,80,0.55)';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.stroke();ctx.restore();});}
+        if(tds>=0){var td=chart.data.datasets[tds].data;var ai=[];chart.data.datasets.forEach(function(ds,i){if(ds.stack==='actual')ai.push(i);});var fa=ai.length?chart.getDatasetMeta(ai[0]):null;td.forEach(function(v,i){if(v===null||v===0)return;if(!fa||!fa.data[i])return;var my=Infinity;ai.forEach(function(idx){var el=chart.getDatasetMeta(idx).data[i];if(el&&el.y<my)my=el.y;});ctx.save();ctx.font='bold 10px Inter,system-ui,sans-serif';ctx.fillStyle='#1A1916';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('$'+Math.round(v).toLocaleString('en-CA'),fa.data[i].x,my-5);ctx.restore();});}
       }
     }]
   });
@@ -2239,36 +2216,21 @@ function delSnapshot(ym){
   recalc();
   scheduleCloudSave();
 }
+var CH_BALANCE=null;
 function renderSnapshots(allMonths){
   var el=document.getElementById('bal-history');if(!el)return;
-  var keys=Object.keys(BAL_SNAPSHOTS).sort().reverse();
-  if(!keys.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0;">No balances recorded yet.</div>';return;}
+  var keys=Object.keys(BAL_SNAPSHOTS).sort();
   if(!allMonths)allMonths=computeProjection(parseFloat(document.getElementById('seed').value)||0);
+  if(CH_BALANCE){CH_BALANCE.destroy();CH_BALANCE=null;}
+  var bc=document.getElementById('ch-balance');
+  if(bc&&keys.length>=2){bc.style.display='block';CH_BALANCE=new Chart(bc.getContext('2d'),{type:'line',data:{labels:keys.map(function(k){return ymlb(k);}),datasets:[{data:keys.map(function(k){return BAL_SNAPSHOTS[k];}),borderColor:'rgba(24,95,165,0.8)',backgroundColor:'rgba(24,95,165,0.06)',borderWidth:2,pointRadius:3,pointHoverRadius:5,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return'$'+Math.round(ctx.parsed.y).toLocaleString('en-CA');}}}},scales:{x:{ticks:{font:{size:9},color:'#8A8580'},grid:{display:false}},y:{ticks:{font:{size:9},color:'#8A8580',callback:function(v){return'$'+(v/1000).toFixed(0)+'k';}},grid:{color:'rgba(0,0,0,0.04)'}}}}}); } else if(bc)bc.style.display='none';
+  if(!keys.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0;">No balances recorded yet. Set opening balance on Track tab.</div>';return;}
   var html='';
-  keys.forEach(function(ym){
-    var real=BAL_SNAPSHOTS[ym];
-    // Compute drift: what did the model predict at this month?
-    // Walk allMonths up to ym, applying earlier snapshots but NOT this one
-    var drift=null;
-    var modelCum=parseFloat(document.getElementById('seed').value)||0;
-    var found=false;
-    for(var mi=0;mi<allMonths.length;mi++){
-      var mm=allMonths[mi];
-      if(mm.ym===ym){
-        drift=real-Math.round(modelCum+mm.net);
-        found=true;break;
-      }
-      // Apply earlier snapshots but skip current one
-      if(BAL_SNAPSHOTS[mm.ym]!==undefined&&mm.ym!==ym){modelCum=BAL_SNAPSHOTS[mm.ym];}
-      else{modelCum+=mm.net;}
-    }
-    var driftHtml=drift!==null?'<span class="snap-drift '+(drift>=0?'var-pos':'var-neg')+'">'+(drift>=0?'+':'')+fmtR(drift)+' vs model</span>':'';
-    html+='<div class="snap-row">'
-      +'<span class="snap-ym">'+ymlb(ym)+'</span>'
-      +'<span class="snap-amt">'+fmtR(real)+'</span>'
-      +driftHtml
-      +'<button class="del-tx" onclick="delSnapshot(\'"+ym+"\');" title="Remove">×</button>'
-      +'</div>';
+  keys.slice().reverse().forEach(function(ym){
+    var real=BAL_SNAPSHOTS[ym],drift=null,mc=parseFloat(document.getElementById('seed').value)||0;
+    for(var mi=0;mi<allMonths.length;mi++){var mm=allMonths[mi];if(mm.ym===ym){drift=real-Math.round(mc+mm.net);break;}if(BAL_SNAPSHOTS[mm.ym]!==undefined&&mm.ym!==ym){mc=BAL_SNAPSHOTS[mm.ym];}else{mc+=mm.net;}}
+    var dc=drift!==null?(drift>=0?'var-pos':'var-neg'):'',dt=drift!==null?(drift>=0?'+':'')+fmtR(drift)+' vs model':'';
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;"><span style="font-size:12px;font-family:var(--mono);color:var(--text3);min-width:64px;">'+ymlb(ym)+'</span><span style="font-weight:500;font-family:var(--mono);color:var(--text);flex:1;">'+fmtR(real)+'</span>'+(dt?'<span style="font-size:11px;font-family:var(--mono);" class="'+dc+'">'+dt+'</span>':'')+'<button class="del-tx" onclick="delSnapshot(\'+ym+\')" style="opacity:.3;" title="Remove">×</button></div>';
   });
   el.innerHTML=html;
 }
@@ -2306,15 +2268,27 @@ function renderYearEnd(allMonths){
   var budgetNet=fullInc-budgetSpend;
   var delta=fullNet-budgetNet;
 
-  var nc=fullNet>=0?'var-pos':'var-neg';
-  var dc=delta>=0?'var-pos':'var-neg';
-
-  el.innerHTML='<div class="ye-row"><span class="ye-lbl">Full year income</span><span class="ye-val">'+fmtR(fullInc)+'</span></div>'
+  var nc=fullNet>=0?'var-pos':'var-neg';var dc=delta>=0?'var-pos':'var-neg';
+  var me=yrMonths.filter(function(m){return m.ym<=todym&&getActualsForMonth(m.ym).total>0;}).length;
+  var br=me>0?ytdActSpend/me:0,rm=yrMonths.filter(function(m){return m.ym>todym;}).length;
+  var rs=yrMonths.filter(function(m){return m.ym>todym;}).reduce(function(s,m){return s+m.spend;},0);
+  var bestNet=fullInc-(ytdActSpend+rs),maxA=0;
+  yrMonths.forEach(function(m){var a=getActualsForMonth(m.ym).total;if(a>maxA)maxA=a;});
+  var worstNet=fullInc-(ytdActSpend+(maxA*rm));
+  el.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:.875rem;">'+rm+' months remaining in '+yr+'</div>'
+    +'<div class="ye-row"><span class="ye-lbl">Full year income</span><span class="ye-val">'+fmtR(fullInc)+'</span></div>'
     +'<div class="ye-row"><span class="ye-lbl">Actual spend to date</span><span class="ye-val">'+fmtR(ytdActSpend)+'</span></div>'
-    +'<div class="ye-row"><span class="ye-lbl">Remaining projected spend</span><span class="ye-val">'+fmtR(yrMonths.filter(function(m){return m.ym>todym;}).reduce(function(s,m){return s+m.spend;},0))+'</span></div>'
-    +'<div class="ye-row total"><span class="ye-lbl">Expected net at Dec 31</span><span class="ye-val '+nc+'">'+(fullNet>=0?'+':'')+fmtR(fullNet)+'</span></div>'
-    +'<div class="ye-row" style="margin-top:8px;"><span class="ye-lbl" style="color:var(--text3);">Budget said</span><span class="ye-val" style="color:var(--text3);">'+(budgetNet>=0?'+':'')+fmtR(budgetNet)+'</span></div>'
-    +'<div class="ye-row"><span class="ye-lbl" style="color:var(--text3);">Trajectory vs budget</span><span class="ye-val '+dc+'">'+(delta>=0?'+':'')+fmtR(delta)+'</span></div>';
+    +(br>0?'<div class="ye-row"><span class="ye-lbl">Monthly burn rate</span><span class="ye-val">'+fmtR(br)+'/mo</span></div>':'')
+    +'<div class="ye-row"><span class="ye-lbl">Remaining projected spend</span><span class="ye-val">'+fmtR(rs)+'</span></div>'
+    +'<div style="margin:12px 0 8px;padding:12px;background:var(--accent-bg);border-radius:var(--radius);border:1px solid #B8D4F0;">'
+      +'<div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Expected net at Dec 31</div>'
+      +'<div style="font-size:24px;font-weight:700;letter-spacing:-.02em;" class="'+nc+'">'+(fullNet>=0?'+':'')+fmtR(fullNet)+'</div>'
+      +'<div style="font-size:12px;margin-top:4px;" class="'+dc+'">'+( delta>=0?'↑ '+fmtR(delta)+' ahead of budget':'↓ '+fmtR(Math.abs(delta))+' behind budget')+'</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--radius);">'
+      +'<div><div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin-bottom:2px;">Best case</div><div style="font-size:15px;font-weight:600;" class="'+(bestNet>=0?'pos':'neg')+'">'+(bestNet>=0?'+':'')+fmtR(bestNet)+'</div><div style="font-size:10px;color:var(--text3);">If rest hits budget</div></div>'
+      +'<div><div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;margin-bottom:2px;">Worst case</div><div style="font-size:15px;font-weight:600;" class="'+(worstNet>=0?'pos':'neg')+'">'+(worstNet>=0?'+':'')+fmtR(worstNet)+'</div><div style="font-size:10px;color:var(--text3);">If rest repeats worst month</div></div>'
+    +'</div>';
 }
 
 // ── Budget variance table ────────────────────────────────────
@@ -2355,7 +2329,7 @@ function renderVarianceTable(){
     var chevron=isExp?'▾':'▸';
     var varCls=gVar!==null?(gVar>0?'color:var(--red);font-weight:500;':'color:var(--green);font-weight:500;'):'';
     var valStyle='flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;';
-    html+='<div style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleVarGroup('+gi+')">'
+    var vBg=gVar!==null?rowGradientBg(gAvg||0,gBudget):'';html+='<div style="display:flex;align-items:center;padding:0 14px;background:'+(vBg||'var(--surface2)')+';border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleVarGroup('+gi+')">'
       +'<div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;">'
         +'<span style="font-size:11px;color:var(--text3);width:12px;">'+chevron+'</span>'
         +'<span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">'+g+'</span>'
@@ -2443,24 +2417,48 @@ function getAvgActuals(months){
   return{byLine:avgLine, byGroup:avgGroup, validMonths:validMonths};
 }
 
-function buildPieLegend(containerId, labels, values, colours){
+function buildPieLegend(containerId,labels,values,colours){
   var total=values.reduce(function(s,v){return s+v;},0);
   if(!total){document.getElementById(containerId).innerHTML='<div class="pie-empty">No data</div>';return;}
-  var html='<div class="pie-legend">';
-  // Sort by value descending
-  var items=labels.map(function(l,i){return{l:l,v:values[i],c:colours[i]};})
-    .filter(function(x){return x.v>0;})
-    .sort(function(a,b){return b.v-a.v;});
-  items.forEach(function(item){
-    var pct=(item.v/total*100).toFixed(1);
-    html+='<div class="pie-leg-row">'
-      +'<div class="pie-leg-swatch" style="background:'+item.c+'"></div>'
-      +'<span class="pie-leg-name">'+item.l+'</span>'
-      +'<span class="pie-leg-vals">'+fmtR(item.v)+' &nbsp;'+pct+'%</span>'
-      +'</div>';
+  var items=labels.map(function(l,i){return{l:l,v:values[i],c:colours[i]};}).filter(function(x){return x.v>0;}).sort(function(a,b){return b.v-a.v;});
+  var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;">';
+  items.forEach(function(item){var pct=(item.v/total*100).toFixed(1);html+='<div style="display:flex;align-items:center;gap:5px;padding:2px 0;font-size:11px;color:var(--text2);min-width:0;"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:'+item.c+'"></div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;">'+item.l+'</span><span style="font-family:var(--mono);color:var(--text3);white-space:nowrap;font-size:10px;">'+fmtR(item.v)+' '+pct+'%</span></div>';});
+  html+='</div>';document.getElementById(containerId).innerHTML=html;
+}
+function buildGroupPieWithCallouts(canvasId,legId,labels,values,colours){
+  if(PIE_CHARTS[canvasId]){PIE_CHARTS[canvasId].destroy();delete PIE_CHARTS[canvasId];}
+  var total=values.reduce(function(s,v){return s+v;},0);
+  if(!total){var el=document.getElementById(legId);if(el)el.innerHTML='<div class="pie-empty">No data</div>';return;}
+  var fl={labels:[],values:[],colours:[]};
+  labels.forEach(function(l,i){if(values[i]>0){fl.labels.push(l);fl.values.push(values[i]);fl.colours.push(colours[i]);}});
+  PIE_CHARTS[canvasId]=new Chart(document.getElementById(canvasId).getContext('2d'),{
+    type:'doughnut',data:{labels:fl.labels,datasets:[{data:fl.values,backgroundColor:fl.colours,borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:true,layout:{padding:55},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){
+        var tot=ctx.dataset.data.reduce(function(s,x){return s+x;},0);
+        return ctx.label+': '+fmtR(ctx.parsed)+' ('+(ctx.parsed/tot*100).toFixed(1)+'%)';
+      }}}}},
+    plugins:[{id:'callouts',afterDatasetsDraw:function(chart){
+      var ctx=chart.ctx,ds=chart.getDatasetMeta(0);
+      var cx=(chart.chartArea.left+chart.chartArea.right)/2,cy=(chart.chartArea.top+chart.chartArea.bottom)/2;
+      var tot=chart.data.datasets[0].data.reduce(function(s,v){return s+v;},0);
+      ds.data.forEach(function(arc,i){
+        var val=chart.data.datasets[0].data[i],pct=val/tot*100;if(pct<4)return;
+        var mid=(arc.startAngle+arc.endAngle)/2,r=arc.outerRadius;
+        var lx=cx+Math.cos(mid)*(r+10),ly=cy+Math.sin(mid)*(r+10);
+        var tx=cx+Math.cos(mid)*(r+24),ty=cy+Math.sin(mid)*(r+24),right=Math.cos(mid)>0;
+        ctx.save();ctx.beginPath();ctx.moveTo(cx+Math.cos(mid)*r,cy+Math.sin(mid)*r);ctx.lineTo(lx,ly);
+        ctx.strokeStyle=chart.data.datasets[0].backgroundColor[i];ctx.lineWidth=1.5;ctx.stroke();
+        ctx.font='bold 11px Inter,system-ui,sans-serif';ctx.fillStyle='#1A1916';
+        ctx.textAlign=right?'left':'right';ctx.textBaseline='middle';
+        ctx.fillText(chart.data.labels[i],tx+(right?4:-4),ty-7);
+        ctx.font='10px Inter,system-ui,sans-serif';ctx.fillStyle='#8A8580';
+        ctx.fillText(fmtR(val)+' · '+pct.toFixed(1)+'%',tx+(right?4:-4),ty+7);
+        ctx.restore();
+      });
+    }}]
   });
-  html+='</div>';
-  document.getElementById(containerId).innerHTML=html;
+  var el=document.getElementById(legId);if(el)el.innerHTML='';
 }
 
 function buildPie(canvasId, legId, labels, values, colours, title){
@@ -2500,7 +2498,6 @@ function renderDashboard(){
   var todym=todayYM();
   var todIdx=ymx(todym);
   // Build month arrays
-  var months1=[todym];
   // Prior N full months, excluding the current (partial-data) month
   var months3=[xym(todIdx-3),xym(todIdx-2),xym(todIdx-1)];
   var months12=[];
@@ -2523,19 +2520,12 @@ function renderDashboard(){
     return groups.map(function(g){return avg&&avg.byGroup[g]?avg.byGroup[g]:0;});
   }
 
-  var avg1=getAvgActuals(months1);
   var avg3=getAvgActuals(months3);
   var avg12=getAvgActuals(months12);
-
-  // Line item pies
-  buildPie('pie-line-1','leg-line-1',lineNames,lineVals(avg1),lineCols);
   buildPie('pie-line-3','leg-line-3',lineNames,lineVals(avg3),lineCols);
   buildPie('pie-line-12','leg-line-12',lineNames,lineVals(avg12),lineCols);
-
-  // Group pies
-  buildPie('pie-grp-1','leg-grp-1',groups,grpVals(avg1),grpCols);
-  buildPie('pie-grp-3','leg-grp-3',groups,grpVals(avg3),grpCols);
-  buildPie('pie-grp-12','leg-grp-12',groups,grpVals(avg12),grpCols);
+  buildGroupPieWithCallouts('pie-grp-3','leg-grp-3',groups,grpVals(avg3),grpCols);
+  buildGroupPieWithCallouts('pie-grp-12','leg-grp-12',groups,grpVals(avg12),grpCols);
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
