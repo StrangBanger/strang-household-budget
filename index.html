@@ -535,7 +535,51 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   </div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- MONTH DETAIL -->
+<div class="panel" id="tab-table">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
+    <span style="font-size:13px;font-weight:500;color:var(--text2);flex:1;">Month detail</span>
+    <div class="detail-toggle-wrap">
+      <button class="detail-toggle-btn on" id="btn-month-view" onclick="setDetailView('months')">By month</button>
+      <button class="detail-toggle-btn" id="btn-outlier-view" onclick="setDetailView('outliers')">Outliers</button>
+    </div>
+  </div>
+  <div id="detail-months-view">
+    <div class="mo-wrap"><table class="mt" id="mtbl"></table></div>
+  </div>
+  <div id="detail-outlier-view" style="display:none;">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;">Categories where actual spend exceeded budget — sorted by severity</div>
+    <div class="act-wrap" id="outlier-list"></div>
+  </div>
+</div>
+
+<!-- PROJECTION -->
+<div class="panel" id="tab-proj">
+  <div class="cards" id="proj-cards"><div class="card a"><div class="card-l">Monthly income</div><div class="card-v">$10,963</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,095</div></div><div class="card g"><div class="card-l">This month net</div><div class="card-v">+$1,868</div></div><div class="card g"><div class="card-l">Net position YTD</div><div class="card-v">+$23,145</div></div></div>
+  <div id="proj-range-btns" style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text3);font-weight:500;align-self:center;margin-right:4px;">Show:</span><button class="range-btn on">YTD</button><button class="range-btn">2026</button><button class="range-btn">2027</button><button class="range-btn">2028</button><button class="range-btn">2029</button><button class="range-btn">2030</button><button class="range-btn">2031</button></div>
+  <div class="chart-box" style="margin-bottom:.75rem;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(200,198,192,0.7);border:1px solid #B0AEA8;"></div>Projected</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(24,95,165,0.80);"></div>Household Fixed</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(96,165,250,0.75);"></div>Household Variable</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.78);"></div>Bryan</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(147,51,234,0.72);"></div>Ashley</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(234,179,8,0.78);"></div>Kids</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(80,80,80,0.4);border:1px dashed #888;"></div>Budget ceiling</div>
+    </div>
+    <canvas id="ch-spend" height="1357" style="display: block; box-sizing: border-box; height: 678px; width: 1018px;" width="2036"></canvas>
+  </div>
+  <div class="chart-box" style="margin-bottom:1.25rem;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:.75rem;">
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.9);border-radius:50%;"></div>Surplus month</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(163,45,45,0.9);border-radius:50%;"></div>Deficit month</div>
+    </div>
+    <canvas id="ch-cum" height="950" width="2036" style="display: block; box-sizing: border-box; height: 475px; width: 1018px;"></canvas>
+    <p style="margin-top:6px;">Each point = income minus actual spend for that month · Only months with logged transactions appear</p>
+  </div>
+  <div class="ev-box"><div class="ev-title">Upcoming budget changes</div><div id="evs"><p style="font-size:13px;color:var(--text3);">No scheduled changes this year to date.</p></div></div>
+</div>
+</div><!-- DASHBOARD -->
 <div class="panel" id="tab-dash">
   <!-- Balance snapshot widget -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem;">
@@ -586,51 +630,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   </div>
 </div>
 
-<!-- MONTH DETAIL -->
-<div class="panel" id="tab-table">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
-    <span style="font-size:13px;font-weight:500;color:var(--text2);flex:1;">Month detail</span>
-    <div class="detail-toggle-wrap">
-      <button class="detail-toggle-btn on" id="btn-month-view" onclick="setDetailView('months')">By month</button>
-      <button class="detail-toggle-btn" id="btn-outlier-view" onclick="setDetailView('outliers')">Outliers</button>
-    </div>
-  </div>
-  <div id="detail-months-view">
-    <div class="mo-wrap"><table class="mt" id="mtbl"></table></div>
-  </div>
-  <div id="detail-outlier-view" style="display:none;">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;">Categories where actual spend exceeded budget — sorted by severity</div>
-    <div class="act-wrap" id="outlier-list"></div>
-  </div>
-</div>
-
-<!-- PROJECTION -->
-<div class="panel" id="tab-proj">
-  <div class="cards" id="proj-cards"><div class="card a"><div class="card-l">Monthly income</div><div class="card-v">$10,963</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,095</div></div><div class="card g"><div class="card-l">This month net</div><div class="card-v">+$1,868</div></div><div class="card g"><div class="card-l">Net position YTD</div><div class="card-v">+$23,145</div></div></div>
-  <div id="proj-range-btns" style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text3);font-weight:500;align-self:center;margin-right:4px;">Show:</span><button class="range-btn on">YTD</button><button class="range-btn">2026</button><button class="range-btn">2027</button><button class="range-btn">2028</button><button class="range-btn">2029</button><button class="range-btn">2030</button><button class="range-btn">2031</button></div>
-  <div class="chart-box" style="margin-bottom:.75rem;">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(200,198,192,0.7);border:1px solid #B0AEA8;"></div>Projected</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(24,95,165,0.80);"></div>Household Fixed</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(96,165,250,0.75);"></div>Household Variable</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.78);"></div>Bryan</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(147,51,234,0.72);"></div>Ashley</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(234,179,8,0.78);"></div>Kids</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(80,80,80,0.4);border:1px dashed #888;"></div>Budget ceiling</div>
-    </div>
-    <canvas id="ch-spend" height="1357" style="display: block; box-sizing: border-box; height: 678px; width: 1018px;" width="2036"></canvas>
-  </div>
-  <div class="chart-box" style="margin-bottom:1.25rem;">
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:.75rem;">
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.9);border-radius:50%;"></div>Surplus month</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(163,45,45,0.9);border-radius:50%;"></div>Deficit month</div>
-    </div>
-    <canvas id="ch-cum" height="950" width="2036" style="display: block; box-sizing: border-box; height: 475px; width: 1018px;"></canvas>
-    <p style="margin-top:6px;">Each point = income minus actual spend for that month · Only months with logged transactions appear</p>
-  </div>
-  <div class="ev-box"><div class="ev-title">Upcoming budget changes</div><div id="evs"><p style="font-size:13px;color:var(--text3);">No scheduled changes this year to date.</p></div></div>
-</div>
-</div><!-- end shell / app-shell -->
+<!-- end shell / app-shell -->
 
 <script>
 // =============================================================
