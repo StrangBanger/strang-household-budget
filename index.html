@@ -565,14 +565,14 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
       <div class="leg-item"><div class="leg-dot" style="background:rgba(234,179,8,0.78);"></div>Kids</div>
       <div class="leg-item"><div class="leg-dot" style="background:rgba(80,80,80,0.4);border:1px dashed #888;"></div>Budget ceiling</div>
     </div>
-    <canvas id="ch-spend" height="1357" style="display: block; box-sizing: border-box; height: 678px; width: 1018px;" width="2036"></canvas>
+    <canvas id="ch-spend" height="120"></canvas></canvas>
   </div>
   <div class="chart-box" style="margin-bottom:1.25rem;">
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:.75rem;">
       <div class="leg-item"><div class="leg-dot" style="background:rgba(22,163,74,0.9);border-radius:50%;"></div>Surplus month</div>
       <div class="leg-item"><div class="leg-dot" style="background:rgba(163,45,45,0.9);border-radius:50%;"></div>Deficit month</div>
     </div>
-    <canvas id="ch-cum" height="950" width="2036" style="display: block; box-sizing: border-box; height: 475px; width: 1018px;"></canvas>
+    <canvas id="ch-cum" height="140"></canvas></canvas>
     <p style="margin-top:6px;">Each point = income minus actual spend for that month · Only months with logged transactions appear</p>
   </div>
   <div class="ev-box"><div class="ev-title">Upcoming budget changes</div><div id="evs"><p style="font-size:13px;color:var(--text3);">No scheduled changes this year to date.</p></div></div>
@@ -795,10 +795,13 @@ var INC_LINES={
   ashleyUnion:    mkI(80),      // monthly flat $, pre-tax
   ashleyOmers:    mkI(604.39),  // OMERS monthly, pre-tax (reduces taxable income, not CPP/EI base)
   ashleyBenefits: mkI(0),       // Group benefits monthly, post-tax (reduces take-home, no tax impact)
+  bryanVariance:  mkI(0),       // monthly +/- adjustment to match actual take-home
+  ashleyVariance: mkI(0),       // monthly +/- adjustment to match actual take-home
   // CCB
   ccbAFNI:        mkI(132662),
   ccbUnder6:      mkI(2),
-  ccbOver6:       mkI(0)
+  ccbOver6:       mkI(0),
+  ccbVariance:    mkI(0)         // monthly +/- adjustment to match actual CCB
 };
 
 // getIncValue: reads the correct value from a schedule for a given month
@@ -829,7 +832,11 @@ function monthlyIncome(ym){
   var yr=parseInt(ym.split('-')[1])>=7?"2627":"2526";
   var ccb=calcCCB(afni,u6,o6,yr);
   var oti=OTI.filter(function(o){return o.ym===ym;}).reduce(function(s,o){return s+o.amount;},0);
-  return b.net+a.net+ccb+oti;
+  // Variance adjustments — flat monthly +/- to match actual take-home
+  var bVar=getIncValue(INC_LINES.bryanVariance,ym);
+  var aVar=getIncValue(INC_LINES.ashleyVariance,ym);
+  var cVar=getIncValue(INC_LINES.ccbVariance,ym);
+  return b.net+a.net+ccb+oti+bVar+aVar+cVar;
 }
 
 // getMonthIncomeParts: for a specific month, returns full breakdown (used by Income tab)
@@ -999,6 +1006,12 @@ function migrateData(data){
   if(!data.otiNextId)data.otiNextId=1;
   if(!data.saveHistory)data.saveHistory=[];
   if(!data.balanceSnapshots)data.balanceSnapshots={};
+  // Add variance income lines if missing (migration)
+  if(data.incomeLines){
+    ['bryanVariance','ashleyVariance','ccbVariance'].forEach(function(k){
+      if(!data.incomeLines[k])data.incomeLines[k]={current:0,c1:{ym:'',val:0},c2:{ym:'',val:0},c3:{ym:'',val:0},c4:{ym:'',val:0}};
+    });
+  }
   // v3 → v4: migrate ashleyPension → ashleyOmers + ashleyTaxBen
   if(data.incomeLines&&data.incomeLines.ashleyPension&&!data.incomeLines.ashleyOmers){
     // Old pension field was post-tax misc; OMERS defaults to 604.39, taxBen to 0
@@ -1232,6 +1245,9 @@ var INC_META={
   ashleyUnion:  {label:'Union dues',           unit:'$', hint:'monthly flat, pre-tax'},
   ashleyOmers:    {label:'OMERS contribution', unit:'$', hint:'monthly, pre-tax — reduces taxable income, not CPP/EI base'},
   ashleyBenefits: {label:'Group Benefits',     unit:'$', hint:'monthly, post-tax — reduces take-home, no tax impact'},
+  bryanVariance:  {label:'Variance adjustment', unit:'$', hint:'monthly +/− to match actual take-home'},
+  ashleyVariance: {label:'Variance adjustment', unit:'$', hint:'monthly +/− to match actual take-home'},
+  ccbVariance:    {label:'Variance adjustment', unit:'$', hint:'monthly +/− to match actual CCB'},
   ccbAFNI:      {label:'AFNI (prior year combined net income)', unit:'$', hint:'set each July after filing'},
   ccbUnder6:    {label:'Children under 6',   unit:'',  hint:'count'},
   ccbOver6:     {label:'Children 6–17',      unit:'',  hint:'count'},
@@ -1310,6 +1326,7 @@ function renderTaxBreakdowns(){
     ['− CPP',fmtR(b.cpp)+'/yr','neg'],
     ['− EI',fmtR(b.ei)+'/yr','neg'],
     ['− Employee RRSP (post-tax)',fmtC(b.eeRmo)+'/mo','neg'],
+    ['± Variance adjustment',(function(){var v=getIncValue(INC_LINES.bryanVariance,ym);return(v>=0?'+':'')+fmtC(v)+'/mo';})(),(getIncValue(INC_LINES.bryanVariance,ym)>=0?'pos':'neg')],
   ];
   var aRows=[
     ['Gross salary',fmtR(a.gross)+'/yr',''],
@@ -1322,26 +1339,28 @@ function renderTaxBreakdowns(){
     ['− Ontario health premium',fmtR(a.ohp)+'/yr','neg'],
     ['− CPP (on gross)',fmtR(a.cpp)+'/yr','neg'],
     ['− EI (on gross)',fmtR(a.ei)+'/yr','neg'],
+    ['± Variance adjustment',(function(){var v=getIncValue(INC_LINES.ashleyVariance,ym);return(v>=0?'+':'')+fmtC(v)+'/mo';})(),(getIncValue(INC_LINES.ashleyVariance,ym)>=0?'pos':'neg')],
   ];
   var ccbRows=[
     ['AFNI (prior year net)',fmtR(parts.afni),''],
     ['Children under 6',parts.u6,''],
     ['Children 6–17',parts.o6,''],
     ['Base annual CCB',fmtR(ccbBase*12)+'/yr',''],
-    ['Monthly payment',fmtC(parts.ccb),'pos'],
+    ['± Variance adjustment',(function(){var v=getIncValue(INC_LINES.ccbVariance,ym);return(v>=0?'+':'')+fmtC(v)+'/mo';})(),(getIncValue(INC_LINES.ccbVariance,ym)>=0?'pos':'neg')],
+    ['Monthly payment',fmtC(parts.ccb+getIncValue(INC_LINES.ccbVariance,ym)),'pos'],
   ];
   // CCB card uses a slightly different layout — no "take-home" concept
   var ccbCard='<div class="tax-card"><div class="tax-card-title">CCB — current benefit year</div>'
     +ccbRows.map(function(r){return'<div class="tax-row"><span class="tax-lbl">'+r[0]+'</span><span class="tax-val'+(r[2]?' '+r[2]:'')+'">'+r[1]+'</span></div>';}).join('')
     +'</div>';
 
-  grid.innerHTML=card('Bryan',bRows,b.net)+card('Ashley',aRows,a.net)+ccbCard;
+  grid.innerHTML=card('Bryan',bRows,b.net+getIncValue(INC_LINES.bryanVariance,ym))+card('Ashley',aRows,a.net+getIncValue(INC_LINES.ashleyVariance,ym))+ccbCard;
 }
 
 function renderIncome(){
-  renderIncSection('inc-tbl-bryan',['bryanGross','bryanEmpRRSP','bryanEeRRSP']);
-  renderIncSection('inc-tbl-ashley',['ashleyGross','ashleyUnion','ashleyOmers','ashleyBenefits']);
-  renderIncSection('inc-tbl-ccb',['ccbAFNI','ccbUnder6','ccbOver6']);
+  renderIncSection('inc-tbl-bryan',['bryanGross','bryanEmpRRSP','bryanEeRRSP','bryanVariance']);
+  renderIncSection('inc-tbl-ashley',['ashleyGross','ashleyUnion','ashleyOmers','ashleyBenefits','ashleyVariance']);
+  renderIncSection('inc-tbl-ccb',['ccbAFNI','ccbUnder6','ccbOver6','ccbVariance']);
   renderTaxBreakdowns();
   renderOTIList();
 }
@@ -1852,14 +1871,31 @@ function renderTable(months){
   var seed=typeof getEffectiveSeed==='function'?getEffectiveSeed(months[0]?months[0].ym:'2026-01'):(parseFloat(document.getElementById('seed').value)||0);
   var todym=todayYM(),rows='',lastYr=null,cum=seed;
   var curYr=parseInt(todym.split('-')[0]),yrData={};
+
+  function avgRow(yr){
+    var yd=yrData[yr],n=yd.count||1;
+    var s='<tr class="yr-rows-'+yr+'" style="'+(YR_EXPANDED[yr]?'':'display:none;')+'background:var(--surface2);font-style:italic;border-top:1px solid var(--border-strong);">';
+    var cellS='text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);';
+    s+='<td style="padding:5px 14px;font-size:11px;font-weight:600;color:var(--text3);">'+yr+' avg/mo</td>';
+    s+='<td style="'+cellS+'">'+fmtR(yd.inc/n)+'</td>';
+    s+='<td style="'+cellS+'">'+fmtR(yd.proj/n)+'</td>';
+    s+='<td style="'+cellS+'">'+fmtR(yd.net/n)+'</td>';
+    s+='<td style="'+cellS+'">'+(yd.actCount>0?fmtR(yd.act/yd.actCount):'—')+'</td>';
+    s+='<td style="'+cellS+'">'+(yd.actCount>0?fmtR(yd.actNet/yd.actCount):'—')+'</td>';
+    s+='<td style="'+cellS+'">'+fmtR(yd.lastCum)+'</td>';
+    s+='<td style="'+cellS+'">—</td>';
+    s+='</tr>';
+    return s;
+  }
+
   months.forEach(function(m){
     if(m.year!==lastYr){
+      if(lastYr!==null&&yrData[lastYr])rows+=avgRow(lastYr);
       lastYr=m.year;
-      if(lastYr!==null&&yrData[lastYr]){var yd=yrData[lastYr],n=yd.count||1;rows+='<tr class="yr-rows-'+lastYr+'" style="'+(YR_EXPANDED[lastYr]?'':'display:none;')+'background:var(--surface2);font-style:italic;border-top:1px solid var(--border-strong);"><td style="padding:5px 14px;font-size:11px;font-weight:600;color:var(--text3);">'+lastYr+'avg/mo</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.inc/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.proj/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.net/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.act/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.actNet/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.lastCum)+'</td></tr>';}
       if(YR_EXPANDED[m.year]===undefined)YR_EXPANDED[m.year]=(m.year===curYr);
       var isExp=YR_EXPANDED[m.year];
       rows+='<tr class="yr-toggle-row" onclick="toggleYear('+m.year+')" style="background:var(--surface2);">'
-        +'<td colspan="7" style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--border-strong);">'
+        +'<td colspan="8" style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--border-strong);">'
           +'<span id="yr-chev-'+m.year+'" style="margin-right:6px;font-size:11px;">'+(isExp?'▾':'▸')+'</span>'
           +m.year
         +'</td></tr>';
@@ -1883,6 +1919,9 @@ function renderTable(months){
       actNetCell='<span class="'+(netForCum>=0?'pos':'neg')+'">'+(netForCum>=0?'+':'')+fmtR(netForCum)+'</span>';
     }
     cum+=netForCum;
+    // Actual bank balance — from BAL_SNAPSHOTS if recorded
+    var actBal=(typeof BAL_SNAPSHOTS!=='undefined'&&BAL_SNAPSHOTS[m.ym]!==undefined)?BAL_SNAPSHOTS[m.ym]:null;
+    var actBalCell=actBal!==null?fmtR(actBal):'<span style="color:var(--text3)">—</span>';
     if(!yrData[m.year])yrData[m.year]={inc:0,proj:0,net:0,act:0,actNet:0,actCount:0,count:0,lastCum:0};
     yrData[m.year].inc+=m.inc;yrData[m.year].proj+=m.spend;yrData[m.year].net+=netForCum;
     yrData[m.year].count++;yrData[m.year].lastCum=cum;
@@ -1898,14 +1937,15 @@ function renderTable(months){
       +'<td class="'+nc+'">'+(m.net>=0?'+':'')+fmtR(m.net)+'</td>'
       +'<td>'+actSpendCell+'</td>'
       +'<td>'+actNetCell+'</td>'
-      +'<td class="'+cc+'">'+fmtR(cum)+'</td></tr>';
+      +'<td class="'+cc+'">'+fmtR(cum)+'</td>'
+      +'<td>'+actBalCell+'</td></tr>';
   });
-  if(lastYr!==null&&yrData[lastYr]){var yd=yrData[lastYr],n=yd.count||1;rows+='<tr class="yr-rows-'+lastYr+'" style="'+(YR_EXPANDED[lastYr]?'':'display:none;')+'background:var(--surface2);font-style:italic;border-top:1px solid var(--border-strong);"><td style="padding:5px 14px;font-size:11px;font-weight:600;color:var(--text3);">'+lastYr+'avg/mo</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.inc/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.proj/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.net/n)+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.act/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+( yd.actCount>0?fmtR(yd.actNet/yd.actCount):'—')+'</td><td style="text-align:right;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--text3);">'+fmtR(yd.lastCum)+'</td></tr>';}
+  if(lastYr!==null&&yrData[lastYr])rows+=avgRow(lastYr);
   document.getElementById('mtbl').innerHTML=
     '<thead><tr><th>Month</th><th>Income</th>'
     +'<th>Proj spend</th><th>Proj net</th>'
     +'<th>Actual spend</th><th>Actual net</th>'
-    +'<th>Bank balance</th></tr></thead><tbody>'+rows+'</tbody>';
+    +'<th>Proj. balance</th><th>Actual balance</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
 function renderOutliers(){
@@ -2554,4 +2594,4 @@ window.addEventListener('load',function(){
 
 
 
-<veepn-lock-screen><style>@font-face{font-family:FigtreeVF;src:url(chrome-extension://majdfhpaihoncoakbjgbdhglocklcgno/fonts/FigtreeVF.woff2)format("woff2 supports variations"),url(chrome-extension://majdfhpaihoncoakbjgbdhglocklcgno/fonts/FigtreeVF.woff2)format("woff2-variations");font-weight:100 1000;font-display:swap}</style></veepn-lock-screen><veepn-intro-offer><style>@font-face{font-family:FigtreeVF;src:url(chrome-extension://majdfhpaihoncoakbjgbdhglocklcgno/fonts/FigtreeVF.woff2)format("woff2 supports variations"),url(chrome-extension://majdfhpaihoncoakbjgbdhglocklcgno/fonts/FigtreeVF.woff2)format("woff2-variations");font-weight:100 1000;font-display:swap}</style></veepn-intro-offer></div></body></html>
+</div></body></html>
