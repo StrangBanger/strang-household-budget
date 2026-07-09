@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Strang Household · Net Worth</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root{
+  --bg:#F7F6F3;--surface:#FFF;--surface2:#F0EEE9;
+  --border:#E2DDD6;--border-strong:#C8C2BA;
+  --text:#1A1916;--text2:#4A4740;--text3:#8A8580;
+  --accent:#185FA5;--accent-bg:#EBF2FB;
+  --green:#0F6E56;--green-bg:#E8F5F1;
+  --red:#A32D2D;--red-bg:#FBEAEA;
+  --radius:8px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Fira Mono',monospace;
+  /* bucket tints */
+  --cash:#0F6E56;--cash-bg:#E8F5F1;
+  --nonreg:#185FA5;--nonreg-bg:#EBF2FB;
+  --tfsa:#7C3AED;--tfsa-bg:#F3ECFF;
+  --rrsp:#A36000;--rrsp-bg:#FFF4E2;
+  --resp:#0E7490;--resp-bg:#E4F5FA;
+  --phys:#4A4740;--phys-bg:#F0EEE9;
+  --liab:#A32D2D;--liab-bg:#FBEAEA;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+.shell{max-width:1100px;margin:0 auto;padding:1.5rem 1.25rem;}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px;}
+header h1{font-size:20px;font-weight:600;letter-spacing:-.02em;}
+header p{font-size:12px;color:var(--text3);margin-top:2px;}
+.header-btns{display:flex;gap:8px;align-items:center;}
+.hbtn{font-size:12px;font-weight:500;padding:6px 14px;border-radius:var(--radius);cursor:pointer;white-space:nowrap;}
+button.hbtn.export{background:var(--accent);color:#fff;border:none;}
+button.hbtn.export:hover{opacity:.88;}
+button.hbtn.import{background:var(--surface);color:var(--text2);border:1px solid var(--border-strong);}
+button.hbtn.import:hover{background:var(--surface2);}
+a.hbtn.hub-link{background:var(--surface);color:var(--text2);border:1px solid var(--border-strong);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-right:4px;transition:background .15s,border-color .15s,color .15s;}
+a.hbtn.hub-link:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
+#import-file{display:none;}
+.save-indicator{font-size:11px;padding:4px 8px;background:var(--green-bg);color:var(--green);border-radius:20px;display:none;}
+.save-indicator.show{display:inline-block;}
+.save-indicator.offline{background:var(--red-bg);color:var(--red);}
+button.hbtn.signout{background:var(--surface);color:var(--text3);border:1px solid var(--border);}
+button.hbtn.signout:hover{background:var(--surface2);color:var(--text2);}
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;}
+#login-screen.hidden{display:none;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.75rem;width:320px;box-shadow:0 4px 24px rgba(0,0,0,.06);}
+.login-card h1{font-size:17px;font-weight:600;margin-bottom:1.25rem;letter-spacing:-.02em;}
+.login-card .field{margin-bottom:.875rem;}
+.login-card label{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;}
+.login-card input{width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);}
+.login-card input:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+.login-card button{width:100%;padding:9px;font-size:13px;font-weight:500;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;margin-top:.5rem;}
+.login-card button:hover{opacity:.88;}
+.login-card button:disabled{opacity:.5;cursor:default;}
+.login-err{font-size:12px;color:var(--red);margin-top:.6rem;min-height:14px;}
+.app-shell.hidden{display:none;}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:1.5rem;}
+.tab{font-size:13px;font-weight:500;padding:8px 18px;cursor:pointer;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;position:relative;bottom:-1px;}
+.tab:hover{color:var(--text);}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.panel{display:none;}.panel.on{display:block;}
+/* MONTH HEADER */
+.month-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
+.month-nav{display:flex;align-items:center;gap:8px;}
+.month-nav button{font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
+.month-nav button:hover:not(:disabled){background:var(--surface2);color:var(--text);}
+.month-nav button:disabled{opacity:.3;cursor:default;}
+.month-pill{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;font-family:var(--mono);text-align:center;min-width:90px;background:var(--accent-bg);color:var(--accent);border:1.5px solid #B8D4F0;}
+/* CARDS */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1rem;}
+.card.a{background:var(--accent-bg);border-color:#B8D4F0;}
+.card.g{background:var(--green-bg);border-color:#A8DDD0;}
+.card.r{background:var(--red-bg);border-color:#F0BABA;}
+.card-l{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+.card.a .card-l{color:var(--accent);}.card.g .card-l{color:var(--green);}.card.r .card-l{color:var(--red);}
+.card-v{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+.card.a .card-v{color:var(--accent);}.card.g .card-v{color:var(--green);}.card.r .card-v{color:var(--red);}
+.card-s{font-size:11px;color:var(--text3);margin-top:2px;}
+/* REGISTER TABLE */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;margin-bottom:1rem;}
+table.nt{width:100%;border-collapse:collapse;min-width:720px;}
+table.nt thead th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
+table.nt thead th.r{text-align:right;}
+table.nt td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table.nt tr:last-child td{border-bottom:none;}
+table.nt tr.gh td{background:#1A1916;font-size:11px;font-weight:700;color:#FFF;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;}
+table.nt tr.gh td .gh-sub{float:right;font-weight:600;font-family:var(--mono);letter-spacing:0;color:#D8D3CC;text-transform:none;}
+table.nt tr.add-row td{padding:2px 6px;}
+.name-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.name-wrap span.nm{font-size:13px;color:var(--text);}
+.name-wrap .pencil{opacity:0;font-size:11px;color:var(--text3);transition:opacity .15s;}
+.name-wrap:hover .pencil{opacity:1;}
+input.name-input{font-size:13px;font-family:var(--font);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;outline:none;background:var(--surface);width:220px;}
+input.ni{width:110px;padding:3px 6px;font-size:13px;font-family:var(--mono);text-align:right;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text);}
+input.ni:hover{border-color:var(--border-strong);background:var(--bg);}
+input.ni:focus{border-color:var(--accent);background:var(--surface);outline:none;}
+input.ni.carried{color:var(--text3);font-style:italic;}
+select.bkt{font-size:11px;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font);}
+select.bkt:hover{border-color:var(--border-strong);background:var(--bg);}
+select.bkt:focus{border-color:var(--accent);outline:none;}
+.ref-note{font-size:11px;color:var(--text3);font-family:var(--mono);white-space:nowrap;}
+.ref-note .dl{margin-left:6px;}
+.ref-note .dl.up{color:var(--green);}
+.ref-note .dl.dn{color:var(--red);}
+button.xb{font-size:15px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:0 3px;opacity:.4;border-radius:4px;}
+button.xb:hover{color:var(--red);opacity:1;background:var(--red-bg);}
+button.revert{font-size:12px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:0 4px;opacity:.5;border-radius:4px;}
+button.revert:hover{color:var(--accent);opacity:1;background:var(--accent-bg);}
+button.ab{font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:7px 10px;display:block;width:100%;text-align:left;border-radius:5px;}
+button.ab:hover{color:var(--accent);background:var(--accent-bg);}
+/* ASSUMPTIONS BOX */
+.assum-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;margin-bottom:1rem;}
+.assum-box h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;}
+.assum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 20px;}
+.assum-field label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:3px;}
+.assum-field .sub{font-size:10px;color:var(--text3);font-weight:400;}
+.assum-field input{width:100%;padding:6px 9px;font-size:13px;font-family:var(--mono);border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);}
+.assum-field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+.assum-field input.pct-in{text-align:right;}
+.note-line{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.5;}
+/* PLACEHOLDER PANELS */
+.placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
+.placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
+.placeholder h2{font-size:17px;font-weight:600;color:var(--text2);margin-bottom:.4rem;letter-spacing:-.02em;}
+.placeholder p{font-size:13px;max-width:400px;margin:0 auto;line-height:1.5;}
+@media(max-width:560px){
+  .cards{grid-template-columns:repeat(2,1fr);}
+  .shell{padding:1.25rem .875rem;}
+  .login-card{width:calc(100% - 2rem);}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <h1>Strang Household · Net Worth</h1>
+    <div class="field"><label>Email</label><input type="email" id="login-email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()"></div>
+    <div class="field"><label>Password</label><input type="password" id="login-pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()"></div>
+    <button id="login-btn" onclick="doSignIn()">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="shell app-shell hidden" id="app-shell">
+<header>
+  <div>
+    <h1>Strang Household · Net Worth</h1>
+    <p id="last-saved-lbl">—</p>
+  </div>
+  <div class="header-btns">
+    <a class="hbtn hub-link" href="/">← Hub</a>
+    <span class="save-indicator" id="saved-badge">Saved ✓</span>
+    <button class="hbtn import" onclick="document.getElementById('import-file').click()">Import</button>
+    <input type="file" id="import-file" accept=".json" onchange="importData(event)">
+    <button class="hbtn import" onclick="downloadHTML()" title="Save a copy of this tool with today's date">Download HTML</button>
+    <button class="hbtn export" onclick="exportData()">Export &amp; Save</button>
+    <button class="hbtn signout" onclick="doSignOut()">Sign out</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab on" id="t-track" onclick="showTab('track')">Track</button>
+  <button class="tab" id="t-summary" onclick="showTab('summary')">Summary</button>
+  <button class="tab" id="t-proj" onclick="showTab('proj')">Projections</button>
+</div>
+
+<!-- ===== TRACK ===== -->
+<div class="panel on" id="tab-track">
+  <div class="month-hdr">
+    <div>
+      <h2 id="snap-title" style="font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.1;">—</h2>
+      <div id="snap-status-lbl" style="font-size:11px;font-weight:500;margin-top:2px;color:var(--accent);">—</div>
+    </div>
+    <div class="month-nav">
+      <button id="snap-prev" onclick="shiftSnap(-1)">‹</button>
+      <div class="month-pill" id="snap-pill">—</div>
+      <button id="snap-next" onclick="shiftSnap(1)">›</button>
+    </div>
+  </div>
+
+  <div class="cards" id="track-cards"></div>
+
+  <div class="tbl-wrap">
+    <table class="nt" id="reg-tbl">
+      <thead><tr>
+        <th>Account</th>
+        <th style="width:130px;">Type</th>
+        <th class="r" style="width:150px;">Value</th>
+        <th class="r" style="width:170px;">Prior snapshot</th>
+        <th style="width:30px;"></th>
+      </tr></thead>
+      <tbody id="reg-body"></tbody>
+    </table>
+  </div>
+
+  <div class="assum-box">
+    <h3>Assumptions &amp; household</h3>
+    <div class="assum-grid">
+      <div class="assum-field">
+        <label>Blended return <span class="sub">annual, all-equity</span></label>
+        <input class="pct-in" type="number" step="0.1" id="as-return" onchange="updAssumption('blendedReturn',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Inflation <span class="sub">annual, for real $</span></label>
+        <input class="pct-in" type="number" step="0.1" id="as-inflation" onchange="updAssumption('inflation',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Monthly savings <span class="sub">$/mo, manual for now</span></label>
+        <input type="number" step="50" id="as-savings" onchange="updAssumption('monthlySavings',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Bryan <span class="sub">birth date</span></label>
+        <input type="date" id="fam-bryan" onchange="updFamily('bryan',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Ashley <span class="sub">birth date</span></label>
+        <input type="date" id="fam-ashley" onchange="updFamily('ashley',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Regan <span class="sub">birth date</span></label>
+        <input type="date" id="fam-regan" onchange="updFamily('regan',this.value)">
+      </div>
+      <div class="assum-field">
+        <label>Harrison <span class="sub">birth date</span></label>
+        <input type="date" id="fam-harrison" onchange="updFamily('harrison',this.value)">
+      </div>
+    </div>
+    <div class="note-line">
+      Values are filed by month. Update whenever you like — each account carries its last-known value forward until you enter a new one, so a snapshot is never a mess of stray dates. Returns, inflation and savings feed the Projections tab.
+    </div>
+  </div>
+</div>
+
+<!-- ===== SUMMARY (placeholder) ===== -->
+<div class="panel" id="tab-summary">
+  <div class="placeholder">
+    <div class="ph-icon">📊</div>
+    <h2>Summary — coming next</h2>
+    <p>This tab will read your snapshots and show net worth over time, breakdowns by bucket and owner, assets vs liabilities, and the change since your last snapshot. Nothing to enter here — it's the read-only view of what you log in Track.</p>
+  </div>
+</div>
+
+<!-- ===== PROJECTIONS (placeholder) ===== -->
+<div class="panel" id="tab-proj">
+  <div class="placeholder">
+    <div class="ph-icon">📈</div>
+    <h2>Projections — coming after Summary</h2>
+    <p>This tab will grow your buckets forward at the blended return, with a real/nominal dollar toggle, everyone's age at each horizon, extra-savings scenarios with start and end windows, and a selectable retirement date that flips the model into drawdown.</p>
+  </div>
+</div>
+
+</div><!-- /app-shell -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Strang Household — Net Worth tool  ·  Stage 1 (Track)
+//  Sibling of the Budget tool. Shares Supabase auth (same project).
+//  Storage: its OWN table `networth_data`, one shared row keyed by
+//  HOUSEHOLD_ID='strang'. Never touches budget_data.
+// ═══════════════════════════════════════════════════════════════
+
+// ── Supabase (same project as every tool) ──
+var SUPABASE_URL='https://ldmoxearkzxhzjscprsh.supabase.co';
+var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23Hcg3o5g_ZLw_GYM-gbYR';
+var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+var HOUSEHOLD_ID='strang';
+var LOCAL_BUFFER_KEY='strangNetWorth_offlineBuffer';
+var APP_VERSION='NetWorth-Stage1';
+
+// ── Global state (all declared up-front with defaults) ──
+var ACCOUNTS=[];           // [{id,name,bucket,values:{'YYYY-MM':num}}]
+var _acctId=1;
+var ASSUMPTIONS={blendedReturn:0.061, inflation:0.03, monthlySavings:3667};
+var FAMILY={bryan:'1991-03-26', ashley:'1988-07-21', regan:'2022-05-20', harrison:'2024-04-23'};
+var SAVE_HISTORY=[];
+var selectedYM='';         // month currently being viewed/edited
+var _cloudSaveTimer=null;
+
+// ── Buckets: the fixed grouping. growth used by Projections later. ──
+var BUCKETS=['Cash','Non-Reg','TFSA','RRSP-LIRA','RESP','Physical','Liabilities'];
+var BUCKET_META={
+  'Cash':      {growth:'flat',      cls:'cash'},
+  'Non-Reg':   {growth:'return',    cls:'nonreg'},
+  'TFSA':      {growth:'return',    cls:'tfsa'},
+  'RRSP-LIRA': {growth:'return',    cls:'rrsp'},
+  'RESP':      {growth:'return',    cls:'resp'},
+  'Physical':  {growth:'flat',      cls:'phys'},
+  'Liabilities':{growth:'liability',cls:'liab'}
+};
+function growthForBucket(b){return (BUCKET_META[b]||{}).growth||'flat';}
+function isLiability(b){return b==='Liabilities';}
+
+// ═══ SEED (Play Ground snapshot, June 3 2026) ═══
+function seedAccounts(){
+  var S='2026-06';
+  function A(name,bucket,val){return {id:_acctId++,name:name,bucket:bucket,values:(function(){var o={};o[S]=val;return o;})()};}
+  return [
+    A("Bryan's TD Chequing","Cash",6444),
+    A("Bryan's Wealthsimple Cash","Cash",16160),
+    A("Ashley's TD Chequing","Cash",14000),
+    A("Joint TD Chequing","Cash",5591),
+    A("Joint Wealthsimple Cash","Cash",7744),
+    A("Bryan's Wealthsimple Non-Reg","Non-Reg",179.83),
+    A("Ashley's Wealthsimple Non-Reg","Non-Reg",37391),
+    A("Bryan's Wealthsimple TFSA (Directed)","TFSA",70099),
+    A("Bryan's Wealthsimple TFSA (PE)","TFSA",15835),
+    A("Ashley's Wealthsimple TFSA (Directed)","TFSA",104248),
+    A("Bryan's Wealthsimple LIRA","RRSP-LIRA",150782),
+    A("Bryan's Wealthsimple RRSP (Directed)","RRSP-LIRA",28545),
+    A("Bryan's Wealthsimple RRSP (PE)","RRSP-LIRA",15849),
+    A("Ashley's Wealthsimple RRSP (Directed)","RRSP-LIRA",145),
+    A("Kids' Wealthsimple RESP","RESP",19228),
+    A("Tucson","Physical",6000),
+    A("Edge","Physical",17000),
+    A("Harley","Physical",7000),
+    A("Oban Cres (home)","Physical",750000),
+    A("Oban Cres Mortgage","Liabilities",-422891.14)
+  ];
+}
+
+// ── Date / month helpers ──
+function pad2(n){return (n<10?'0':'')+n;}
+function todayYM(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1);}
+function ymLabel(ym){
+  if(!ym)return '—';
+  var p=ym.split('-'),y=+p[0],m=+p[1];
+  var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return M[m-1]+' '+y;
+}
+function ymAdd(ym,delta){
+  var p=ym.split('-'),y=+p[0],m=+p[1]-1;
+  var t=y*12+m+delta;
+  return Math.floor(t/12)+'-'+pad2((t%12)+1);
+}
+function ymCmp(a,b){return a<b?-1:(a>b?1:0);}
+
+// ── Money formatting ──
+function fmtMoney(n){
+  var neg=n<0;
+  var s='$'+Math.abs(Math.round(n)).toLocaleString('en-CA');
+  return neg?'-'+s:s;
+}
+function fmtInput(n){
+  if(n===null||n===undefined||n==='')return '';
+  return (Math.round(n*100)/100).toString();
+}
+
+// ── Snapshot value resolution ──
+// effective(acct, ym): the value in force for that month =
+//   explicit value for ym, else most-recent explicit value before ym.
+function acctMonths(acct){return Object.keys(acct.values||{}).sort();}
+function explicitVal(acct,ym){
+  return (acct.values && acct.values[ym]!==undefined) ? acct.values[ym] : null;
+}
+function effective(acct,ym){
+  if(acct.values && acct.values[ym]!==undefined)
+    return {val:acct.values[ym], sourceYM:ym, isActual:true};
+  var best=null;
+  acctMonths(acct).forEach(function(k){
+    if(ymCmp(k,ym)<=0 && (best===null||ymCmp(k,best)>0)) best=k;
+  });
+  if(best!==null) return {val:acct.values[best], sourceYM:best, isActual:false};
+  return {val:0, sourceYM:null, isActual:false};
+}
+// latest actual snapshot month strictly before ym (across all accounts)
+function priorSnapshotMonth(ym){
+  var months=allSnapshotMonths().filter(function(m){return ymCmp(m,ym)<0;});
+  return months.length?months[months.length-1]:null;
+}
+function allSnapshotMonths(){
+  var set={};
+  ACCOUNTS.forEach(function(a){acctMonths(a).forEach(function(k){set[k]=1;});});
+  return Object.keys(set).sort();
+}
+// navigation bounds: earliest snapshot → current calendar month
+function snapBounds(){
+  var months=allSnapshotMonths();
+  var min=months.length?months[0]:todayYM();
+  var cur=todayYM();
+  var max=(ymCmp(cur,min)>=0)?cur:min;
+  // include any snapshot beyond current month too (defensive)
+  if(months.length&&ymCmp(months[months.length-1],max)>0)max=months[months.length-1];
+  return {min:min,max:max};
+}
+
+// ── Totals for a given month (uses effective values) ──
+function bucketTotal(bucket,ym){
+  var t=0;
+  ACCOUNTS.forEach(function(a){if(a.bucket===bucket)t+=effective(a,ym).val;});
+  return t;
+}
+function totalAssets(ym){
+  var t=0;
+  ACCOUNTS.forEach(function(a){if(!isLiability(a.bucket))t+=effective(a,ym).val;});
+  return t;
+}
+function totalLiabilities(ym){ // returns a negative number (as stored)
+  var t=0;
+  ACCOUNTS.forEach(function(a){if(isLiability(a.bucket))t+=effective(a,ym).val;});
+  return t;
+}
+function netWorth(ym){return totalAssets(ym)+totalLiabilities(ym);}
+
+// ═══════════════ RENDER ═══════════════
+function renderTrack(){
+  if(!selectedYM)selectedYM=todayYM();
+  var b=snapBounds();
+  if(ymCmp(selectedYM,b.min)<0)selectedYM=b.min;
+  if(ymCmp(selectedYM,b.max)>0)selectedYM=b.max;
+
+  // header
+  document.getElementById('snap-title').textContent=ymLabel(selectedYM);
+  document.getElementById('snap-pill').textContent=selectedYM;
+  var hasActual=ACCOUNTS.some(function(a){return explicitVal(a,selectedYM)!==null;});
+  var lbl,clr;
+  if(selectedYM===todayYM()){lbl=hasActual?'Current month · snapshot on file':'Current month · new snapshot (values carried forward)';clr='var(--accent)';}
+  else{lbl=hasActual?'Snapshot on file':'No entries this month · values carried forward';clr=hasActual?'var(--green)':'var(--text3)';}
+  var sl=document.getElementById('snap-status-lbl');sl.textContent=lbl;sl.style.color=clr;
+  document.getElementById('snap-prev').disabled=(selectedYM===b.min);
+  document.getElementById('snap-next').disabled=(selectedYM===b.max);
+
+  renderTrackCards();
+  renderRegister();
+  syncAssumptionInputs();
+}
+
+function renderTrackCards(){
+  var assets=totalAssets(selectedYM);
+  var liab=totalLiabilities(selectedYM);
+  var nw=netWorth(selectedYM);
+  var priorM=priorSnapshotMonth(selectedYM);
+  var deltaHtml='';
+  if(priorM){
+    var prevNW=netWorth(priorM);
+    var d=nw-prevNW;
+    var sign=d>=0?'+':'−';
+    deltaHtml='<div class="card-s">'+sign+fmtMoney(Math.abs(d)).replace('$','$')+' vs '+ymLabel(priorM)+'</div>';
+  }else{
+    deltaHtml='<div class="card-s">First snapshot</div>';
+  }
+  var el=document.getElementById('track-cards');
+  el.innerHTML=
+    '<div class="card"><div class="card-l">Assets</div><div class="card-v">'+fmtMoney(assets)+'</div></div>'+
+    '<div class="card r"><div class="card-l">Liabilities</div><div class="card-v">'+fmtMoney(liab)+'</div></div>'+
+    '<div class="card g"><div class="card-l">Net worth</div><div class="card-v">'+fmtMoney(nw)+'</div></div>'+
+    '<div class="card a"><div class="card-l">Change</div><div class="card-v" style="font-size:15px;">'+(priorM?((nw-netWorth(priorM))>=0?'▲':'▼'):'—')+'</div>'+deltaHtml+'</div>';
+}
+
+function bucketSelectHtml(id,current){
+  var h='<select class="bkt" onchange="setAcctBucket('+id+',this.value)">';
+  BUCKETS.forEach(function(b){h+='<option value="'+b+'"'+(b===current?' selected':'')+'>'+b+'</option>';});
+  return h+'</select>';
+}
+
+function renderRegister(){
+  var body=document.getElementById('reg-body');
+  var priorM=priorSnapshotMonth(selectedYM);
+  var html='';
+  BUCKETS.forEach(function(bucket){
+    var rows=ACCOUNTS.filter(function(a){return a.bucket===bucket;});
+    var sub=bucketTotal(bucket,selectedYM);
+    html+='<tr class="gh"><td colspan="5">'+bucket+'<span class="gh-sub">'+fmtMoney(sub)+'</span></td></tr>';
+    rows.forEach(function(a){
+      var eff=effective(a,selectedYM);
+      var carried=!eff.isActual;
+      // prior snapshot reference + delta
+      var refHtml='<span class="ref-note">—</span>';
+      if(priorM){
+        var prevEff=effective(a,priorM);
+        var dv=eff.val-prevEff.val;
+        var dlCls=dv>0?'up':(dv<0?'dn':'');
+        var dlTxt=dv===0?'':((dv>0?'+':'−')+fmtMoney(Math.abs(dv)).replace('$','$'));
+        refHtml='<span class="ref-note">'+fmtMoney(prevEff.val)+
+          (dlTxt?'<span class="dl '+dlCls+'">'+dlTxt+'</span>':'')+'</span>';
+      }
+      var revert=(!carried)?'<button class="revert" title="Clear this month\'s entry (revert to carried value)" onclick="clearAcctMonth('+a.id+')">↺</button>':'';
+      html+='<tr>'+
+        '<td><div class="name-wrap" onclick="editAcctName('+a.id+',this)"><span class="nm">'+escapeHtml(a.name)+'</span><span class="pencil">✎</span></div></td>'+
+        '<td>'+bucketSelectHtml(a.id,a.bucket)+'</td>'+
+        '<td style="text-align:right;"><input class="ni'+(carried?' carried':'')+'" type="number" step="0.01" value="'+fmtInput(eff.val)+'" '+
+          'onblur="setAcctValue('+a.id+',this.value)" onfocus="this.select()" title="'+(carried?'Carried from '+ymLabel(eff.sourceYM):'Entered for '+ymLabel(selectedYM))+'"> '+revert+'</td>'+
+        '<td style="text-align:right;">'+refHtml+'</td>'+
+        '<td><button class="xb" onclick="delAccount('+a.id+')" title="Remove account">×</button></td>'+
+        '</tr>';
+    });
+    html+='<tr class="add-row"><td colspan="5"><button class="ab" onclick="addAccount(\''+bucket+'\')">+ Add '+bucket.toLowerCase()+' account</button></td></tr>';
+  });
+  body.innerHTML=html;
+}
+
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function syncAssumptionInputs(){
+  document.getElementById('as-return').value=(ASSUMPTIONS.blendedReturn*100).toFixed(1);
+  document.getElementById('as-inflation').value=(ASSUMPTIONS.inflation*100).toFixed(1);
+  document.getElementById('as-savings').value=ASSUMPTIONS.monthlySavings;
+  document.getElementById('fam-bryan').value=FAMILY.bryan||'';
+  document.getElementById('fam-ashley').value=FAMILY.ashley||'';
+  document.getElementById('fam-regan').value=FAMILY.regan||'';
+  document.getElementById('fam-harrison').value=FAMILY.harrison||'';
+}
+
+// ═══════════════ MUTATIONS ═══════════════
+function shiftSnap(delta){
+  var b=snapBounds();
+  var next=ymAdd(selectedYM,delta);
+  if(ymCmp(next,b.min)<0||ymCmp(next,b.max)>0)return;
+  selectedYM=next;
+  renderTrack();
+}
+function setAcctValue(id,raw){
+  var a=ACCOUNTS.find(function(x){return x.id===id;});
+  if(!a)return;
+  var s=(raw===null||raw===undefined)?'':String(raw).trim();
+  if(s===''){ // empty → clear explicit entry for this month
+    if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];
+  }else{
+    var v=parseFloat(s);
+    if(isNaN(v))return;
+    a.values[selectedYM]=v;
+  }
+  renderTrack();scheduleCloudSave();
+}
+function clearAcctMonth(id){
+  var a=ACCOUNTS.find(function(x){return x.id===id;});
+  if(!a)return;
+  if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];
+  renderTrack();scheduleCloudSave();
+}
+function editAcctName(id,wrap){
+  var a=ACCOUNTS.find(function(x){return x.id===id;});
+  if(!a)return;
+  var span=wrap.querySelector('.nm');var cur=span.textContent;
+  var inp=document.createElement('input');inp.className='name-input';inp.value=cur;
+  wrap.replaceWith(inp);inp.focus();inp.select();
+  function commit(){a.name=(inp.value.trim()||cur);renderRegister();scheduleCloudSave();}
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=cur;inp.blur();}});
+}
+function setAcctBucket(id,bucket){
+  var a=ACCOUNTS.find(function(x){return x.id===id;});
+  if(!a||BUCKETS.indexOf(bucket)<0)return;
+  a.bucket=bucket;
+  renderTrack();scheduleCloudSave();
+}
+function addAccount(bucket){
+  var nm=prompt('Account name:','');
+  if(nm===null)return;
+  nm=nm.trim();if(!nm)return;
+  var raw=prompt('Current value ($)'+(bucket==='Liabilities'?' — enter as a negative number':'')+':','');
+  var v=parseFloat(raw);if(isNaN(v))v=0;
+  var vals={};vals[selectedYM]=v;
+  ACCOUNTS.push({id:_acctId++,name:nm,bucket:bucket,values:vals});
+  renderTrack();scheduleCloudSave();
+}
+function delAccount(id){
+  var a=ACCOUNTS.find(function(x){return x.id===id;});
+  if(!a)return;
+  if(!confirm('Remove "'+a.name+'" and its full history?'))return;
+  ACCOUNTS=ACCOUNTS.filter(function(x){return x.id!==id;});
+  renderTrack();scheduleCloudSave();
+}
+function updAssumption(key,val){
+  var v=parseFloat(val);if(isNaN(v))v=0;
+  if(key==='blendedReturn'||key==='inflation')ASSUMPTIONS[key]=v/100;
+  else ASSUMPTIONS[key]=v;
+  scheduleCloudSave();
+}
+function updFamily(key,val){FAMILY[key]=val||'';scheduleCloudSave();}
+
+// ═══════════════ PERSISTENCE ═══════════════
+function buildSavePayload(){
+  var now=new Date().toISOString();
+  SAVE_HISTORY.unshift(now);
+  if(SAVE_HISTORY.length>10)SAVE_HISTORY.length=10;
+  return{
+    version:1,
+    savedAt:now,
+    appVersion:APP_VERSION,
+    saveHistory:SAVE_HISTORY,
+    accounts:ACCOUNTS,
+    acctNextId:_acctId,
+    assumptions:ASSUMPTIONS,
+    family:FAMILY
+  };
+}
+function applyLoadedData(data,sourceLbl){
+  if(!data)return;
+  ACCOUNTS=Array.isArray(data.accounts)?data.accounts:ACCOUNTS;
+  _acctId=data.acctNextId||(ACCOUNTS.length?Math.max.apply(null,ACCOUNTS.map(function(a){return a.id||0;}))+1:1);
+  if(data.assumptions)ASSUMPTIONS={blendedReturn:0.061,inflation:0.03,monthlySavings:3667,...data.assumptions};
+  if(data.family)FAMILY={...FAMILY,...data.family};
+  SAVE_HISTORY=data.saveHistory||[];
+  var d=new Date(data.savedAt||Date.now());
+  document.getElementById('last-saved-lbl').textContent=
+    (sourceLbl||'Loaded')+' · Saved '+d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
+  selectedYM=todayYM();
+  renderTrack();
+}
+function scheduleCloudSave(){
+  if(_cloudSaveTimer)clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer=setTimeout(saveToCloud,600);
+}
+async function saveToCloud(){
+  var payload=buildSavePayload();
+  if(!sbClient){showSavedBadge('Cloud not configured',true);return;}
+  try{
+    if(!navigator.onLine)throw new Error('offline');
+    var res=await sbClient.from('networth_data').upsert(
+      {household_id:HOUSEHOLD_ID,data:payload,updated_at:new Date().toISOString()},
+      {onConflict:'household_id'}
+    );
+    if(res.error)throw res.error;
+    localStorage.removeItem(LOCAL_BUFFER_KEY);
+    showSavedBadge('Saved ✓');
+  }catch(err){
+    localStorage.setItem(LOCAL_BUFFER_KEY,JSON.stringify(payload));
+    showSavedBadge('Saved offline ⚠',true);
+  }
+}
+function syncOfflineBuffer(){
+  var buf=localStorage.getItem(LOCAL_BUFFER_KEY);
+  if(buf&&sbClient)saveToCloud();
+}
+window.addEventListener('online',syncOfflineBuffer);
+async function loadFromCloud(){
+  if(!sbClient)return;
+  try{
+    var res=await sbClient.from('networth_data').select('data,updated_at').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error)throw res.error;
+    if(res.data&&res.data.data){
+      applyLoadedData(res.data.data,'Loaded from cloud');
+    }else{
+      // First run on this table: seed with the June 3 snapshot and save it up.
+      ACCOUNTS=seedAccounts();
+      selectedYM=todayYM();
+      renderTrack();
+      document.getElementById('last-saved-lbl').textContent='Seeded from your June 3 balance sheet — saving…';
+      saveToCloud();
+    }
+  }catch(err){
+    var buf=localStorage.getItem(LOCAL_BUFFER_KEY);
+    if(buf){applyLoadedData(JSON.parse(buf),'Loaded from offline buffer (unsynced)');}
+    else{document.getElementById('last-saved-lbl').textContent='Could not reach cloud — check your connection';}
+  }
+}
+function showSavedBadge(msg,isErr){
+  var b=document.getElementById('saved-badge');
+  b.textContent=msg;
+  b.classList.toggle('offline',!!isErr);
+  b.classList.add('show');
+  clearTimeout(showSavedBadge._t);
+  showSavedBadge._t=setTimeout(function(){b.classList.remove('show');},2200);
+}
+
+// ── Export / Import / Download ──
+function exportData(){
+  var payload=buildSavePayload();
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var d=new Date();
+  a.href=url;a.download='Strang_Net_Worth_-_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.json';
+  a.click();URL.revokeObjectURL(url);
+  saveToCloud();
+  showSavedBadge('Exported ✓');
+}
+function importData(ev){
+  var file=ev.target.files[0];if(!file)return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{applyLoadedData(JSON.parse(r.result),'Imported');scheduleCloudSave();}
+    catch(e){alert('Could not read that file — is it a Net Worth export?');}
+  };
+  r.readAsText(file);
+  ev.target.value='';
+}
+function downloadHTML(){
+  var html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var d=new Date();
+  a.href=url;a.download='Strang_Net_Worth_-_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.html';
+  a.click();URL.revokeObjectURL(url);
+  showSavedBadge('Downloaded ✓');
+}
+
+// ═══════════════ TABS ═══════════════
+function showTab(n){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
+  document.getElementById('tab-'+n).classList.add('on');
+  document.getElementById('t-'+n).classList.add('on');
+  if(n==='track')renderTrack();
+  // 'summary' and 'proj' are placeholders in Stage 1
+}
+
+// ═══════════════ AUTH ═══════════════
+function showLoginScreen(){
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app-shell').classList.add('hidden');
+}
+function showAppScreen(){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+}
+async function doSignIn(){
+  var email=document.getElementById('login-email').value.trim();
+  var pw=document.getElementById('login-pw').value;
+  var errEl=document.getElementById('login-err');
+  var btn=document.getElementById('login-btn');
+  errEl.textContent='';
+  if(!email||!pw){errEl.textContent='Enter your email and password.';return;}
+  if(!sbClient){errEl.textContent='Cloud backend not configured yet.';return;}
+  btn.disabled=true;btn.textContent='Signing in…';
+  var res=await sbClient.auth.signInWithPassword({email:email,password:pw});
+  btn.disabled=false;btn.textContent='Sign in';
+  if(res.error){errEl.textContent=res.error.message;return;}
+  document.getElementById('login-pw').value='';
+  await initAppAfterAuth();
+}
+async function doSignOut(){
+  if(sbClient)await sbClient.auth.signOut();
+  showLoginScreen();
+}
+async function initAppAfterAuth(){
+  showAppScreen();
+  selectedYM=todayYM();
+  renderTrack();
+  await loadFromCloud();
+  syncOfflineBuffer();
+}
+async function initAuth(){
+  if(!sbClient){showLoginScreen();document.getElementById('login-err').textContent='Cloud backend not configured — edit SUPABASE_URL/SUPABASE_ANON_KEY in the script.';return;}
+  var res=await sbClient.auth.getSession();
+  if(res.data&&res.data.session){await initAppAfterAuth();}
+  else{showLoginScreen();}
+  sbClient.auth.onAuthStateChange(function(event){if(event==='SIGNED_OUT')showLoginScreen();});
+}
+window.addEventListener('load',function(){initAuth();});
+</script>
+</body>
+</html>
