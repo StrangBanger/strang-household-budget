@@ -1872,6 +1872,8 @@ function renderTable(months){
   var seed=typeof getEffectiveSeed==='function'?getEffectiveSeed(months[0]?months[0].ym:'2026-01'):(parseFloat(document.getElementById('seed').value)||0);
   var todym=todayYM(),rows='',lastYr=null,cum=seed;
   var curYr=parseInt(todym.split('-')[0]),yrData={};
+  // Month immediately after current — its balance is "in flux" (depends on current month's still-changing net)
+  var nextYM=(typeof xym==='function'&&typeof ymx==='function')?xym(ymx(todym)+1):null;
 
   function avgRow(yr){
     var yd=yrData[yr],n=yd.count||1;
@@ -1919,11 +1921,17 @@ function renderTable(months){
       actSpendCell=hasAct?fmtR(act.total):'<span style="color:var(--text3);font-style:italic;">no data</span>';
       actNetCell='<span class="'+(netForCum>=0?'pos':'neg')+'">'+(netForCum>=0?'+':'')+fmtR(netForCum)+'</span>';
     }
-    cum+=netForCum;
     var hasSnap=(typeof BAL_SNAPSHOTS!=='undefined'&&BAL_SNAPSHOTS[m.ym]!==undefined);
+    // Anchor: a real snapshot resets the running balance to the recorded value.
+    // Otherwise roll forward by netForCum (projected for current+future months, actual for completed past months).
+    if(hasSnap){cum=BAL_SNAPSHOTS[m.ym];}
+    else{cum+=netForCum;}
     var balCell;
     if(hasSnap){
       balCell='<td class="'+(BAL_SNAPSHOTS[m.ym]>=0?'pos':'neg')+'" style="font-weight:600;">'+fmtR(BAL_SNAPSHOTS[m.ym])+'</td>';
+    } else if(m.ym===nextYM){
+      // Month right after current — value in flux, accent blue italic to call attention
+      balCell='<td style="color:var(--accent);font-style:italic;">'+fmtR(cum)+'</td>';
     } else {
       balCell='<td style="color:var(--text3);font-style:italic;">'+fmtR(cum)+'</td>';
     }
