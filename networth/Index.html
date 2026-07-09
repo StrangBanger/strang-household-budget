@@ -17,14 +17,6 @@
   --radius:8px;
   --font:'Inter',system-ui,-apple-system,sans-serif;
   --mono:'JetBrains Mono','Fira Mono',monospace;
-  /* bucket tints */
-  --cash:#0F6E56;--cash-bg:#E8F5F1;
-  --nonreg:#185FA5;--nonreg-bg:#EBF2FB;
-  --tfsa:#7C3AED;--tfsa-bg:#F3ECFF;
-  --rrsp:#A36000;--rrsp-bg:#FFF4E2;
-  --resp:#0E7490;--resp-bg:#E4F5FA;
-  --phys:#4A4740;--phys-bg:#F0EEE9;
-  --liab:#A32D2D;--liab-bg:#FBEAEA;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
@@ -69,10 +61,12 @@ button.hbtn.signout:hover{background:var(--surface2);color:var(--text2);}
 /* MONTH HEADER */
 .month-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
 .month-nav{display:flex;align-items:center;gap:8px;}
-.month-nav button{font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
-.month-nav button:hover:not(:disabled){background:var(--surface2);color:var(--text);}
-.month-nav button:disabled{opacity:.3;cursor:default;}
+.month-nav button.arw{font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
+.month-nav button.arw:hover:not(:disabled){background:var(--surface2);color:var(--text);}
+.month-nav button.arw:disabled{opacity:.3;cursor:default;}
 .month-pill{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;font-family:var(--mono);text-align:center;min-width:90px;background:var(--accent-bg);color:var(--accent);border:1.5px solid #B8D4F0;}
+.clear-month{font-size:12px;font-weight:500;padding:6px 12px;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--surface);color:var(--text3);cursor:pointer;white-space:nowrap;}
+.clear-month:hover{background:var(--red-bg);border-color:#F0BABA;color:var(--red);}
 /* CARDS */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1rem;}
@@ -85,47 +79,55 @@ button.hbtn.signout:hover{background:var(--surface2);color:var(--text2);}
 .card.a .card-v{color:var(--accent);}.card.g .card-v{color:var(--green);}.card.r .card-v{color:var(--red);}
 .card-s{font-size:11px;color:var(--text3);margin-top:2px;}
 /* REGISTER TABLE */
-.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;margin-bottom:1rem;}
-table.nt{width:100%;border-collapse:collapse;min-width:720px;}
-table.nt thead th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem;}
+.tbl-scroll{overflow-x:auto;}
+table.nt{width:100%;border-collapse:collapse;min-width:760px;}
+table.nt thead th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;background:var(--surface);}
 table.nt thead th.r{text-align:right;}
-table.nt td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table.nt td{padding:6px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
 table.nt tr:last-child td{border-bottom:none;}
-table.nt tr.gh td{background:#1A1916;font-size:11px;font-weight:700;color:#FFF;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;}
-table.nt tr.gh td .gh-sub{float:right;font-weight:600;font-family:var(--mono);letter-spacing:0;color:#D8D3CC;text-transform:none;}
-table.nt tr.add-row td{padding:2px 6px;}
+/* group header — soft grey, matches budget Month Detail */
+table.nt tr.gh td{background:var(--surface2);font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+table.nt tr.gh td .gh-sub{float:right;font-weight:600;font-family:var(--mono);letter-spacing:0;color:var(--text2);text-transform:none;font-size:12px;}
+table.nt tr.add-row td{padding:2px 8px;border-bottom:1px solid var(--border);}
+table.nt tr.acct:hover td{background:#FBFAF8;}
+table.nt tr.closed td{opacity:.55;}
 .name-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .name-wrap span.nm{font-size:13px;color:var(--text);}
 .name-wrap .pencil{opacity:0;font-size:11px;color:var(--text3);transition:opacity .15s;}
 .name-wrap:hover .pencil{opacity:1;}
+.closed-tag{font-size:10px;font-weight:600;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;margin-left:6px;text-transform:uppercase;letter-spacing:.04em;}
 input.name-input{font-size:13px;font-family:var(--font);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;outline:none;background:var(--surface);width:220px;}
-input.ni{width:110px;padding:3px 6px;font-size:13px;font-family:var(--mono);text-align:right;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text);}
+input.ni{width:112px;padding:4px 7px;font-size:13px;font-family:var(--mono);text-align:right;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text);}
 input.ni:hover{border-color:var(--border-strong);background:var(--bg);}
 input.ni:focus{border-color:var(--accent);background:var(--surface);outline:none;}
 input.ni.carried{color:var(--text3);font-style:italic;}
-select.bkt{font-size:11px;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font);}
-select.bkt:hover{border-color:var(--border-strong);background:var(--bg);}
-select.bkt:focus{border-color:var(--accent);outline:none;}
+input.ni:disabled{opacity:.5;cursor:default;}
+select.sel{font-size:12px;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font);}
+select.sel:hover{border-color:var(--border-strong);background:var(--bg);}
+select.sel:focus{border-color:var(--accent);outline:none;}
 .ref-note{font-size:11px;color:var(--text3);font-family:var(--mono);white-space:nowrap;}
 .ref-note .dl{margin-left:6px;}
 .ref-note .dl.up{color:var(--green);}
 .ref-note .dl.dn{color:var(--red);}
-button.xb{font-size:15px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:0 3px;opacity:.4;border-radius:4px;}
-button.xb:hover{color:var(--red);opacity:1;background:var(--red-bg);}
-button.revert{font-size:12px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:0 4px;opacity:.5;border-radius:4px;}
-button.revert:hover{color:var(--accent);opacity:1;background:var(--accent-bg);}
+.acct-actions{display:flex;align-items:center;gap:2px;justify-content:flex-end;}
+button.act{font-size:11px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:3px 6px;border-radius:4px;white-space:nowrap;}
+button.act.close:hover{color:var(--accent);background:var(--accent-bg);}
+button.act.reopen:hover{color:var(--green);background:var(--green-bg);}
+button.act.del{font-size:15px;padding:2px 5px;opacity:.4;}
+button.act.del:hover{color:var(--red);opacity:1;background:var(--red-bg);}
 button.ab{font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:7px 10px;display:block;width:100%;text-align:left;border-radius:5px;}
 button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 /* ASSUMPTIONS BOX */
 .assum-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;margin-bottom:1rem;}
 .assum-box h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;}
-.assum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 20px;}
+.assum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px 20px;max-width:560px;}
 .assum-field label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:3px;}
 .assum-field .sub{font-size:10px;color:var(--text3);font-weight:400;}
 .assum-field input{width:100%;padding:6px 9px;font-size:13px;font-family:var(--mono);border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);}
 .assum-field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 .assum-field input.pct-in{text-align:right;}
-.note-line{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.5;}
+.note-line{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.5;max-width:640px;}
 /* PLACEHOLDER PANELS */
 .placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
 .placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
@@ -183,29 +185,31 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
       <div id="snap-status-lbl" style="font-size:11px;font-weight:500;margin-top:2px;color:var(--accent);">—</div>
     </div>
     <div class="month-nav">
-      <button id="snap-prev" onclick="shiftSnap(-1)">‹</button>
+      <button class="arw" id="snap-prev" onclick="shiftSnap(-1)">‹</button>
       <div class="month-pill" id="snap-pill">—</div>
-      <button id="snap-next" onclick="shiftSnap(1)">›</button>
+      <button class="arw" id="snap-next" onclick="shiftSnap(1)">›</button>
+      <button class="clear-month" onclick="clearWholeMonth()" title="Remove every entry filed under this month">Clear month</button>
     </div>
   </div>
 
   <div class="cards" id="track-cards"></div>
 
-  <div class="tbl-wrap">
+  <div class="tbl-wrap"><div class="tbl-scroll">
     <table class="nt" id="reg-tbl">
       <thead><tr>
         <th>Account</th>
-        <th style="width:130px;">Type</th>
+        <th style="width:110px;">Owner</th>
+        <th style="width:120px;">Type</th>
         <th class="r" style="width:150px;">Value</th>
         <th class="r" style="width:170px;">Prior snapshot</th>
-        <th style="width:30px;"></th>
+        <th style="width:120px;"></th>
       </tr></thead>
       <tbody id="reg-body"></tbody>
     </table>
-  </div>
+  </div></div>
 
   <div class="assum-box">
-    <h3>Assumptions &amp; household</h3>
+    <h3>Assumptions</h3>
     <div class="assum-grid">
       <div class="assum-field">
         <label>Blended return <span class="sub">annual, all-equity</span></label>
@@ -219,25 +223,9 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
         <label>Monthly savings <span class="sub">$/mo, manual for now</span></label>
         <input type="number" step="50" id="as-savings" onchange="updAssumption('monthlySavings',this.value)">
       </div>
-      <div class="assum-field">
-        <label>Bryan <span class="sub">birth date</span></label>
-        <input type="date" id="fam-bryan" onchange="updFamily('bryan',this.value)">
-      </div>
-      <div class="assum-field">
-        <label>Ashley <span class="sub">birth date</span></label>
-        <input type="date" id="fam-ashley" onchange="updFamily('ashley',this.value)">
-      </div>
-      <div class="assum-field">
-        <label>Regan <span class="sub">birth date</span></label>
-        <input type="date" id="fam-regan" onchange="updFamily('regan',this.value)">
-      </div>
-      <div class="assum-field">
-        <label>Harrison <span class="sub">birth date</span></label>
-        <input type="date" id="fam-harrison" onchange="updFamily('harrison',this.value)">
-      </div>
     </div>
     <div class="note-line">
-      Values are filed by month. Update whenever you like — each account carries its last-known value forward until you enter a new one, so a snapshot is never a mess of stray dates. Returns, inflation and savings feed the Projections tab.
+      Values are filed by month — update whenever you like, and each account carries its last-known value forward until you enter a new one. Closing an account keeps its history but drops it to $0 from the close month onward. Household birth dates are stored and feed the Projections tab; they don't change, so they're not shown here.
     </div>
   </div>
 </div>
@@ -277,55 +265,60 @@ var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPA
 var HOUSEHOLD_ID='strang';
 var LOCAL_BUFFER_KEY='strangNetWorth_offlineBuffer';
 var APP_VERSION='NetWorth-Stage1';
+var FLOOR_YM='2024-03';   // earliest navigable month
 
 // ── Global state (all declared up-front with defaults) ──
-var ACCOUNTS=[];           // [{id,name,bucket,values:{'YYYY-MM':num}}]
+var ACCOUNTS=[];           // [{id,name,owner,bucket,values:{'YYYY-MM':num},closedYM:null}]
 var _acctId=1;
 var ASSUMPTIONS={blendedReturn:0.061, inflation:0.03, monthlySavings:3667};
+// Birth dates: stored + saved, feed Projections. Not editable in UI (never change).
+// If one ever must change, edit here and it flows through.
 var FAMILY={bryan:'1991-03-26', ashley:'1988-07-21', regan:'2022-05-20', harrison:'2024-04-23'};
 var SAVE_HISTORY=[];
-var selectedYM='';         // month currently being viewed/edited
+var selectedYM='';
 var _cloudSaveTimer=null;
 
-// ── Buckets: the fixed grouping. growth used by Projections later. ──
+// ── Buckets & owners ──
 var BUCKETS=['Cash','Non-Reg','TFSA','RRSP-LIRA','RESP','Physical','Liabilities'];
 var BUCKET_META={
-  'Cash':      {growth:'flat',      cls:'cash'},
-  'Non-Reg':   {growth:'return',    cls:'nonreg'},
-  'TFSA':      {growth:'return',    cls:'tfsa'},
-  'RRSP-LIRA': {growth:'return',    cls:'rrsp'},
-  'RESP':      {growth:'return',    cls:'resp'},
-  'Physical':  {growth:'flat',      cls:'phys'},
-  'Liabilities':{growth:'liability',cls:'liab'}
+  'Cash':      {growth:'flat'},
+  'Non-Reg':   {growth:'return'},
+  'TFSA':      {growth:'return'},
+  'RRSP-LIRA': {growth:'return'},
+  'RESP':      {growth:'return'},
+  'Physical':  {growth:'flat'},
+  'Liabilities':{growth:'liability'}
 };
+var OWNERS=['Bryan','Ashley','Joint','Kids'];
 function growthForBucket(b){return (BUCKET_META[b]||{}).growth||'flat';}
 function isLiability(b){return b==='Liabilities';}
 
-// ═══ SEED (Play Ground snapshot, June 3 2026) ═══
-function seedAccounts(){
-  var S='2026-06';
-  function A(name,bucket,val){return {id:_acctId++,name:name,bucket:bucket,values:(function(){var o={};o[S]=val;return o;})()};}
+// ═══ SCAFFOLD — account list only, blank values. ═══
+// Appears when the cloud table is empty; user enters figures, Supabase persists.
+function scaffoldAccounts(){
+  _acctId=1;
+  function A(name,owner,bucket){return {id:_acctId++,name:name,owner:owner,bucket:bucket,values:{},closedYM:null};}
   return [
-    A("Bryan's TD Chequing","Cash",6444),
-    A("Bryan's Wealthsimple Cash","Cash",16160),
-    A("Ashley's TD Chequing","Cash",14000),
-    A("Joint TD Chequing","Cash",5591),
-    A("Joint Wealthsimple Cash","Cash",7744),
-    A("Bryan's Wealthsimple Non-Reg","Non-Reg",179.83),
-    A("Ashley's Wealthsimple Non-Reg","Non-Reg",37391),
-    A("Bryan's Wealthsimple TFSA (Directed)","TFSA",70099),
-    A("Bryan's Wealthsimple TFSA (PE)","TFSA",15835),
-    A("Ashley's Wealthsimple TFSA (Directed)","TFSA",104248),
-    A("Bryan's Wealthsimple LIRA","RRSP-LIRA",150782),
-    A("Bryan's Wealthsimple RRSP (Directed)","RRSP-LIRA",28545),
-    A("Bryan's Wealthsimple RRSP (PE)","RRSP-LIRA",15849),
-    A("Ashley's Wealthsimple RRSP (Directed)","RRSP-LIRA",145),
-    A("Kids' Wealthsimple RESP","RESP",19228),
-    A("Tucson","Physical",6000),
-    A("Edge","Physical",17000),
-    A("Harley","Physical",7000),
-    A("Oban Cres (home)","Physical",750000),
-    A("Oban Cres Mortgage","Liabilities",-422891.14)
+    A("Bryan's TD Chequing","Bryan","Cash"),
+    A("Bryan's Wealthsimple Cash","Bryan","Cash"),
+    A("Ashley's TD Chequing","Ashley","Cash"),
+    A("Joint TD Chequing","Joint","Cash"),
+    A("Joint Wealthsimple Cash","Joint","Cash"),
+    A("Bryan's Wealthsimple Non-Reg","Bryan","Non-Reg"),
+    A("Ashley's Wealthsimple Non-Reg","Ashley","Non-Reg"),
+    A("Bryan's Wealthsimple TFSA (Directed)","Bryan","TFSA"),
+    A("Bryan's Wealthsimple TFSA (PE)","Bryan","TFSA"),
+    A("Ashley's Wealthsimple TFSA (Directed)","Ashley","TFSA"),
+    A("Bryan's Wealthsimple LIRA","Bryan","RRSP-LIRA"),
+    A("Bryan's Wealthsimple RRSP (Directed)","Bryan","RRSP-LIRA"),
+    A("Bryan's Wealthsimple RRSP (PE)","Bryan","RRSP-LIRA"),
+    A("Ashley's Wealthsimple RRSP (Directed)","Ashley","RRSP-LIRA"),
+    A("Kids' Wealthsimple RESP","Kids","RESP"),
+    A("Tucson","Joint","Physical"),
+    A("Edge","Joint","Physical"),
+    A("Harley","Joint","Physical"),
+    A("Oban Cres (home)","Joint","Physical"),
+    A("Oban Cres Mortgage","Joint","Liabilities")
   ];
 }
 
@@ -334,9 +327,9 @@ function pad2(n){return (n<10?'0':'')+n;}
 function todayYM(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1);}
 function ymLabel(ym){
   if(!ym)return '—';
-  var p=ym.split('-'),y=+p[0],m=+p[1];
+  var p=ym.split('-'),m=+p[1];
   var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return M[m-1]+' '+y;
+  return M[m-1]+' '+p[0];
 }
 function ymAdd(ym,delta){
   var p=ym.split('-'),y=+p[0],m=+p[1]-1;
@@ -356,14 +349,14 @@ function fmtInput(n){
   return (Math.round(n*100)/100).toString();
 }
 
-// ── Snapshot value resolution ──
-// effective(acct, ym): the value in force for that month =
-//   explicit value for ym, else most-recent explicit value before ym.
+// ── Snapshot value resolution (respects account close) ──
 function acctMonths(acct){return Object.keys(acct.values||{}).sort();}
 function explicitVal(acct,ym){
   return (acct.values && acct.values[ym]!==undefined) ? acct.values[ym] : null;
 }
+function isClosedAt(acct,ym){return acct.closedYM && ymCmp(ym,acct.closedYM)>=0;}
 function effective(acct,ym){
+  if(isClosedAt(acct,ym)) return {val:0, sourceYM:acct.closedYM, isActual:false, closed:true};
   if(acct.values && acct.values[ym]!==undefined)
     return {val:acct.values[ym], sourceYM:ym, isActual:true};
   var best=null;
@@ -373,42 +366,33 @@ function effective(acct,ym){
   if(best!==null) return {val:acct.values[best], sourceYM:best, isActual:false};
   return {val:0, sourceYM:null, isActual:false};
 }
-// latest actual snapshot month strictly before ym (across all accounts)
-function priorSnapshotMonth(ym){
-  var months=allSnapshotMonths().filter(function(m){return ymCmp(m,ym)<0;});
-  return months.length?months[months.length-1]:null;
-}
 function allSnapshotMonths(){
   var set={};
   ACCOUNTS.forEach(function(a){acctMonths(a).forEach(function(k){set[k]=1;});});
   return Object.keys(set).sort();
 }
-// navigation bounds: earliest snapshot → current calendar month
+function priorSnapshotMonth(ym){
+  var months=allSnapshotMonths().filter(function(m){return ymCmp(m,ym)<0;});
+  return months.length?months[months.length-1]:null;
+}
 function snapBounds(){
   var months=allSnapshotMonths();
-  var min=months.length?months[0]:todayYM();
+  var min=FLOOR_YM;
   var cur=todayYM();
   var max=(ymCmp(cur,min)>=0)?cur:min;
-  // include any snapshot beyond current month too (defensive)
   if(months.length&&ymCmp(months[months.length-1],max)>0)max=months[months.length-1];
   return {min:min,max:max};
 }
 
-// ── Totals for a given month (uses effective values) ──
+// ── Totals for a month (effective values) ──
 function bucketTotal(bucket,ym){
-  var t=0;
-  ACCOUNTS.forEach(function(a){if(a.bucket===bucket)t+=effective(a,ym).val;});
-  return t;
+  var t=0;ACCOUNTS.forEach(function(a){if(a.bucket===bucket)t+=effective(a,ym).val;});return t;
 }
 function totalAssets(ym){
-  var t=0;
-  ACCOUNTS.forEach(function(a){if(!isLiability(a.bucket))t+=effective(a,ym).val;});
-  return t;
+  var t=0;ACCOUNTS.forEach(function(a){if(!isLiability(a.bucket))t+=effective(a,ym).val;});return t;
 }
-function totalLiabilities(ym){ // returns a negative number (as stored)
-  var t=0;
-  ACCOUNTS.forEach(function(a){if(isLiability(a.bucket))t+=effective(a,ym).val;});
-  return t;
+function totalLiabilities(ym){
+  var t=0;ACCOUNTS.forEach(function(a){if(isLiability(a.bucket))t+=effective(a,ym).val;});return t;
 }
 function netWorth(ym){return totalAssets(ym)+totalLiabilities(ym);}
 
@@ -419,7 +403,6 @@ function renderTrack(){
   if(ymCmp(selectedYM,b.min)<0)selectedYM=b.min;
   if(ymCmp(selectedYM,b.max)>0)selectedYM=b.max;
 
-  // header
   document.getElementById('snap-title').textContent=ymLabel(selectedYM);
   document.getElementById('snap-pill').textContent=selectedYM;
   var hasActual=ACCOUNTS.some(function(a){return explicitVal(a,selectedYM)!==null;});
@@ -440,26 +423,22 @@ function renderTrackCards(){
   var liab=totalLiabilities(selectedYM);
   var nw=netWorth(selectedYM);
   var priorM=priorSnapshotMonth(selectedYM);
-  var deltaHtml='';
+  var deltaHtml,arrow;
   if(priorM){
-    var prevNW=netWorth(priorM);
-    var d=nw-prevNW;
-    var sign=d>=0?'+':'−';
-    deltaHtml='<div class="card-s">'+sign+fmtMoney(Math.abs(d)).replace('$','$')+' vs '+ymLabel(priorM)+'</div>';
-  }else{
-    deltaHtml='<div class="card-s">First snapshot</div>';
-  }
-  var el=document.getElementById('track-cards');
-  el.innerHTML=
+    var d=nw-netWorth(priorM);
+    arrow=d>=0?'▲':'▼';
+    deltaHtml='<div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs '+ymLabel(priorM)+'</div>';
+  }else{arrow='—';deltaHtml='<div class="card-s">First snapshot</div>';}
+  document.getElementById('track-cards').innerHTML=
     '<div class="card"><div class="card-l">Assets</div><div class="card-v">'+fmtMoney(assets)+'</div></div>'+
     '<div class="card r"><div class="card-l">Liabilities</div><div class="card-v">'+fmtMoney(liab)+'</div></div>'+
     '<div class="card g"><div class="card-l">Net worth</div><div class="card-v">'+fmtMoney(nw)+'</div></div>'+
-    '<div class="card a"><div class="card-l">Change</div><div class="card-v" style="font-size:15px;">'+(priorM?((nw-netWorth(priorM))>=0?'▲':'▼'):'—')+'</div>'+deltaHtml+'</div>';
+    '<div class="card a"><div class="card-l">Change</div><div class="card-v" style="font-size:15px;">'+arrow+'</div>'+deltaHtml+'</div>';
 }
 
-function bucketSelectHtml(id,current){
-  var h='<select class="bkt" onchange="setAcctBucket('+id+',this.value)">';
-  BUCKETS.forEach(function(b){h+='<option value="'+b+'"'+(b===current?' selected':'')+'>'+b+'</option>';});
+function selHtml(cls,id,opts,current,handler){
+  var h='<select class="'+cls+'" onchange="'+handler+'('+id+',this.value)">';
+  opts.forEach(function(o){h+='<option value="'+o+'"'+(o===current?' selected':'')+'>'+o+'</option>';});
   return h+'</select>';
 }
 
@@ -470,8 +449,9 @@ function renderRegister(){
   BUCKETS.forEach(function(bucket){
     var rows=ACCOUNTS.filter(function(a){return a.bucket===bucket;});
     var sub=bucketTotal(bucket,selectedYM);
-    html+='<tr class="gh"><td colspan="5">'+bucket+'<span class="gh-sub">'+fmtMoney(sub)+'</span></td></tr>';
+    html+='<tr class="gh"><td colspan="6">'+bucket+'<span class="gh-sub">'+fmtMoney(sub)+'</span></td></tr>';
     rows.forEach(function(a){
+      var closedNow=isClosedAt(a,selectedYM);
       var eff=effective(a,selectedYM);
       var carried=!eff.isActual;
       // prior snapshot reference + delta
@@ -480,21 +460,31 @@ function renderRegister(){
         var prevEff=effective(a,priorM);
         var dv=eff.val-prevEff.val;
         var dlCls=dv>0?'up':(dv<0?'dn':'');
-        var dlTxt=dv===0?'':((dv>0?'+':'−')+fmtMoney(Math.abs(dv)).replace('$','$'));
-        refHtml='<span class="ref-note">'+fmtMoney(prevEff.val)+
-          (dlTxt?'<span class="dl '+dlCls+'">'+dlTxt+'</span>':'')+'</span>';
+        var dlTxt=dv===0?'':((dv>0?'+':'−')+fmtMoney(Math.abs(dv)));
+        refHtml='<span class="ref-note">'+fmtMoney(prevEff.val)+(dlTxt?'<span class="dl '+dlCls+'">'+dlTxt+'</span>':'')+'</span>';
       }
-      var revert=(!carried)?'<button class="revert" title="Clear this month\'s entry (revert to carried value)" onclick="clearAcctMonth('+a.id+')">↺</button>':'';
-      html+='<tr>'+
-        '<td><div class="name-wrap" onclick="editAcctName('+a.id+',this)"><span class="nm">'+escapeHtml(a.name)+'</span><span class="pencil">✎</span></div></td>'+
-        '<td>'+bucketSelectHtml(a.id,a.bucket)+'</td>'+
-        '<td style="text-align:right;"><input class="ni'+(carried?' carried':'')+'" type="number" step="0.01" value="'+fmtInput(eff.val)+'" '+
-          'onblur="setAcctValue('+a.id+',this.value)" onfocus="this.select()" title="'+(carried?'Carried from '+ymLabel(eff.sourceYM):'Entered for '+ymLabel(selectedYM))+'"> '+revert+'</td>'+
+      var valCell,actions;
+      if(closedNow){
+        valCell='<input class="ni" type="text" value="Closed · $0" disabled>';
+        actions='<button class="act reopen" onclick="reopenAccount('+a.id+')" title="Reopen this account">Reopen</button>';
+      }else{
+        valCell='<input class="ni'+(carried?' carried':'')+'" type="number" step="0.01" value="'+fmtInput(eff.val)+'" '+
+          'onblur="setAcctValue('+a.id+',this.value)" onfocus="this.select()" title="'+(carried?'Carried from '+ymLabel(eff.sourceYM):'Entered for '+ymLabel(selectedYM))+'">'+
+          ((!carried)?' <button class="act" style="font-size:12px;opacity:.5;" title="Clear this month\u2019s entry" onclick="clearAcctMonth('+a.id+')">↺</button>':'');
+        actions='<button class="act close" onclick="closeAccount('+a.id+')" title="Close — keeps history, $0 from '+ymLabel(selectedYM)+' onward">Close</button>'+
+          '<button class="act del" onclick="delAccount('+a.id+')" title="Delete permanently (alters past totals)">×</button>';
+      }
+      var closedTag=closedNow?'<span class="closed-tag">Closed '+ymLabel(a.closedYM)+'</span>':'';
+      html+='<tr class="acct'+(closedNow?' closed':'')+'">'+
+        '<td><div class="name-wrap" onclick="editAcctName('+a.id+',this)"><span class="nm">'+escapeHtml(a.name)+'</span><span class="pencil">✎</span></div>'+closedTag+'</td>'+
+        '<td>'+selHtml('sel',a.id,OWNERS,a.owner||'Joint','setAcctOwner')+'</td>'+
+        '<td>'+selHtml('sel',a.id,BUCKETS,a.bucket,'setAcctBucket')+'</td>'+
+        '<td style="text-align:right;">'+valCell+'</td>'+
         '<td style="text-align:right;">'+refHtml+'</td>'+
-        '<td><button class="xb" onclick="delAccount('+a.id+')" title="Remove account">×</button></td>'+
+        '<td><div class="acct-actions">'+actions+'</div></td>'+
         '</tr>';
     });
-    html+='<tr class="add-row"><td colspan="5"><button class="ab" onclick="addAccount(\''+bucket+'\')">+ Add '+bucket.toLowerCase()+' account</button></td></tr>';
+    html+='<tr class="add-row"><td colspan="6"><button class="ab" onclick="addAccount(\''+bucket+'\')">+ Add '+bucket.toLowerCase()+' account</button></td></tr>';
   });
   body.innerHTML=html;
 }
@@ -505,10 +495,6 @@ function syncAssumptionInputs(){
   document.getElementById('as-return').value=(ASSUMPTIONS.blendedReturn*100).toFixed(1);
   document.getElementById('as-inflation').value=(ASSUMPTIONS.inflation*100).toFixed(1);
   document.getElementById('as-savings').value=ASSUMPTIONS.monthlySavings;
-  document.getElementById('fam-bryan').value=FAMILY.bryan||'';
-  document.getElementById('fam-ashley').value=FAMILY.ashley||'';
-  document.getElementById('fam-regan').value=FAMILY.regan||'';
-  document.getElementById('fam-harrison').value=FAMILY.harrison||'';
 }
 
 // ═══════════════ MUTATIONS ═══════════════
@@ -516,31 +502,29 @@ function shiftSnap(delta){
   var b=snapBounds();
   var next=ymAdd(selectedYM,delta);
   if(ymCmp(next,b.min)<0||ymCmp(next,b.max)>0)return;
-  selectedYM=next;
-  renderTrack();
+  selectedYM=next;renderTrack();
 }
 function setAcctValue(id,raw){
-  var a=ACCOUNTS.find(function(x){return x.id===id;});
-  if(!a)return;
+  var a=findAcct(id);if(!a)return;
   var s=(raw===null||raw===undefined)?'':String(raw).trim();
-  if(s===''){ // empty → clear explicit entry for this month
-    if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];
-  }else{
-    var v=parseFloat(s);
-    if(isNaN(v))return;
-    a.values[selectedYM]=v;
-  }
+  if(s===''){if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];}
+  else{var v=parseFloat(s);if(isNaN(v))return;a.values[selectedYM]=v;}
   renderTrack();scheduleCloudSave();
 }
 function clearAcctMonth(id){
-  var a=ACCOUNTS.find(function(x){return x.id===id;});
-  if(!a)return;
+  var a=findAcct(id);if(!a)return;
   if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];
   renderTrack();scheduleCloudSave();
 }
+function clearWholeMonth(){
+  var n=0;ACCOUNTS.forEach(function(a){if(a.values[selectedYM]!==undefined)n++;});
+  if(n===0){alert('No entries filed under '+ymLabel(selectedYM)+' to clear.');return;}
+  if(!confirm('Clear all '+n+' entr'+(n===1?'y':'ies')+' filed under '+ymLabel(selectedYM)+'? Each account reverts to its carried-forward value. History in other months is untouched.'))return;
+  ACCOUNTS.forEach(function(a){if(a.values[selectedYM]!==undefined)delete a.values[selectedYM];});
+  renderTrack();scheduleCloudSave();
+}
 function editAcctName(id,wrap){
-  var a=ACCOUNTS.find(function(x){return x.id===id;});
-  if(!a)return;
+  var a=findAcct(id);if(!a)return;
   var span=wrap.querySelector('.nm');var cur=span.textContent;
   var inp=document.createElement('input');inp.className='name-input';inp.value=cur;
   wrap.replaceWith(inp);inp.focus();inp.select();
@@ -548,56 +532,59 @@ function editAcctName(id,wrap){
   inp.addEventListener('blur',commit);
   inp.addEventListener('keydown',function(e){if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=cur;inp.blur();}});
 }
+function setAcctOwner(id,owner){
+  var a=findAcct(id);if(!a||OWNERS.indexOf(owner)<0)return;
+  a.owner=owner;scheduleCloudSave();
+}
 function setAcctBucket(id,bucket){
-  var a=ACCOUNTS.find(function(x){return x.id===id;});
-  if(!a||BUCKETS.indexOf(bucket)<0)return;
-  a.bucket=bucket;
-  renderTrack();scheduleCloudSave();
+  var a=findAcct(id);if(!a||BUCKETS.indexOf(bucket)<0)return;
+  a.bucket=bucket;renderTrack();scheduleCloudSave();
 }
 function addAccount(bucket){
   var nm=prompt('Account name:','');
-  if(nm===null)return;
-  nm=nm.trim();if(!nm)return;
-  var raw=prompt('Current value ($)'+(bucket==='Liabilities'?' — enter as a negative number':'')+':','');
-  var v=parseFloat(raw);if(isNaN(v))v=0;
-  var vals={};vals[selectedYM]=v;
-  ACCOUNTS.push({id:_acctId++,name:nm,bucket:bucket,values:vals});
+  if(nm===null)return;nm=nm.trim();if(!nm)return;
+  ACCOUNTS.push({id:_acctId++,name:nm,owner:'Joint',bucket:bucket,values:{},closedYM:null});
   renderTrack();scheduleCloudSave();
 }
+function closeAccount(id){
+  var a=findAcct(id);if(!a)return;
+  if(!confirm('Close "'+a.name+'" as of '+ymLabel(selectedYM)+'?\n\nIts history before this month is kept intact. It shows $0 from '+ymLabel(selectedYM)+' onward and drops off active entry. You can reopen it anytime.'))return;
+  a.closedYM=selectedYM;renderTrack();scheduleCloudSave();
+}
+function reopenAccount(id){
+  var a=findAcct(id);if(!a)return;
+  a.closedYM=null;renderTrack();scheduleCloudSave();
+}
 function delAccount(id){
-  var a=ACCOUNTS.find(function(x){return x.id===id;});
-  if(!a)return;
-  if(!confirm('Remove "'+a.name+'" and its full history?'))return;
+  var a=findAcct(id);if(!a)return;
+  if(!confirm('DELETE "'+a.name+'" permanently?\n\nThis removes the account AND its entire value history, which WILL change your past net-worth totals. To keep history and just stop tracking it, use Close instead.\n\nDelete anyway?'))return;
   ACCOUNTS=ACCOUNTS.filter(function(x){return x.id!==id;});
   renderTrack();scheduleCloudSave();
 }
 function updAssumption(key,val){
   var v=parseFloat(val);if(isNaN(v))v=0;
-  if(key==='blendedReturn'||key==='inflation')ASSUMPTIONS[key]=v/100;
-  else ASSUMPTIONS[key]=v;
+  if(key==='blendedReturn'||key==='inflation')ASSUMPTIONS[key]=v/100;else ASSUMPTIONS[key]=v;
   scheduleCloudSave();
 }
-function updFamily(key,val){FAMILY[key]=val||'';scheduleCloudSave();}
+function findAcct(id){return ACCOUNTS.find(function(x){return x.id===id;});}
 
 // ═══════════════ PERSISTENCE ═══════════════
 function buildSavePayload(){
   var now=new Date().toISOString();
   SAVE_HISTORY.unshift(now);
   if(SAVE_HISTORY.length>10)SAVE_HISTORY.length=10;
-  return{
-    version:1,
-    savedAt:now,
-    appVersion:APP_VERSION,
-    saveHistory:SAVE_HISTORY,
-    accounts:ACCOUNTS,
-    acctNextId:_acctId,
-    assumptions:ASSUMPTIONS,
-    family:FAMILY
-  };
+  return{version:1,savedAt:now,appVersion:APP_VERSION,saveHistory:SAVE_HISTORY,
+    accounts:ACCOUNTS,acctNextId:_acctId,assumptions:ASSUMPTIONS,family:FAMILY};
+}
+function normalizeAccounts(list){
+  return (list||[]).map(function(a){
+    return {id:a.id,name:a.name,owner:a.owner||'Joint',bucket:a.bucket,
+      values:a.values||{},closedYM:a.closedYM||null};
+  });
 }
 function applyLoadedData(data,sourceLbl){
   if(!data)return;
-  ACCOUNTS=Array.isArray(data.accounts)?data.accounts:ACCOUNTS;
+  if(Array.isArray(data.accounts))ACCOUNTS=normalizeAccounts(data.accounts);
   _acctId=data.acctNextId||(ACCOUNTS.length?Math.max.apply(null,ACCOUNTS.map(function(a){return a.id||0;}))+1:1);
   if(data.assumptions)ASSUMPTIONS={blendedReturn:0.061,inflation:0.03,monthlySavings:3667,...data.assumptions};
   if(data.family)FAMILY={...FAMILY,...data.family};
@@ -605,8 +592,7 @@ function applyLoadedData(data,sourceLbl){
   var d=new Date(data.savedAt||Date.now());
   document.getElementById('last-saved-lbl').textContent=
     (sourceLbl||'Loaded')+' · Saved '+d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
-  selectedYM=todayYM();
-  renderTrack();
+  selectedYM=todayYM();renderTrack();
 }
 function scheduleCloudSave(){
   if(_cloudSaveTimer)clearTimeout(_cloudSaveTimer);
@@ -619,14 +605,11 @@ async function saveToCloud(){
     if(!navigator.onLine)throw new Error('offline');
     var res=await sbClient.from('networth_data').upsert(
       {household_id:HOUSEHOLD_ID,data:payload,updated_at:new Date().toISOString()},
-      {onConflict:'household_id'}
-    );
+      {onConflict:'household_id'});
     if(res.error)throw res.error;
-    localStorage.removeItem(LOCAL_BUFFER_KEY);
-    showSavedBadge('Saved ✓');
+    localStorage.removeItem(LOCAL_BUFFER_KEY);showSavedBadge('Saved ✓');
   }catch(err){
-    localStorage.setItem(LOCAL_BUFFER_KEY,JSON.stringify(payload));
-    showSavedBadge('Saved offline ⚠',true);
+    localStorage.setItem(LOCAL_BUFFER_KEY,JSON.stringify(payload));showSavedBadge('Saved offline ⚠',true);
   }
 }
 function syncOfflineBuffer(){
@@ -642,11 +625,9 @@ async function loadFromCloud(){
     if(res.data&&res.data.data){
       applyLoadedData(res.data.data,'Loaded from cloud');
     }else{
-      // First run on this table: seed with the June 3 snapshot and save it up.
-      ACCOUNTS=seedAccounts();
-      selectedYM=todayYM();
-      renderTrack();
-      document.getElementById('last-saved-lbl').textContent='Seeded from your June 3 balance sheet — saving…';
+      // Empty table → lay down the account scaffold (blank values) and save it up.
+      ACCOUNTS=scaffoldAccounts();selectedYM=todayYM();renderTrack();
+      document.getElementById('last-saved-lbl').textContent='New — enter values from March 2024 onward. Saving scaffold…';
       saveToCloud();
     }
   }catch(err){
@@ -657,9 +638,7 @@ async function loadFromCloud(){
 }
 function showSavedBadge(msg,isErr){
   var b=document.getElementById('saved-badge');
-  b.textContent=msg;
-  b.classList.toggle('offline',!!isErr);
-  b.classList.add('show');
+  b.textContent=msg;b.classList.toggle('offline',!!isErr);b.classList.add('show');
   clearTimeout(showSavedBadge._t);
   showSavedBadge._t=setTimeout(function(){b.classList.remove('show');},2200);
 }
@@ -668,33 +647,23 @@ function showSavedBadge(msg,isErr){
 function exportData(){
   var payload=buildSavePayload();
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  var d=new Date();
+  var url=URL.createObjectURL(blob);var a=document.createElement('a');var d=new Date();
   a.href=url;a.download='Strang_Net_Worth_-_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.json';
-  a.click();URL.revokeObjectURL(url);
-  saveToCloud();
-  showSavedBadge('Exported ✓');
+  a.click();URL.revokeObjectURL(url);saveToCloud();showSavedBadge('Exported ✓');
 }
 function importData(ev){
   var file=ev.target.files[0];if(!file)return;
   var r=new FileReader();
-  r.onload=function(){
-    try{applyLoadedData(JSON.parse(r.result),'Imported');scheduleCloudSave();}
-    catch(e){alert('Could not read that file — is it a Net Worth export?');}
-  };
-  r.readAsText(file);
-  ev.target.value='';
+  r.onload=function(){try{applyLoadedData(JSON.parse(r.result),'Imported');scheduleCloudSave();}
+    catch(e){alert('Could not read that file — is it a Net Worth export?');}};
+  r.readAsText(file);ev.target.value='';
 }
 function downloadHTML(){
   var html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
-  var blob=new Blob([html],{type:'text/html'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  var d=new Date();
+  var blob=new Blob([html],{type:'text/html'});var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');var d=new Date();
   a.href=url;a.download='Strang_Net_Worth_-_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.html';
-  a.click();URL.revokeObjectURL(url);
-  showSavedBadge('Downloaded ✓');
+  a.click();URL.revokeObjectURL(url);showSavedBadge('Downloaded ✓');
 }
 
 // ═══════════════ TABS ═══════════════
@@ -704,7 +673,6 @@ function showTab(n){
   document.getElementById('tab-'+n).classList.add('on');
   document.getElementById('t-'+n).classList.add('on');
   if(n==='track')renderTrack();
-  // 'summary' and 'proj' are placeholders in Stage 1
 }
 
 // ═══════════════ AUTH ═══════════════
@@ -719,8 +687,7 @@ function showAppScreen(){
 async function doSignIn(){
   var email=document.getElementById('login-email').value.trim();
   var pw=document.getElementById('login-pw').value;
-  var errEl=document.getElementById('login-err');
-  var btn=document.getElementById('login-btn');
+  var errEl=document.getElementById('login-err');var btn=document.getElementById('login-btn');
   errEl.textContent='';
   if(!email||!pw){errEl.textContent='Enter your email and password.';return;}
   if(!sbClient){errEl.textContent='Cloud backend not configured yet.';return;}
@@ -731,22 +698,15 @@ async function doSignIn(){
   document.getElementById('login-pw').value='';
   await initAppAfterAuth();
 }
-async function doSignOut(){
-  if(sbClient)await sbClient.auth.signOut();
-  showLoginScreen();
-}
+async function doSignOut(){if(sbClient)await sbClient.auth.signOut();showLoginScreen();}
 async function initAppAfterAuth(){
-  showAppScreen();
-  selectedYM=todayYM();
-  renderTrack();
-  await loadFromCloud();
-  syncOfflineBuffer();
+  showAppScreen();selectedYM=todayYM();renderTrack();
+  await loadFromCloud();syncOfflineBuffer();
 }
 async function initAuth(){
   if(!sbClient){showLoginScreen();document.getElementById('login-err').textContent='Cloud backend not configured — edit SUPABASE_URL/SUPABASE_ANON_KEY in the script.';return;}
   var res=await sbClient.auth.getSession();
-  if(res.data&&res.data.session){await initAppAfterAuth();}
-  else{showLoginScreen();}
+  if(res.data&&res.data.session){await initAppAfterAuth();}else{showLoginScreen();}
   sbClient.auth.onAuthStateChange(function(event){if(event==='SIGNED_OUT')showLoginScreen();});
 }
 window.addEventListener('load',function(){initAuth();});
