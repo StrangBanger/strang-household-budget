@@ -1153,11 +1153,16 @@ function renderProjCards(P,V){
   var retRow=rows.filter(function(r){return r.year===P.drawdownStartYear;})[0]||rows[rows.length-1];
   var endRow=rows[rows.length-1];
   function m(v,y){return fmtMoney(projDisp(v,y,cy,inf));}
+  // On the Scenarios view (with an active scenario) the depletion/end-balance
+  // cards track the SCENARIO path; on Projections they track the base case.
+  var useScen=(V.withScenario && P.hasScenario);
+  var dep=useScen?P.depScen:P.depBase;
+  var endVal=useScen?endRow.scen:endRow.base;
   var endCard;
-  if(P.depBase!==null){endCard='<div class="card r"><div class="card-l">Runs dry</div><div class="card-v">Age '+P.depBase+'</div><div class="card-s">base case depletes</div></div>';}
-  else{endCard='<div class="card g"><div class="card-l">At age '+endRow.bryanAge+'</div><div class="card-v">'+m(endRow.base,endRow.year)+'</div></div>';}
+  if(dep!==null){endCard='<div class="card r"><div class="card-l">Runs dry</div><div class="card-v">Age '+dep+'</div><div class="card-s">'+(useScen?'scenario':'base case')+' depletes</div></div>';}
+  else{endCard='<div class="card g"><div class="card-l">At age '+endRow.bryanAge+'</div><div class="card-v">'+m(endVal,endRow.year)+'</div></div>';}
   var lastCard;
-  if(V.withScenario && P.hasScenario){
+  if(useScen){
     var d=retRow.scen-retRow.base;
     lastCard='<div class="card a"><div class="card-l">Scenario at retirement</div><div class="card-v">'+m(retRow.scen,retRow.year)+'</div><div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs base</div></div>';
   }else{
@@ -1205,7 +1210,8 @@ function renderProjChart(P,V){
     }
   });
   var note='Solid = building (contributions run until the first of you retires, at '+P.firstRetireYear+'). Dashed = drawdown, from your retirement at age '+P.drawdownAge+'.';
-  if(P.depBase!==null)note+=' Base case runs dry at your age '+P.depBase+'.';
+  var noteDep=showScen?P.depScen:P.depBase;
+  if(noteDep!==null)note+=' '+(showScen?'Scenario':'Base case')+' runs dry at your age '+noteDep+'.';
   document.getElementById(V.chartNote).textContent=note;
 }
 
