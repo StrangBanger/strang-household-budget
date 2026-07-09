@@ -135,6 +135,8 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 .sum-current{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--green);letter-spacing:-.02em;}
 .chart-box{position:relative;height:280px;}
 .chart-note{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.4;}
+.chart-subhd{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:1.25rem 0 .5rem;padding-top:1rem;border-top:1px solid var(--border);}
+.chart-box.pie-box{height:320px;}
 .mini-nav{display:flex;align-items:center;gap:6px;}
 .mini-nav button.mini-arw{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
 .mini-nav button.mini-arw:hover:not(:disabled){background:var(--surface2);color:var(--text);}
@@ -252,10 +254,9 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
   <div id="sum-content">
     <div class="sum-card">
       <div class="sum-card-hd">
-        <h3>Net worth over time</h3>
-        <span class="sum-current" id="nw-current">—</span>
+        <h3>Asset buckets over time</h3>
       </div>
-      <div class="chart-box"><canvas id="ch-nw"></canvas></div>
+      <div class="chart-box"><canvas id="ch-lines"></canvas></div>
     </div>
 
     <div class="sum-card">
@@ -268,14 +269,17 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
         </div>
       </div>
       <div class="chart-box"><canvas id="ch-bars"></canvas></div>
-      <div class="chart-note">Investable buckets only. Physical assets and liabilities are reflected in the net-worth line above.</div>
+      <div class="chart-subhd">By account</div>
+      <div class="chart-box pie-box"><canvas id="ch-pie"></canvas></div>
+      <div class="chart-note">Investable buckets only, for the selected month. Each bucket's accounts share a colour, shaded light to dark. Physical assets and liabilities are reflected in the net-worth line below.</div>
     </div>
 
     <div class="sum-card">
       <div class="sum-card-hd">
-        <h3>Asset buckets over time</h3>
+        <h3>Net worth over time</h3>
+        <span class="sum-current" id="nw-current">—</span>
       </div>
-      <div class="chart-box"><canvas id="ch-lines"></canvas></div>
+      <div class="chart-box"><canvas id="ch-nw"></canvas></div>
     </div>
   </div>
 </div>
@@ -712,7 +716,15 @@ var ASSET_CHART_BUCKETS=['Cash','Non-Reg','TFSA','RRSP-LIRA','RESP'];
 var BUCKET_COLORS={
   'Cash':'#0F6E56','Non-Reg':'#185FA5','TFSA':'#7C3AED','RRSP-LIRA':'#A36000','RESP':'#0E7490'
 };
-var SUM_CHARTS={nw:null,bars:null,lines:null};
+// blend a hex colour toward white by t (0=base .. 1=white) — for account shading within a bucket
+function shade(hex,t){
+  var h=hex.replace('#','');
+  var r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+  r=Math.round(r+(255-r)*t);g=Math.round(g+(255-g)*t);b=Math.round(b+(255-b)*t);
+  function hx(n){return (n<16?'0':'')+n.toString(16);}
+  return '#'+hx(r)+hx(g)+hx(b);
+}
+var SUM_CHARTS={nw:null,bars:null,lines:null,pie:null};
 var summaryBarYM='';
 
 function monthSeq(a,b){
@@ -742,7 +754,47 @@ function renderSummary(){
   if(typeof Chart==='undefined')return; // guard if CDN blocked
   renderNWLine(months);
   renderBucketBars(months);
+  renderAccountPie();
   renderBucketLines(months);
+}
+
+// Pie: every account in the 5 investable buckets with effective value > 0
+// in the selected month. Bucket = hue; its accounts shaded light→dark.
+// Accounts closed by (or $0 in) the selected month drop out; an account
+// open & funded that month still shows even if closed later.
+function renderAccountPie(){
+  var labels=[],data=[],colors=[];
+  ASSET_CHART_BUCKETS.forEach(function(bucket){
+    var accts=ACCOUNTS.filter(function(a){return a.bucket===bucket;})
+      .map(function(a){return {name:a.name,val:effective(a,summaryBarYM).val};})
+      .filter(function(x){return x.val>0.005;})
+      .sort(function(a,b){return b.val-a.val;});
+    var n=accts.length;
+    accts.forEach(function(x,i){
+      labels.push(x.name);
+      data.push(Math.round(x.val));
+      // shade range 0 (base) .. up to ~0.55 for the lightest, stepped
+      var t=(n<=1)?0:(0.55*i/(n-1));
+      colors.push(shade(BUCKET_COLORS[bucket],t));
+    });
+  });
+  destroyChart('pie');
+  if(!labels.length){return;} // nothing funded this month — leave blank
+  SUM_CHARTS.pie=new Chart(document.getElementById('ch-pie'),{
+    type:'doughnut',
+    data:{labels:labels,datasets:[{data:data,backgroundColor:colors,borderColor:'#FFF',borderWidth:1.5}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'52%',
+      plugins:{
+        legend:{position:'right',labels:{boxWidth:11,boxHeight:11,font:{size:11},color:'#4A4740',padding:8,usePointStyle:true,pointStyle:'rectRounded'}},
+        tooltip:{callbacks:{label:function(c){
+          var tot=c.dataset.data.reduce(function(s,v){return s+v;},0);
+          var pct=tot?Math.round(c.parsed/tot*100):0;
+          return c.label+': '+fmtMoney(c.parsed)+' ('+pct+'%)';
+        }}}
+      }
+    }
+  });
 }
 
 function renderNWLine(months){
@@ -790,7 +842,7 @@ function renderBucketLines(months){
   var datasets=ASSET_CHART_BUCKETS.map(function(b){
     return{label:b,data:seq.map(function(ym){return Math.round(bucketTotal(b,ym));}),
       borderColor:BUCKET_COLORS[b],backgroundColor:BUCKET_COLORS[b],
-      borderWidth:2,fill:false,tension:.25,pointRadius:seq.length>24?0:2.5};
+      borderWidth:3,fill:false,tension:.25,pointRadius:seq.length>24?0:2.5};
   });
   destroyChart('lines');
   SUM_CHARTS.lines=new Chart(document.getElementById('ch-lines'),{
@@ -822,6 +874,7 @@ function barShift(delta){
   if(ni<0||ni>=months.length)return;
   summaryBarYM=months[ni];
   renderBucketBars(months);
+  renderAccountPie();
 }
 
 // ═══════════════ TABS ═══════════════
