@@ -313,7 +313,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
   <div class="placeholder" id="proj-empty" style="display:none;">
     <div class="ph-icon">📈</div>
     <h2>Nothing to project yet</h2>
-    <p>Enter some account values in Track so there's an investable balance to grow. Projections use the five investable buckets (Cash, Non-Reg, TFSA, RRSP-LIRA, RESP) — the house and mortgage are excluded.</p>
+    <p>Enter some account values in Track so there's an investable balance to grow. Projections use your invested buckets only (Non-Reg, TFSA, RRSP-LIRA, RESP) — cash, the house and the mortgage are excluded.</p>
   </div>
   <div id="proj-content">
     <div class="proj-controls">
@@ -970,11 +970,14 @@ function barShift(delta){
 }
 
 // ═══════════════ PROJECTIONS TAB ═══════════════
+// Projections grow only actually-invested buckets — Cash (chequing/savings)
+// is excluded since it isn't compounding at the equity return.
+var PROJ_BUCKETS=['Non-Reg','TFSA','RRSP-LIRA','RESP'];
 function birthYear(k){var v=FAMILY[k];return v?parseInt(String(v).split('-')[0],10):null;}
 function investableNow(){
   var months=allSnapshotMonths();if(!months.length)return 0;
   var ym=months[months.length-1],t=0;
-  ACCOUNTS.forEach(function(a){if(ASSET_CHART_BUCKETS.indexOf(a.bucket)>=0)t+=effective(a,ym).val;});
+  ACCOUNTS.forEach(function(a){if(PROJ_BUCKETS.indexOf(a.bucket)>=0)t+=effective(a,ym).val;});
   return t;
 }
 // Build the year-by-year projection. Returns rows + key markers.
