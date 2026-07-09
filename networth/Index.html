@@ -142,6 +142,26 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 .mini-nav button.mini-arw:hover:not(:disabled){background:var(--surface2);color:var(--text);}
 .mini-nav button.mini-arw:disabled{opacity:.3;cursor:default;}
 .mini-nav .mini-month{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--accent);background:var(--accent-bg);border-radius:20px;padding:4px 12px;min-width:82px;text-align:center;}
+/* PROJECTIONS */
+.proj-controls{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;}
+@media(max-width:720px){.proj-controls{grid-template-columns:1fr;}}
+.pc-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;}
+.pc-group h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;}
+.pc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px 16px;}
+.pc-note{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.4;}
+.proj-bar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
+.proj-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px;}
+.proj-toggle .pt-btn{font-size:12px;font-weight:600;padding:5px 14px;border:none;background:none;color:var(--text3);border-radius:16px;cursor:pointer;}
+.proj-toggle .pt-btn.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.proj-mode-note{font-size:11px;color:var(--text3);}
+table.proj-tbl{min-width:520px;}
+table.proj-tbl td,table.proj-tbl th{padding:7px 12px;font-size:12px;border-bottom:1px solid var(--border);text-align:left;}
+table.proj-tbl thead th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;background:var(--surface2);}
+table.proj-tbl td.r,table.proj-tbl th.r{text-align:right;font-family:var(--mono);}
+table.proj-tbl tr.ret td{background:var(--accent-bg);}
+table.proj-tbl tr.ret td:first-child{font-weight:700;color:var(--accent);}
+table.proj-tbl .agebr{color:var(--text3);font-size:11px;}
+table.proj-tbl tr.depleted td{color:var(--red);}
 /* PLACEHOLDER PANELS */
 .placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
 .placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
@@ -286,10 +306,57 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 
 <!-- ===== PROJECTIONS (placeholder) ===== -->
 <div class="panel" id="tab-proj">
-  <div class="placeholder">
+  <div class="placeholder" id="proj-empty" style="display:none;">
     <div class="ph-icon">📈</div>
-    <h2>Projections — coming after Summary</h2>
-    <p>This tab will grow your buckets forward at the blended return, with a real/nominal dollar toggle, everyone's age at each horizon, extra-savings scenarios with start and end windows, and a selectable retirement date that flips the model into drawdown.</p>
+    <h2>Nothing to project yet</h2>
+    <p>Enter some account values in Track so there's an investable balance to grow. Projections use the five investable buckets (Cash, Non-Reg, TFSA, RRSP-LIRA, RESP) — the house and mortgage are excluded.</p>
+  </div>
+  <div id="proj-content">
+    <div class="proj-controls">
+      <div class="pc-group">
+        <h3>Retirement &amp; withdrawals</h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Your retirement age</label><input type="number" step="1" id="pj-bryan-ret" onchange="updProj('bryanRetireAge',this.value)"></div>
+          <div class="assum-field"><label>Ashley's retirement age</label><input type="number" step="1" id="pj-ashley-ret" onchange="updProj('ashleyRetireAge',this.value)"></div>
+          <div class="assum-field"><label>Project to age <span class="sub">your age</span></label><input type="number" step="1" id="pj-end-age" onchange="updProj('endAge',this.value)"></div>
+          <div class="assum-field"><label>Withdrawal / yr <span class="sub">today's $, gross</span></label><input type="number" step="1000" id="pj-wd1" onchange="updProj('wdTier1',this.value)"></div>
+          <div class="assum-field"><label>Breakpoint age</label><input type="number" step="1" id="pj-break" onchange="updProj('wdBreakAge',this.value)"></div>
+          <div class="assum-field"><label>Withdrawal / yr after <span class="sub">today's $, gross</span></label><input type="number" step="1000" id="pj-wd2" onchange="updProj('wdTier2',this.value)"></div>
+        </div>
+      </div>
+      <div class="pc-group">
+        <h3>Scenario — extra savings</h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Extra savings / mo <span class="sub">on top of base</span></label><input type="number" step="100" id="pj-sc-extra" onchange="updProj('scExtra',this.value)"></div>
+          <div class="assum-field"><label>From age <span class="sub">blank = now</span></label><input type="number" step="1" id="pj-sc-start" onchange="updProj('scStartAge',this.value)"></div>
+          <div class="assum-field"><label>Until age <span class="sub">blank = retirement</span></label><input type="number" step="1" id="pj-sc-end" onchange="updProj('scEndAge',this.value)"></div>
+        </div>
+        <div class="pc-note">Draws a second line so you can see the effect of saving more, optionally only for a window (e.g. the next 5 years).</div>
+      </div>
+    </div>
+
+    <div class="proj-bar">
+      <div class="proj-toggle">
+        <button id="pj-mode-nominal" class="pt-btn on" onclick="setProjMode('nominal')">Future $</button>
+        <button id="pj-mode-real" class="pt-btn" onclick="setProjMode('real')">Today's $</button>
+      </div>
+      <div class="proj-mode-note" id="pj-mode-note"></div>
+    </div>
+
+    <div class="cards" id="proj-cards"></div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd"><h3>Investable assets over time</h3></div>
+      <div class="chart-box" style="height:320px;"><canvas id="ch-proj"></canvas></div>
+      <div class="chart-note" id="proj-chart-note"></div>
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd"><h3>Balance at key ages</h3></div>
+      <div class="tbl-scroll">
+        <table class="nt proj-tbl" id="proj-tbl"><tbody></tbody></table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -319,6 +386,13 @@ var ASSUMPTIONS={blendedReturn:0.061, inflation:0.03, monthlySavings:3667};
 // Birth dates: stored + saved, feed Projections. Not editable in UI (never change).
 // If one ever must change, edit here and it flows through.
 var FAMILY={bryan:'1991-03-26', ashley:'1988-07-21', regan:'2022-05-20', harrison:'2024-04-23'};
+// Projection inputs (persisted).
+var PROJ={
+  bryanRetireAge:60, ashleyRetireAge:60, endAge:100,
+  wdTier1:80000, wdBreakAge:65, wdTier2:65000,
+  scExtra:0, scStartAge:null, scEndAge:null,
+  displayMode:'nominal'
+};
 var SAVE_HISTORY=[];
 var selectedYM='';
 var _cloudSaveTimer=null;
@@ -619,7 +693,7 @@ function buildSavePayload(){
   SAVE_HISTORY.unshift(now);
   if(SAVE_HISTORY.length>10)SAVE_HISTORY.length=10;
   return{version:1,savedAt:now,appVersion:APP_VERSION,saveHistory:SAVE_HISTORY,
-    accounts:ACCOUNTS,acctNextId:_acctId,assumptions:ASSUMPTIONS,family:FAMILY};
+    accounts:ACCOUNTS,acctNextId:_acctId,assumptions:ASSUMPTIONS,family:FAMILY,proj:PROJ};
 }
 function normalizeAccounts(list){
   return (list||[]).map(function(a){
@@ -633,6 +707,7 @@ function applyLoadedData(data,sourceLbl){
   _acctId=data.acctNextId||(ACCOUNTS.length?Math.max.apply(null,ACCOUNTS.map(function(a){return a.id||0;}))+1:1);
   if(data.assumptions)ASSUMPTIONS={blendedReturn:0.061,inflation:0.03,monthlySavings:3667,...data.assumptions};
   if(data.family)FAMILY={...FAMILY,...data.family};
+  if(data.proj)PROJ={...PROJ,...data.proj};
   SAVE_HISTORY=data.saveHistory||[];
   var d=new Date(data.savedAt||Date.now());
   document.getElementById('last-saved-lbl').textContent=
@@ -724,7 +799,7 @@ function shade(hex,t){
   function hx(n){return (n<16?'0':'')+n.toString(16);}
   return '#'+hx(r)+hx(g)+hx(b);
 }
-var SUM_CHARTS={nw:null,bars:null,lines:null,pie:null};
+var SUM_CHARTS={nw:null,bars:null,lines:null,pie:null,proj:null};
 var summaryBarYM='';
 
 function monthSeq(a,b){
@@ -890,6 +965,193 @@ function barShift(delta){
   renderAccountPie();
 }
 
+// ═══════════════ PROJECTIONS TAB ═══════════════
+function birthYear(k){var v=FAMILY[k];return v?parseInt(String(v).split('-')[0],10):null;}
+function investableNow(){
+  var months=allSnapshotMonths();if(!months.length)return 0;
+  var ym=months[months.length-1],t=0;
+  ACCOUNTS.forEach(function(a){if(ASSET_CHART_BUCKETS.indexOf(a.bucket)>=0)t+=effective(a,ym).val;});
+  return t;
+}
+// Build the year-by-year projection. Returns rows + key markers.
+function computeProjection(){
+  var g=ASSUMPTIONS.blendedReturn, inf=ASSUMPTIONS.inflation, save=ASSUMPTIONS.monthlySavings*12;
+  var cy=new Date().getFullYear();
+  var byBY=birthYear('bryan'), ashBY=birthYear('ashley'), regBY=birthYear('regan'), harBY=birthYear('harrison');
+  if(byBY===null)return null;
+  var bryanAgeNow=cy-byBY;
+  var endAge=Math.max(PROJ.endAge, bryanAgeNow+1);
+  var lastYear=byBY+endAge;
+  var bryanRetireYear=byBY+PROJ.bryanRetireAge;
+  var ashleyRetireYear=(ashBY!==null)?ashBY+PROJ.ashleyRetireAge:bryanRetireYear;
+  var firstRetireYear=Math.min(bryanRetireYear,ashleyRetireYear);
+  var drawdownStartYear=bryanRetireYear;
+
+  var base=investableNow(), scen=base;
+  var rows=[], depBase=null, depScen=null;
+  function push(y){
+    var ba=y-byBY;
+    rows.push({
+      year:y, bryanAge:ba,
+      ashleyAge:(ashBY!==null)?y-ashBY:null,
+      reganAge:(regBY!==null)?y-regBY:null,
+      harrisonAge:(harBY!==null)?y-harBY:null,
+      base:base, scen:scen
+    });
+  }
+  push(cy);
+  for(var y=cy+1;y<=lastYear;y++){
+    var ba=y-byBY;
+    // grow
+    base*=(1+g); scen*=(1+g);
+    // contributions (both working, before drawdown)
+    if(y<=firstRetireYear && y<drawdownStartYear){base+=save; scen+=save;}
+    // scenario extra savings within window, during accumulation
+    var inWin=(PROJ.scStartAge==null||ba>=PROJ.scStartAge)&&(PROJ.scEndAge==null||ba<=PROJ.scEndAge);
+    if(PROJ.scExtra>0 && inWin && y<drawdownStartYear) scen+=PROJ.scExtra*12;
+    // withdrawals (Bryan retired), inflated forward from today's $
+    if(y>=drawdownStartYear){
+      var wdToday=(ba<PROJ.wdBreakAge)?PROJ.wdTier1:PROJ.wdTier2;
+      var wd=wdToday*Math.pow(1+inf, y-cy);
+      base-=wd; scen-=wd;
+    }
+    if(base<0)base=0; if(scen<0)scen=0;
+    if(base<=0 && depBase===null && y>=drawdownStartYear)depBase=ba;
+    if(scen<=0 && depScen===null && y>=drawdownStartYear)depScen=ba;
+    push(y);
+  }
+  return {rows:rows, cy:cy, inf:inf, drawdownStartYear:drawdownStartYear, drawdownAge:PROJ.bryanRetireAge,
+    firstRetireYear:firstRetireYear, hasScenario:PROJ.scExtra>0, depBase:depBase, depScen:depScen,
+    byBY:byBY, ashBY:ashBY};
+}
+function projDisp(val,year,cy,inf){return PROJ.displayMode==='real'?val/Math.pow(1+inf,year-cy):val;}
+function ageBrackets(row){
+  var parts=[];
+  if(row.ashleyAge!==null)parts.push('Ashley '+row.ashleyAge);
+  if(row.reganAge!==null && row.reganAge>=0)parts.push('Regan '+row.reganAge);
+  if(row.harrisonAge!==null && row.harrisonAge>=0)parts.push('Harrison '+row.harrisonAge);
+  return parts.length?'('+parts.join(' · ')+')':'';
+}
+
+function renderProjections(){
+  var empty=document.getElementById('proj-empty'), content=document.getElementById('proj-content');
+  syncProjInputs();
+  var base0=investableNow();
+  if(base0<=0 || birthYear('bryan')===null){
+    empty.style.display='block';content.style.display='none';destroyChart('proj');return;
+  }
+  empty.style.display='none';content.style.display='block';
+  document.getElementById('pj-mode-note').textContent=
+    PROJ.displayMode==='real'?'Balances shown in today\u2019s purchasing power (inflation removed).':'Balances shown in actual future dollars.';
+  var P=computeProjection();
+  if(!P)return;
+  renderProjCards(P);
+  if(typeof Chart!=='undefined')renderProjChart(P);
+  renderProjTable(P);
+}
+
+function renderProjCards(P){
+  var rows=P.rows, cy=P.cy, inf=P.inf;
+  var start=rows[0].base;
+  var retRow=rows.filter(function(r){return r.year===P.drawdownStartYear;})[0]||rows[rows.length-1];
+  var endRow=rows[rows.length-1];
+  function m(v,y){return fmtMoney(projDisp(v,y,cy,inf));}
+  var endCard;
+  if(P.depBase!==null){endCard='<div class="card r"><div class="card-l">Runs dry</div><div class="card-v">Age '+P.depBase+'</div><div class="card-s">base case depletes</div></div>';}
+  else{endCard='<div class="card g"><div class="card-l">At age '+endRow.bryanAge+'</div><div class="card-v">'+m(endRow.base,endRow.year)+'</div></div>';}
+  var scenCard;
+  if(P.hasScenario){
+    var d=retRow.scen-retRow.base;
+    scenCard='<div class="card a"><div class="card-l">Scenario at retirement</div><div class="card-v">'+m(retRow.scen,retRow.year)+'</div><div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs base</div></div>';
+  }else{
+    scenCard='<div class="card"><div class="card-l">Drawdown begins</div><div class="card-v" style="font-size:16px;">You '+P.drawdownAge+'</div><div class="card-s">'+P.drawdownStartYear+'</div></div>';
+  }
+  document.getElementById('proj-cards').innerHTML=
+    '<div class="card"><div class="card-l">Investable now</div><div class="card-v">'+fmtMoney(start)+'</div></div>'+
+    '<div class="card"><div class="card-l">At retirement (You '+P.drawdownAge+')</div><div class="card-v">'+m(retRow.base,retRow.year)+'</div></div>'+
+    endCard+scenCard;
+}
+
+function renderProjChart(P){
+  var cy=P.cy, inf=P.inf;
+  var labels=P.rows.map(function(r){return r.bryanAge;});
+  var baseData=P.rows.map(function(r){return Math.round(projDisp(r.base,r.year,cy,inf));});
+  var ddIdx=P.rows.findIndex(function(r){return r.year>=P.drawdownStartYear;});
+  var ds=[{
+    label:'Base',data:baseData,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.07)',
+    borderWidth:2.5,fill:true,tension:.2,pointRadius:0,
+    segment:{borderDash:function(ctx){return ctx.p0DataIndex>=ddIdx?[6,4]:undefined;}}
+  }];
+  if(P.hasScenario){
+    var scenData=P.rows.map(function(r){return Math.round(projDisp(r.scen,r.year,cy,inf));});
+    ds.push({label:'Scenario (extra savings)',data:scenData,borderColor:'#0F6E56',backgroundColor:'rgba(15,110,86,.05)',
+      borderWidth:2.5,fill:false,tension:.2,pointRadius:0,borderDash:[2,2]});
+  }
+  destroyChart('proj');
+  SUM_CHARTS.proj=new Chart(document.getElementById('ch-proj'),{
+    type:'line',
+    data:{labels:labels,datasets:ds},
+    options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:P.hasScenario,position:'bottom',labels:{boxWidth:12,font:{size:11},color:'#4A4740',usePointStyle:true,pointStyle:'line'}},
+        tooltip:{callbacks:{
+          title:function(items){var r=P.rows[items[0].dataIndex];return 'You '+r.bryanAge+' · '+r.year+'  '+ageBrackets(r);},
+          label:function(c){return c.dataset.label+': '+fmtMoney(c.parsed.y);}
+        }}
+      },
+      scales:{
+        x:{title:{display:true,text:'Your age',font:{size:11},color:'#8A8580'},ticks:{font:{size:11},color:'#8A8580',maxRotation:0,autoSkip:true,maxTicksLimit:12},grid:{display:false}},
+        y:{ticks:{callback:moneyTick,font:{size:11},color:'#8A8580'},grid:{color:'#EFEDE8'}}
+      }
+    }
+  });
+  var note='Solid = building (contributions run until the first of you retires, at '+P.firstRetireYear+'). Dashed = drawdown, from your retirement at age '+P.drawdownAge+'.';
+  if(P.depBase!==null)note+=' Base case runs dry at your age '+P.depBase+'.';
+  document.getElementById('proj-chart-note').textContent=note;
+}
+
+function renderProjTable(P){
+  var cy=P.cy, inf=P.inf;
+  var set=[P.rows[0].bryanAge, PROJ.bryanRetireAge, PROJ.wdBreakAge, 70,75,80,85,90,95, PROJ.endAge];
+  var uniq=[];set.forEach(function(a){if(uniq.indexOf(a)<0)uniq.push(a);});
+  uniq.sort(function(a,b){return a-b;});
+  var byAge={};P.rows.forEach(function(r){byAge[r.bryanAge]=r;});
+  var head='<thead><tr><th>Your age</th><th>Year</th><th>Household</th><th class="r">Base</th>'+(P.hasScenario?'<th class="r">Scenario</th>':'')+'</tr></thead>';
+  var body='';
+  uniq.forEach(function(age){
+    var r=byAge[age];if(!r)return;
+    var isRet=(age===PROJ.bryanRetireAge);
+    var depleted=(P.depBase!==null && age>=P.depBase);
+    body+='<tr class="'+(isRet?'ret':'')+(depleted?' depleted':'')+'">'+
+      '<td>'+r.bryanAge+(isRet?' · retires':'')+'</td>'+
+      '<td>'+r.year+'</td>'+
+      '<td class="agebr">'+ageBrackets(r).replace(/[()]/g,'')+'</td>'+
+      '<td class="r">'+fmtMoney(projDisp(r.base,r.year,cy,inf))+'</td>'+
+      (P.hasScenario?'<td class="r">'+fmtMoney(projDisp(r.scen,r.year,cy,inf))+'</td>':'')+
+      '</tr>';
+  });
+  document.getElementById('proj-tbl').innerHTML=head+'<tbody>'+body+'</tbody>';
+}
+
+
+function syncProjInputs(){
+  var v=function(id,val){var e=document.getElementById(id);if(e)e.value=(val==null?'':val);};
+  v('pj-bryan-ret',PROJ.bryanRetireAge);v('pj-ashley-ret',PROJ.ashleyRetireAge);v('pj-end-age',PROJ.endAge);
+  v('pj-wd1',PROJ.wdTier1);v('pj-break',PROJ.wdBreakAge);v('pj-wd2',PROJ.wdTier2);
+  v('pj-sc-extra',PROJ.scExtra);v('pj-sc-start',PROJ.scStartAge);v('pj-sc-end',PROJ.scEndAge);
+  var n=document.getElementById('pj-mode-nominal'),r=document.getElementById('pj-mode-real');
+  if(n&&r){n.classList.toggle('on',PROJ.displayMode==='nominal');r.classList.toggle('on',PROJ.displayMode==='real');}
+}
+function updProj(key,val){
+  var optional=(key==='scStartAge'||key==='scEndAge');
+  var s=String(val).trim();
+  if(optional && s===''){PROJ[key]=null;}
+  else{var num=parseFloat(s);if(isNaN(num))num=0;PROJ[key]=num;}
+  renderProjections();scheduleCloudSave();
+}
+function setProjMode(mode){PROJ.displayMode=mode;renderProjections();scheduleCloudSave();}
+
 // ═══════════════ TABS ═══════════════
 function showTab(n){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
@@ -898,6 +1160,7 @@ function showTab(n){
   document.getElementById('t-'+n).classList.add('on');
   if(n==='track')renderTrack();
   if(n==='summary')renderSummary();
+  if(n==='proj')renderProjections();
 }
 
 // ═══════════════ AUTH ═══════════════
