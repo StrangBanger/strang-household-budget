@@ -166,6 +166,7 @@ table.proj-tbl .agebr{color:var(--text3);font-size:11px;}
 table.proj-tbl tr.depleted td{color:var(--red);}
 .proj-tbl-scroll{max-height:420px;overflow-y:auto;border-radius:var(--radius);}
 .proj-tbl-scroll table.proj-tbl thead th{position:sticky;top:0;z-index:1;}
+.scen-tag{font-size:10px;font-weight:600;color:var(--green);background:var(--green-bg);border:1px solid #A8DDD0;border-radius:20px;padding:2px 9px;margin-left:8px;text-transform:uppercase;letter-spacing:.04em;vertical-align:middle;}
 /* PLACEHOLDER PANELS */
 .placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
 .placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
@@ -359,6 +360,13 @@ table.proj-tbl tr.depleted td{color:var(--red);}
       <div class="sum-card-hd"><h3>Balance by year</h3></div>
       <div class="proj-tbl-scroll"><div class="tbl-scroll">
         <table class="nt proj-tbl" id="proj-tbl"><tbody></tbody></table>
+      </div></div>
+    </div>
+
+    <div class="sum-card" id="proj-scen-card" style="display:none;">
+      <div class="sum-card-hd"><h3>Scenario balance by year <span class="scen-tag">with extra savings</span></h3></div>
+      <div class="proj-tbl-scroll"><div class="tbl-scroll">
+        <table class="nt proj-tbl" id="proj-tbl-scen"><tbody></tbody></table>
       </div></div>
     </div>
   </div>
@@ -1118,25 +1126,35 @@ function renderProjChart(P){
   document.getElementById('proj-chart-note').textContent=note;
 }
 
-function renderProjTable(P){
+function buildYearTable(P,valFn,colHead){
   var cy=P.cy, inf=P.inf;
-  var head='<thead><tr><th>Your age</th><th>Year</th><th>Household</th><th class="r">Base</th>'+(P.hasScenario?'<th class="r">Scenario</th>':'')+'</tr></thead>';
+  var head='<thead><tr><th>Your age</th><th>Year</th><th>Household</th><th class="r">'+colHead+'</th></tr></thead>';
   var body='';
   P.rows.forEach(function(r){
     var isRet=(r.bryanAge===PROJ.bryanRetireAge);
     var isBrk=(r.bryanAge===PROJ.wdBreakAge && r.bryanAge>=PROJ.bryanRetireAge);
     var depleted=(P.depBase!==null && r.bryanAge>=P.depBase);
-    var cls=(isRet?'ret':(isBrk?'brk':''))+(depleted?' depleted':'');
+    var cls=((isRet?'ret':(isBrk?'brk':''))+(depleted?' depleted':'')).trim();
     var tag=isRet?' · retires':(isBrk?' · rate change':'');
-    body+='<tr class="'+cls.trim()+'">'+
+    body+='<tr'+(cls?' class="'+cls+'"':'')+'>'+
       '<td>'+r.bryanAge+tag+'</td>'+
       '<td>'+r.year+'</td>'+
       '<td class="agebr">'+ageBrackets(r).replace(/[()]/g,'')+'</td>'+
-      '<td class="r">'+fmtMoney(projDisp(r.base,r.year,cy,inf))+'</td>'+
-      (P.hasScenario?'<td class="r">'+fmtMoney(projDisp(r.scen,r.year,cy,inf))+'</td>':'')+
+      '<td class="r">'+fmtMoney(projDisp(valFn(r),r.year,cy,inf))+'</td>'+
       '</tr>';
   });
-  document.getElementById('proj-tbl').innerHTML=head+'<tbody>'+body+'</tbody>';
+  return head+'<tbody>'+body+'</tbody>';
+}
+function renderProjTable(P){
+  document.getElementById('proj-tbl').innerHTML=buildYearTable(P,function(r){return r.base;},'Balance');
+  var scenCard=document.getElementById('proj-scen-card');
+  if(P.hasScenario){
+    scenCard.style.display='block';
+    document.getElementById('proj-tbl-scen').innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance');
+  }else{
+    scenCard.style.display='none';
+    document.getElementById('proj-tbl-scen').innerHTML='';
+  }
 }
 
 
