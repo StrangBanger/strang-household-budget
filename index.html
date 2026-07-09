@@ -111,19 +111,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
       </div>
     </a>
 
-    <!-- Net Worth — placeholder -->
-    <div class="tool-card soon">
+    <!-- Net Worth — LIVE -->
+    <a class="tool-card live" href="/networth/">
       <div class="tc-top">
         <div class="tc-icon" style="background:var(--green-bg);">💰</div>
-        <span class="tc-status soon">Coming soon</span>
+        <span class="tc-status on">Open</span>
       </div>
       <h2>Net Worth</h2>
-      <p>Assets minus liabilities over time, pulling balances from your other tools.</p>
+      <p>Assets minus liabilities over time — accounts by owner and type, with growth projections.</p>
       <div class="tc-summary">
-        <span class="lbl">Total</span>
-        <span class="val" style="color:var(--text3);">—</span>
+        <span class="lbl">Net worth</span>
+        <span class="val" id="sum-networth" style="color:var(--text3);">—</span>
       </div>
-    </div>
+    </a>
 
     <!-- TBD — future idea placeholder -->
     <div class="tool-card soon">
@@ -147,7 +147,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 <script>
 // ---- Supabase (same project as every tool) ----
 var SUPABASE_URL='https://ldmoxearkzxhzjscprsh.supabase.co';
-var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23Hcg3o5g_ZLw_GYM-gbYR';
+var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
 var sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
 function showLogin(){
@@ -187,6 +187,11 @@ async function doSignOut(){
 // Best-effort: fails quietly if unavailable.
 var HOUSEHOLD_ID='strang';
 async function loadSummaries(){
+  loadBudgetSummary();
+  loadNetWorthSummary();
+}
+// Budget card — latest bank balance snapshot from budget_data.
+async function loadBudgetSummary(){
   try{
     var res=await sbClient.from('budget_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
     if(res.error||!res.data||!res.data.data)return;
@@ -199,7 +204,35 @@ async function loadSummaries(){
       el.textContent='$'+Math.round(latest).toLocaleString();
       el.style.color=latest>=0?'var(--green)':'var(--red)';
     }
-  }catch(e){/* summary is best-effort; ignore */}
+  }catch(e){/* best-effort */}
+}
+// Net Worth card — latest month's net worth from networth_data.
+// Mirrors the tool's effective-value logic: closed accounts read $0 from
+// their close month; otherwise take the value on-or-before the latest month.
+async function loadNetWorthSummary(){
+  try{
+    var res=await sbClient.from('networth_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error||!res.data||!res.data.data)return;
+    var accts=res.data.data.accounts||[];
+    // latest month with any explicit value
+    var monthsSet={};
+    accts.forEach(function(a){Object.keys(a.values||{}).forEach(function(k){monthsSet[k]=1;});});
+    var months=Object.keys(monthsSet).sort();
+    if(!months.length)return; // no data entered yet — leave "—"
+    var latest=months[months.length-1];
+    function effVal(a){
+      if(a.closedYM && a.closedYM<=latest) return 0;
+      if(a.values && a.values[latest]!==undefined) return a.values[latest];
+      var best=null;
+      Object.keys(a.values||{}).forEach(function(k){if(k<=latest&&(best===null||k>best))best=k;});
+      return best!==null?a.values[best]:0;
+    }
+    var nw=0;
+    accts.forEach(function(a){nw+=effVal(a);}); // liabilities stored negative
+    var el=document.getElementById('sum-networth');
+    el.textContent=(nw<0?'-$':'$')+Math.abs(Math.round(nw)).toLocaleString();
+    el.style.color=nw>=0?'var(--green)':'var(--red)';
+  }catch(e){/* best-effort */}
 }
 
 // On load: if already authenticated (session shared across strang.pro), show hub.
