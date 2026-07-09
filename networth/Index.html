@@ -128,6 +128,18 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 .assum-field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 .assum-field input.pct-in{text-align:right;}
 .note-line{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.5;max-width:640px;}
+/* SUMMARY CHARTS */
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem 1.25rem;margin-bottom:16px;}
+.sum-card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:10px;flex-wrap:wrap;}
+.sum-card-hd h3{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:-.01em;}
+.sum-current{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--green);letter-spacing:-.02em;}
+.chart-box{position:relative;height:280px;}
+.chart-note{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.4;}
+.mini-nav{display:flex;align-items:center;gap:6px;}
+.mini-nav button.mini-arw{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
+.mini-nav button.mini-arw:hover:not(:disabled){background:var(--surface2);color:var(--text);}
+.mini-nav button.mini-arw:disabled{opacity:.3;cursor:default;}
+.mini-nav .mini-month{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--accent);background:var(--accent-bg);border-radius:20px;padding:4px 12px;min-width:82px;text-align:center;}
 /* PLACEHOLDER PANELS */
 .placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
 .placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
@@ -230,12 +242,41 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
   </div>
 </div>
 
-<!-- ===== SUMMARY (placeholder) ===== -->
+<!-- ===== SUMMARY ===== -->
 <div class="panel" id="tab-summary">
-  <div class="placeholder">
+  <div class="placeholder" id="sum-empty" style="display:none;">
     <div class="ph-icon">📊</div>
-    <h2>Summary — coming next</h2>
-    <p>This tab will read your snapshots and show net worth over time, breakdowns by bucket and owner, assets vs liabilities, and the change since your last snapshot. Nothing to enter here — it's the read-only view of what you log in Track.</p>
+    <h2>No snapshots yet</h2>
+    <p>Enter account values in the Track tab and they'll chart here — net worth over time, and your asset mix by bucket.</p>
+  </div>
+  <div id="sum-content">
+    <div class="sum-card">
+      <div class="sum-card-hd">
+        <h3>Net worth over time</h3>
+        <span class="sum-current" id="nw-current">—</span>
+      </div>
+      <div class="chart-box"><canvas id="ch-nw"></canvas></div>
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd">
+        <h3>Asset mix by bucket</h3>
+        <div class="mini-nav">
+          <button class="mini-arw" id="bar-prev" onclick="barShift(-1)">‹</button>
+          <span class="mini-month" id="bar-month">—</span>
+          <button class="mini-arw" id="bar-next" onclick="barShift(1)">›</button>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="ch-bars"></canvas></div>
+      <div class="chart-note">Investable buckets only. Physical assets and liabilities are reflected in the net-worth line above.</div>
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd">
+        <h3>Asset buckets over time</h3>
+      </div>
+      <div class="chart-box"><canvas id="ch-lines"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -666,6 +707,123 @@ function downloadHTML(){
   a.click();URL.revokeObjectURL(url);showSavedBadge('Downloaded ✓');
 }
 
+// ═══════════════ SUMMARY TAB (read-only charts) ═══════════════
+var ASSET_CHART_BUCKETS=['Cash','Non-Reg','TFSA','RRSP-LIRA','RESP'];
+var BUCKET_COLORS={
+  'Cash':'#0F6E56','Non-Reg':'#185FA5','TFSA':'#7C3AED','RRSP-LIRA':'#A36000','RESP':'#0E7490'
+};
+var SUM_CHARTS={nw:null,bars:null,lines:null};
+var summaryBarYM='';
+
+function monthSeq(a,b){
+  var out=[],c=a,guard=0;
+  while(ymCmp(c,b)<=0 && guard<600){out.push(c);c=ymAdd(c,1);guard++;}
+  return out;
+}
+function moneyTick(v){
+  var n=Math.abs(v);
+  if(n>=1000000)return (v<0?'-$':'$')+(Math.round(v/1000)/1000)+'M';
+  if(n>=1000)return (v<0?'-$':'$')+Math.round(v/1000)+'k';
+  return fmtMoney(v);
+}
+function destroyChart(k){if(SUM_CHARTS[k]){SUM_CHARTS[k].destroy();SUM_CHARTS[k]=null;}}
+
+function renderSummary(){
+  var months=allSnapshotMonths();
+  var empty=document.getElementById('sum-empty');
+  var content=document.getElementById('sum-content');
+  if(!months.length){
+    empty.style.display='block';content.style.display='none';
+    ['nw','bars','lines'].forEach(destroyChart);
+    return;
+  }
+  empty.style.display='none';content.style.display='block';
+  if(!summaryBarYM||months.indexOf(summaryBarYM)<0)summaryBarYM=months[months.length-1];
+  if(typeof Chart==='undefined')return; // guard if CDN blocked
+  renderNWLine(months);
+  renderBucketBars(months);
+  renderBucketLines(months);
+}
+
+function renderNWLine(months){
+  var seq=monthSeq(months[0],months[months.length-1]);
+  var data=seq.map(function(ym){return Math.round(netWorth(ym));});
+  var latest=months[months.length-1];
+  document.getElementById('nw-current').textContent=fmtMoney(netWorth(latest));
+  destroyChart('nw');
+  SUM_CHARTS.nw=new Chart(document.getElementById('ch-nw'),{
+    type:'line',
+    data:{labels:seq.map(ymLabel),datasets:[{
+      label:'Net worth',data:data,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.08)',
+      borderWidth:2,fill:true,tension:.25,pointRadius:seq.length>24?0:3,pointBackgroundColor:'#185FA5'
+    }]},
+    options:baseLineOpts(false)
+  });
+}
+
+function renderBucketBars(months){
+  document.getElementById('bar-month').textContent=ymLabel(summaryBarYM);
+  var idx=months.indexOf(summaryBarYM);
+  document.getElementById('bar-prev').disabled=(idx<=0);
+  document.getElementById('bar-next').disabled=(idx>=months.length-1);
+  var data=ASSET_CHART_BUCKETS.map(function(b){return Math.round(bucketTotal(b,summaryBarYM));});
+  var colors=ASSET_CHART_BUCKETS.map(function(b){return BUCKET_COLORS[b];});
+  destroyChart('bars');
+  SUM_CHARTS.bars=new Chart(document.getElementById('ch-bars'),{
+    type:'bar',
+    data:{labels:ASSET_CHART_BUCKETS.slice(),datasets:[{
+      data:data,backgroundColor:colors,borderRadius:4,barThickness:22
+    }]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return fmtMoney(c.parsed.x);}}}},
+      scales:{
+        x:{ticks:{callback:moneyTick,font:{size:11},color:'#8A8580'},grid:{color:'#EFEDE8'}},
+        y:{ticks:{font:{size:12},color:'#4A4740'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function renderBucketLines(months){
+  var seq=monthSeq(months[0],months[months.length-1]);
+  var datasets=ASSET_CHART_BUCKETS.map(function(b){
+    return{label:b,data:seq.map(function(ym){return Math.round(bucketTotal(b,ym));}),
+      borderColor:BUCKET_COLORS[b],backgroundColor:BUCKET_COLORS[b],
+      borderWidth:2,fill:false,tension:.25,pointRadius:seq.length>24?0:2.5};
+  });
+  destroyChart('lines');
+  SUM_CHARTS.lines=new Chart(document.getElementById('ch-lines'),{
+    type:'line',
+    data:{labels:seq.map(ymLabel),datasets:datasets},
+    options:baseLineOpts(true)
+  });
+}
+
+function baseLineOpts(showLegend){
+  return{
+    responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:showLegend,position:'bottom',labels:{boxWidth:12,boxHeight:12,font:{size:11},color:'#4A4740',usePointStyle:true,pointStyle:'line'}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+fmtMoney(c.parsed.y);}}}
+    },
+    scales:{
+      x:{ticks:{font:{size:11},color:'#8A8580',maxRotation:0,autoSkip:true,maxTicksLimit:8},grid:{display:false}},
+      y:{ticks:{callback:moneyTick,font:{size:11},color:'#8A8580'},grid:{color:'#EFEDE8'}}
+    }
+  };
+}
+
+function barShift(delta){
+  var months=allSnapshotMonths();
+  var idx=months.indexOf(summaryBarYM);
+  if(idx<0)return;
+  var ni=idx+delta;
+  if(ni<0||ni>=months.length)return;
+  summaryBarYM=months[ni];
+  renderBucketBars(months);
+}
+
 // ═══════════════ TABS ═══════════════
 function showTab(n){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
@@ -673,6 +831,7 @@ function showTab(n){
   document.getElementById('tab-'+n).classList.add('on');
   document.getElementById('t-'+n).classList.add('on');
   if(n==='track')renderTrack();
+  if(n==='summary')renderSummary();
 }
 
 // ═══════════════ AUTH ═══════════════
