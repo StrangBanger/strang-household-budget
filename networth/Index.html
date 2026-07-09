@@ -149,6 +149,7 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 @media(max-width:720px){.proj-controls{grid-template-columns:1fr;}}
 .pc-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;}
 .pc-group h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;}
+.pc-group h3 .pc-hint{font-weight:500;color:var(--text3);text-transform:none;letter-spacing:0;font-size:11px;margin-left:6px;opacity:.85;}
 .pc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px 16px;}
 .pc-note{font-size:11px;color:var(--text3);margin-top:.75rem;line-height:1.4;}
 .proj-bar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
@@ -368,7 +369,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
   </div>
   <div id="scen-content">
     <div class="scen-intro">Shares your plan from Projections — retirement ages and withdrawals set here update there too. Add extra savings below to see the effect.</div>
-    <div class="proj-controls">
+    <div class="proj-controls proj-controls-single">
       <div class="pc-group">
         <h3>Retirement &amp; withdrawals</h3>
         <div class="pc-grid">
@@ -381,14 +382,28 @@ table.proj-tbl tr.depleted td{color:var(--red);}
         </div>
       </div>
       <div class="pc-group">
-        <h3>Extra savings</h3>
+        <h3>Extra savings <span class="pc-hint">recurring, monthly</span></h3>
         <div class="pc-grid">
-          <div class="assum-field"><label>Extra savings / mo <span class="sub">on top of base</span></label><input type="number" step="100" id="sc-sc-extra" onchange="updProj('scExtra',this.value)"></div>
+          <div class="assum-field"><label>Extra savings / mo <span class="sub">today's $, on top of base</span></label><input type="number" step="100" id="sc-sc-extra" onchange="updProj('scExtra',this.value)"></div>
           <div class="assum-field"><label>From age <span class="sub">blank = now</span></label><input type="number" step="1" id="sc-sc-start" onchange="updProj('scStartAge',this.value)"></div>
           <div class="assum-field"><label>Until age <span class="sub">blank = retirement</span></label><input type="number" step="1" id="sc-sc-end" onchange="updProj('scEndAge',this.value)"></div>
         </div>
-        <div class="pc-note">Draws a second line so you can see the effect of saving more, optionally only for a window (e.g. the next 5 years).</div>
       </div>
+      <div class="pc-group">
+        <h3>One-time amount #1 <span class="pc-hint">lump sum, actual $</span></h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Amount <span class="sub">actual $ that year</span></label><input type="number" step="1000" id="sc-ot1-amt" onchange="updProj('oneTime1Amt',this.value)"></div>
+          <div class="assum-field"><label>At your age</label><input type="number" step="1" id="sc-ot1-age" onchange="updProj('oneTime1Age',this.value)"></div>
+        </div>
+      </div>
+      <div class="pc-group">
+        <h3>One-time amount #2 <span class="pc-hint">lump sum, actual $</span></h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Amount <span class="sub">actual $ that year</span></label><input type="number" step="1000" id="sc-ot2-amt" onchange="updProj('oneTime2Amt',this.value)"></div>
+          <div class="assum-field"><label>At your age</label><input type="number" step="1" id="sc-ot2-age" onchange="updProj('oneTime2Age',this.value)"></div>
+        </div>
+      </div>
+      <div class="pc-note">All three savings inputs feed one blended scenario line — recurring extra savings plus up to two one-time lump sums (e.g. an inheritance or house-sale proceeds), each landing in the year you hit that age.</div>
     </div>
 
     <div class="proj-bar">
@@ -454,6 +469,7 @@ var PROJ={
   bryanRetireAge:60, ashleyRetireAge:60, endAge:100,
   wdTier1:80000, wdBreakAge:65, wdTier2:65000,
   scExtra:0, scStartAge:null, scEndAge:null,
+  oneTime1Amt:null, oneTime1Age:null, oneTime2Amt:null, oneTime2Age:null,
   displayMode:'nominal'
 };
 var SAVE_HISTORY=[];
@@ -1075,6 +1091,9 @@ function computeProjection(){
     // scenario extra savings within window, during accumulation
     var inWin=(PROJ.scStartAge==null||ba>=PROJ.scStartAge)&&(PROJ.scEndAge==null||ba<=PROJ.scEndAge);
     if(PROJ.scExtra>0 && inWin && y<drawdownStartYear) scen+=PROJ.scExtra*12;
+    // one-time lump sums (nominal $, any age) — scenario only
+    if(PROJ.oneTime1Amt>0 && PROJ.oneTime1Age===ba) scen+=PROJ.oneTime1Amt;
+    if(PROJ.oneTime2Amt>0 && PROJ.oneTime2Age===ba) scen+=PROJ.oneTime2Amt;
     // withdrawals (Bryan retired), inflated forward from today's $
     if(y>=drawdownStartYear){
       var wdToday=(ba<PROJ.wdBreakAge)?PROJ.wdTier1:PROJ.wdTier2;
@@ -1087,7 +1106,7 @@ function computeProjection(){
     push(y);
   }
   return {rows:rows, cy:cy, inf:inf, drawdownStartYear:drawdownStartYear, drawdownAge:PROJ.bryanRetireAge,
-    firstRetireYear:firstRetireYear, hasScenario:PROJ.scExtra>0, depBase:depBase, depScen:depScen,
+    firstRetireYear:firstRetireYear, hasScenario:(PROJ.scExtra>0||PROJ.oneTime1Amt>0||PROJ.oneTime2Amt>0), depBase:depBase, depScen:depScen,
     byBY:byBY, ashBY:ashBY};
 }
 function projDisp(val,year,cy,inf){return PROJ.displayMode==='real'?val/Math.pow(1+inf,year-cy):val;}
@@ -1229,11 +1248,13 @@ function syncProjInputs(V){
   v('wd1',PROJ.wdTier1);v('break',PROJ.wdBreakAge);v('wd2',PROJ.wdTier2);
   // scenario inputs only exist on the Scenarios view (sc- prefix, sc-sc-*)
   v('sc-extra',PROJ.scExtra);v('sc-start',PROJ.scStartAge);v('sc-end',PROJ.scEndAge);
+  v('ot1-amt',PROJ.oneTime1Amt);v('ot1-age',PROJ.oneTime1Age);
+  v('ot2-amt',PROJ.oneTime2Amt);v('ot2-age',PROJ.oneTime2Age);
   var n=document.getElementById(p+'-mode-nominal'),r=document.getElementById(p+'-mode-real');
   if(n&&r){n.classList.toggle('on',PROJ.displayMode==='nominal');r.classList.toggle('on',PROJ.displayMode==='real');}
 }
 function updProj(key,val){
-  var optional=(key==='scStartAge'||key==='scEndAge');
+  var optional=(key==='scStartAge'||key==='scEndAge'||key==='oneTime1Age'||key==='oneTime2Age'||key==='oneTime1Amt'||key==='oneTime2Amt');
   var s=String(val).trim();
   if(optional && s===''){PROJ[key]=null;}
   else{var num=parseFloat(s);if(isNaN(num))num=0;PROJ[key]=num;}
