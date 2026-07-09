@@ -144,6 +144,8 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 .mini-nav .mini-month{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--accent);background:var(--accent-bg);border-radius:20px;padding:4px 12px;min-width:82px;text-align:center;}
 /* PROJECTIONS */
 .proj-controls{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;}
+.proj-controls.proj-controls-single{grid-template-columns:1fr;}
+.scen-intro{font-size:12px;color:var(--text2);background:var(--accent-bg);border:1px solid #B8D4F0;border-radius:var(--radius);padding:9px 13px;margin-bottom:14px;line-height:1.45;}
 @media(max-width:720px){.proj-controls{grid-template-columns:1fr;}}
 .pc-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;}
 .pc-group h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem;}
@@ -214,6 +216,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
   <button class="tab on" id="t-track" onclick="showTab('track')">Track</button>
   <button class="tab" id="t-summary" onclick="showTab('summary')">Summary</button>
   <button class="tab" id="t-proj" onclick="showTab('proj')">Projections</button>
+  <button class="tab" id="t-scen" onclick="showTab('scen')">Scenarios</button>
 </div>
 
 <!-- ===== TRACK ===== -->
@@ -309,7 +312,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
   </div>
 </div>
 
-<!-- ===== PROJECTIONS (placeholder) ===== -->
+<!-- ===== PROJECTIONS (base plan only) ===== -->
 <div class="panel" id="tab-proj">
   <div class="placeholder" id="proj-empty" style="display:none;">
     <div class="ph-icon">📈</div>
@@ -317,7 +320,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
     <p>Enter some account values in Track so there's an investable balance to grow. Projections use your invested buckets only (Non-Reg, TFSA, RRSP-LIRA, RESP) — cash, the house and the mortgage are excluded.</p>
   </div>
   <div id="proj-content">
-    <div class="proj-controls">
+    <div class="proj-controls proj-controls-single">
       <div class="pc-group">
         <h3>Retirement &amp; withdrawals</h3>
         <div class="pc-grid">
@@ -328,15 +331,6 @@ table.proj-tbl tr.depleted td{color:var(--red);}
           <div class="assum-field"><label>Breakpoint age</label><input type="number" step="1" id="pj-break" onchange="updProj('wdBreakAge',this.value)"></div>
           <div class="assum-field"><label>Withdrawal / yr after <span class="sub">today's $, gross</span></label><input type="number" step="1000" id="pj-wd2" onchange="updProj('wdTier2',this.value)"></div>
         </div>
-      </div>
-      <div class="pc-group">
-        <h3>Scenario — extra savings</h3>
-        <div class="pc-grid">
-          <div class="assum-field"><label>Extra savings / mo <span class="sub">on top of base</span></label><input type="number" step="100" id="pj-sc-extra" onchange="updProj('scExtra',this.value)"></div>
-          <div class="assum-field"><label>From age <span class="sub">blank = now</span></label><input type="number" step="1" id="pj-sc-start" onchange="updProj('scStartAge',this.value)"></div>
-          <div class="assum-field"><label>Until age <span class="sub">blank = retirement</span></label><input type="number" step="1" id="pj-sc-end" onchange="updProj('scEndAge',this.value)"></div>
-        </div>
-        <div class="pc-note">Draws a second line so you can see the effect of saving more, optionally only for a window (e.g. the next 5 years).</div>
       </div>
     </div>
 
@@ -362,11 +356,68 @@ table.proj-tbl tr.depleted td{color:var(--red);}
         <table class="nt proj-tbl" id="proj-tbl"><tbody></tbody></table>
       </div></div>
     </div>
+  </div>
+</div>
 
-    <div class="sum-card" id="proj-scen-card" style="display:none;">
+<!-- ===== SCENARIOS (plan + extra-savings overlay) ===== -->
+<div class="panel" id="tab-scen">
+  <div class="placeholder" id="scen-empty" style="display:none;">
+    <div class="ph-icon">🧮</div>
+    <h2>Nothing to model yet</h2>
+    <p>Enter some account values in Track so there's an investable balance to grow. Scenarios build on your base plan and layer in extra savings to see how the endpoint changes.</p>
+  </div>
+  <div id="scen-content">
+    <div class="scen-intro">Shares your plan from Projections — retirement ages and withdrawals set here update there too. Add extra savings below to see the effect.</div>
+    <div class="proj-controls">
+      <div class="pc-group">
+        <h3>Retirement &amp; withdrawals</h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Your retirement age</label><input type="number" step="1" id="sc-bryan-ret" onchange="updProj('bryanRetireAge',this.value)"></div>
+          <div class="assum-field"><label>Ashley's retirement age</label><input type="number" step="1" id="sc-ashley-ret" onchange="updProj('ashleyRetireAge',this.value)"></div>
+          <div class="assum-field"><label>Project to age <span class="sub">your age</span></label><input type="number" step="1" id="sc-end-age" onchange="updProj('endAge',this.value)"></div>
+          <div class="assum-field"><label>Withdrawal / yr <span class="sub">today's $, gross</span></label><input type="number" step="1000" id="sc-wd1" onchange="updProj('wdTier1',this.value)"></div>
+          <div class="assum-field"><label>Breakpoint age</label><input type="number" step="1" id="sc-break" onchange="updProj('wdBreakAge',this.value)"></div>
+          <div class="assum-field"><label>Withdrawal / yr after <span class="sub">today's $, gross</span></label><input type="number" step="1000" id="sc-wd2" onchange="updProj('wdTier2',this.value)"></div>
+        </div>
+      </div>
+      <div class="pc-group">
+        <h3>Extra savings</h3>
+        <div class="pc-grid">
+          <div class="assum-field"><label>Extra savings / mo <span class="sub">on top of base</span></label><input type="number" step="100" id="sc-sc-extra" onchange="updProj('scExtra',this.value)"></div>
+          <div class="assum-field"><label>From age <span class="sub">blank = now</span></label><input type="number" step="1" id="sc-sc-start" onchange="updProj('scStartAge',this.value)"></div>
+          <div class="assum-field"><label>Until age <span class="sub">blank = retirement</span></label><input type="number" step="1" id="sc-sc-end" onchange="updProj('scEndAge',this.value)"></div>
+        </div>
+        <div class="pc-note">Draws a second line so you can see the effect of saving more, optionally only for a window (e.g. the next 5 years).</div>
+      </div>
+    </div>
+
+    <div class="proj-bar">
+      <div class="proj-toggle">
+        <button id="sc-mode-nominal" class="pt-btn on" onclick="setProjMode('nominal')">Future $</button>
+        <button id="sc-mode-real" class="pt-btn" onclick="setProjMode('real')">Today's $</button>
+      </div>
+      <div class="proj-mode-note" id="sc-mode-note"></div>
+    </div>
+
+    <div class="cards" id="scen-cards"></div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd"><h3>Investable assets over time</h3></div>
+      <div class="chart-box" style="height:320px;"><canvas id="ch-scen"></canvas></div>
+      <div class="chart-note" id="scen-chart-note"></div>
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-card-hd"><h3>Balance by year</h3></div>
+      <div class="proj-tbl-scroll"><div class="tbl-scroll">
+        <table class="nt proj-tbl" id="scen-tbl"><tbody></tbody></table>
+      </div></div>
+    </div>
+
+    <div class="sum-card" id="scen-scen-card" style="display:none;">
       <div class="sum-card-hd"><h3>Scenario balance by year <span class="scen-tag">with extra savings</span></h3></div>
       <div class="proj-tbl-scroll"><div class="tbl-scroll">
-        <table class="nt proj-tbl" id="proj-tbl-scen"><tbody></tbody></table>
+        <table class="nt proj-tbl" id="scen-tbl-scen"><tbody></tbody></table>
       </div></div>
     </div>
   </div>
@@ -811,7 +862,7 @@ function shade(hex,t){
   function hx(n){return (n<16?'0':'')+n.toString(16);}
   return '#'+hx(r)+hx(g)+hx(b);
 }
-var SUM_CHARTS={nw:null,bars:null,lines:null,pie:null,proj:null};
+var SUM_CHARTS={nw:null,bars:null,lines:null,pie:null,proj:null,scen:null};
 var summaryBarYM='';
 
 function monthSeq(a,b){
@@ -1048,24 +1099,36 @@ function ageBrackets(row){
   return parts.length?'('+parts.join(' · ')+')':'';
 }
 
-function renderProjections(){
-  var empty=document.getElementById('proj-empty'), content=document.getElementById('proj-content');
-  syncProjInputs();
+// Two views share the same engine (computeProjection) and inputs (PROJ).
+// Projections = base plan only; Scenarios = base + extra-savings overlay.
+var V_PROJ={pre:'pj', empty:'proj-empty', content:'proj-content', modeNote:'pj-mode-note',
+  cards:'proj-cards', chart:'ch-proj', chartKey:'proj', chartNote:'proj-chart-note',
+  baseTbl:'proj-tbl', scenCard:null, scenTbl:null, withScenario:false};
+var V_SCEN={pre:'sc', empty:'scen-empty', content:'scen-content', modeNote:'sc-mode-note',
+  cards:'scen-cards', chart:'ch-scen', chartKey:'scen', chartNote:'scen-chart-note',
+  baseTbl:'scen-tbl', scenCard:'scen-scen-card', scenTbl:'scen-tbl-scen', withScenario:true};
+
+function renderProjView(V){
+  var empty=document.getElementById(V.empty), content=document.getElementById(V.content);
+  syncProjInputs(V);
   var base0=investableNow();
   if(base0<=0 || birthYear('bryan')===null){
-    empty.style.display='block';content.style.display='none';destroyChart('proj');return;
+    empty.style.display='block';content.style.display='none';destroyChart(V.chartKey);return;
   }
   empty.style.display='none';content.style.display='block';
-  document.getElementById('pj-mode-note').textContent=
+  document.getElementById(V.modeNote).textContent=
     PROJ.displayMode==='real'?'Balances shown in today\u2019s purchasing power (inflation removed).':'Balances shown in actual future dollars.';
   var P=computeProjection();
   if(!P)return;
-  renderProjCards(P);
-  if(typeof Chart!=='undefined')renderProjChart(P);
-  renderProjTable(P);
+  renderProjCards(P,V);
+  if(typeof Chart!=='undefined')renderProjChart(P,V);
+  renderProjTable(P,V);
 }
+function renderProjections(){renderProjView(V_PROJ);}
+function renderScenarios(){renderProjView(V_SCEN);}
+function renderAllProjViews(){renderProjView(V_PROJ);renderProjView(V_SCEN);}
 
-function renderProjCards(P){
+function renderProjCards(P,V){
   var rows=P.rows, cy=P.cy, inf=P.inf;
   var start=rows[0].base;
   var retRow=rows.filter(function(r){return r.year===P.drawdownStartYear;})[0]||rows[rows.length-1];
@@ -1074,42 +1137,43 @@ function renderProjCards(P){
   var endCard;
   if(P.depBase!==null){endCard='<div class="card r"><div class="card-l">Runs dry</div><div class="card-v">Age '+P.depBase+'</div><div class="card-s">base case depletes</div></div>';}
   else{endCard='<div class="card g"><div class="card-l">At age '+endRow.bryanAge+'</div><div class="card-v">'+m(endRow.base,endRow.year)+'</div></div>';}
-  var scenCard;
-  if(P.hasScenario){
+  var lastCard;
+  if(V.withScenario && P.hasScenario){
     var d=retRow.scen-retRow.base;
-    scenCard='<div class="card a"><div class="card-l">Scenario at retirement</div><div class="card-v">'+m(retRow.scen,retRow.year)+'</div><div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs base</div></div>';
+    lastCard='<div class="card a"><div class="card-l">Scenario at retirement</div><div class="card-v">'+m(retRow.scen,retRow.year)+'</div><div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs base</div></div>';
   }else{
-    scenCard='<div class="card"><div class="card-l">Drawdown begins</div><div class="card-v" style="font-size:16px;">You '+P.drawdownAge+'</div><div class="card-s">'+P.drawdownStartYear+'</div></div>';
+    lastCard='<div class="card"><div class="card-l">Drawdown begins</div><div class="card-v" style="font-size:16px;">You '+P.drawdownAge+'</div><div class="card-s">'+P.drawdownStartYear+'</div></div>';
   }
-  document.getElementById('proj-cards').innerHTML=
+  document.getElementById(V.cards).innerHTML=
     '<div class="card"><div class="card-l">Investable now</div><div class="card-v">'+fmtMoney(start)+'</div></div>'+
     '<div class="card"><div class="card-l">At retirement (You '+P.drawdownAge+')</div><div class="card-v">'+m(retRow.base,retRow.year)+'</div></div>'+
-    endCard+scenCard;
+    endCard+lastCard;
 }
 
-function renderProjChart(P){
+function renderProjChart(P,V){
   var cy=P.cy, inf=P.inf;
   var labels=P.rows.map(function(r){return r.bryanAge;});
   var baseData=P.rows.map(function(r){return Math.round(projDisp(r.base,r.year,cy,inf));});
   var ddIdx=P.rows.findIndex(function(r){return r.year>=P.drawdownStartYear;});
+  var showScen=(V.withScenario && P.hasScenario);
   var ds=[{
     label:'Base',data:baseData,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,.07)',
     borderWidth:2.5,fill:true,tension:.2,pointRadius:0,
     segment:{borderDash:function(ctx){return ctx.p0DataIndex>=ddIdx?[6,4]:undefined;}}
   }];
-  if(P.hasScenario){
+  if(showScen){
     var scenData=P.rows.map(function(r){return Math.round(projDisp(r.scen,r.year,cy,inf));});
     ds.push({label:'Scenario (extra savings)',data:scenData,borderColor:'#0F6E56',backgroundColor:'rgba(15,110,86,.05)',
       borderWidth:2.5,fill:false,tension:.2,pointRadius:0,borderDash:[2,2]});
   }
-  destroyChart('proj');
-  SUM_CHARTS.proj=new Chart(document.getElementById('ch-proj'),{
+  destroyChart(V.chartKey);
+  SUM_CHARTS[V.chartKey]=new Chart(document.getElementById(V.chart),{
     type:'line',
     data:{labels:labels,datasets:ds},
     options:{
       responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{
-        legend:{display:P.hasScenario,position:'bottom',labels:{boxWidth:12,font:{size:11},color:'#4A4740',usePointStyle:true,pointStyle:'line'}},
+        legend:{display:showScen,position:'bottom',labels:{boxWidth:12,font:{size:11},color:'#4A4740',usePointStyle:true,pointStyle:'line'}},
         tooltip:{callbacks:{
           title:function(items){var r=P.rows[items[0].dataIndex];return 'You '+r.bryanAge+' · '+r.year+'  '+ageBrackets(r);},
           label:function(c){return c.dataset.label+': '+fmtMoney(c.parsed.y);}
@@ -1123,7 +1187,7 @@ function renderProjChart(P){
   });
   var note='Solid = building (contributions run until the first of you retires, at '+P.firstRetireYear+'). Dashed = drawdown, from your retirement at age '+P.drawdownAge+'.';
   if(P.depBase!==null)note+=' Base case runs dry at your age '+P.depBase+'.';
-  document.getElementById('proj-chart-note').textContent=note;
+  document.getElementById(V.chartNote).textContent=note;
 }
 
 function buildYearTable(P,valFn,colHead){
@@ -1145,25 +1209,27 @@ function buildYearTable(P,valFn,colHead){
   });
   return head+'<tbody>'+body+'</tbody>';
 }
-function renderProjTable(P){
-  document.getElementById('proj-tbl').innerHTML=buildYearTable(P,function(r){return r.base;},'Balance');
-  var scenCard=document.getElementById('proj-scen-card');
-  if(P.hasScenario){
+function renderProjTable(P,V){
+  document.getElementById(V.baseTbl).innerHTML=buildYearTable(P,function(r){return r.base;},'Balance');
+  if(!V.scenCard)return;
+  var scenCard=document.getElementById(V.scenCard);
+  if(V.withScenario && P.hasScenario){
     scenCard.style.display='block';
-    document.getElementById('proj-tbl-scen').innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance');
+    document.getElementById(V.scenTbl).innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance');
   }else{
     scenCard.style.display='none';
-    document.getElementById('proj-tbl-scen').innerHTML='';
+    document.getElementById(V.scenTbl).innerHTML='';
   }
 }
 
-
-function syncProjInputs(){
-  var v=function(id,val){var e=document.getElementById(id);if(e)e.value=(val==null?'':val);};
-  v('pj-bryan-ret',PROJ.bryanRetireAge);v('pj-ashley-ret',PROJ.ashleyRetireAge);v('pj-end-age',PROJ.endAge);
-  v('pj-wd1',PROJ.wdTier1);v('pj-break',PROJ.wdBreakAge);v('pj-wd2',PROJ.wdTier2);
-  v('pj-sc-extra',PROJ.scExtra);v('pj-sc-start',PROJ.scStartAge);v('pj-sc-end',PROJ.scEndAge);
-  var n=document.getElementById('pj-mode-nominal'),r=document.getElementById('pj-mode-real');
+function syncProjInputs(V){
+  var p=V.pre;
+  var v=function(suffix,val){var e=document.getElementById(p+'-'+suffix);if(e)e.value=(val==null?'':val);};
+  v('bryan-ret',PROJ.bryanRetireAge);v('ashley-ret',PROJ.ashleyRetireAge);v('end-age',PROJ.endAge);
+  v('wd1',PROJ.wdTier1);v('break',PROJ.wdBreakAge);v('wd2',PROJ.wdTier2);
+  // scenario inputs only exist on the Scenarios view (sc- prefix, sc-sc-*)
+  v('sc-extra',PROJ.scExtra);v('sc-start',PROJ.scStartAge);v('sc-end',PROJ.scEndAge);
+  var n=document.getElementById(p+'-mode-nominal'),r=document.getElementById(p+'-mode-real');
   if(n&&r){n.classList.toggle('on',PROJ.displayMode==='nominal');r.classList.toggle('on',PROJ.displayMode==='real');}
 }
 function updProj(key,val){
@@ -1171,9 +1237,9 @@ function updProj(key,val){
   var s=String(val).trim();
   if(optional && s===''){PROJ[key]=null;}
   else{var num=parseFloat(s);if(isNaN(num))num=0;PROJ[key]=num;}
-  renderProjections();scheduleCloudSave();
+  renderAllProjViews();scheduleCloudSave();
 }
-function setProjMode(mode){PROJ.displayMode=mode;renderProjections();scheduleCloudSave();}
+function setProjMode(mode){PROJ.displayMode=mode;renderAllProjViews();scheduleCloudSave();}
 
 // ═══════════════ TABS ═══════════════
 function showTab(n){
@@ -1184,6 +1250,7 @@ function showTab(n){
   if(n==='track')renderTrack();
   if(n==='summary')renderSummary();
   if(n==='proj')renderProjections();
+  if(n==='scen')renderScenarios();
 }
 
 // ═══════════════ AUTH ═══════════════
