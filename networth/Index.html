@@ -160,8 +160,12 @@ table.proj-tbl thead th{font-size:11px;font-weight:600;color:var(--text3);text-t
 table.proj-tbl td.r,table.proj-tbl th.r{text-align:right;font-family:var(--mono);}
 table.proj-tbl tr.ret td{background:var(--accent-bg);}
 table.proj-tbl tr.ret td:first-child{font-weight:700;color:var(--accent);}
+table.proj-tbl tr.brk td{background:var(--surface2);}
+table.proj-tbl tr.brk td:first-child{font-weight:600;}
 table.proj-tbl .agebr{color:var(--text3);font-size:11px;}
 table.proj-tbl tr.depleted td{color:var(--red);}
+.proj-tbl-scroll{max-height:420px;overflow-y:auto;border-radius:var(--radius);}
+.proj-tbl-scroll table.proj-tbl thead th{position:sticky;top:0;z-index:1;}
 /* PLACEHOLDER PANELS */
 .placeholder{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:3rem 2rem;text-align:center;color:var(--text3);}
 .placeholder .ph-icon{font-size:30px;margin-bottom:.75rem;}
@@ -352,10 +356,10 @@ table.proj-tbl tr.depleted td{color:var(--red);}
     </div>
 
     <div class="sum-card">
-      <div class="sum-card-hd"><h3>Balance at key ages</h3></div>
-      <div class="tbl-scroll">
+      <div class="sum-card-hd"><h3>Balance by year</h3></div>
+      <div class="proj-tbl-scroll"><div class="tbl-scroll">
         <table class="nt proj-tbl" id="proj-tbl"><tbody></tbody></table>
-      </div>
+      </div></div>
     </div>
   </div>
 </div>
@@ -1113,18 +1117,16 @@ function renderProjChart(P){
 
 function renderProjTable(P){
   var cy=P.cy, inf=P.inf;
-  var set=[P.rows[0].bryanAge, PROJ.bryanRetireAge, PROJ.wdBreakAge, 70,75,80,85,90,95, PROJ.endAge];
-  var uniq=[];set.forEach(function(a){if(uniq.indexOf(a)<0)uniq.push(a);});
-  uniq.sort(function(a,b){return a-b;});
-  var byAge={};P.rows.forEach(function(r){byAge[r.bryanAge]=r;});
   var head='<thead><tr><th>Your age</th><th>Year</th><th>Household</th><th class="r">Base</th>'+(P.hasScenario?'<th class="r">Scenario</th>':'')+'</tr></thead>';
   var body='';
-  uniq.forEach(function(age){
-    var r=byAge[age];if(!r)return;
-    var isRet=(age===PROJ.bryanRetireAge);
-    var depleted=(P.depBase!==null && age>=P.depBase);
-    body+='<tr class="'+(isRet?'ret':'')+(depleted?' depleted':'')+'">'+
-      '<td>'+r.bryanAge+(isRet?' · retires':'')+'</td>'+
+  P.rows.forEach(function(r){
+    var isRet=(r.bryanAge===PROJ.bryanRetireAge);
+    var isBrk=(r.bryanAge===PROJ.wdBreakAge && r.bryanAge>=PROJ.bryanRetireAge);
+    var depleted=(P.depBase!==null && r.bryanAge>=P.depBase);
+    var cls=(isRet?'ret':(isBrk?'brk':''))+(depleted?' depleted':'');
+    var tag=isRet?' · retires':(isBrk?' · rate change':'');
+    body+='<tr class="'+cls.trim()+'">'+
+      '<td>'+r.bryanAge+tag+'</td>'+
       '<td>'+r.year+'</td>'+
       '<td class="agebr">'+ageBrackets(r).replace(/[()]/g,'')+'</td>'+
       '<td class="r">'+fmtMoney(projDisp(r.base,r.year,cy,inf))+'</td>'+
