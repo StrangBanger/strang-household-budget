@@ -2106,31 +2106,68 @@ function renderProjection(allMonths){
   var cumCard=seed;sliceForCard.forEach(function(m){cumCard+=m.net;});
   // ---- New insight cards ----
   var curYr=parseInt(todym.split('-')[0]);
-  // 1. Avg monthly net — last 3 COMPLETED months (actual net where available, exclude current partial)
+  var nowD=new Date();
+  var dayOfMonth=nowD.getDate();
+  var daysInMonth=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
+
+  // 1. Avg monthly net — last 3 COMPLETED months (actual net, exclude current partial)
   var completed=allMonths.filter(function(m){return m.ym<todym&&getActualsForMonth(m.ym).total>0;});
   var last3=completed.slice(-3);
   var avg3=last3.length?last3.reduce(function(s,m){var a=getActualsForMonth(m.ym);return s+(m.inc-a.total);},0)/last3.length:0;
-  // 2. This month vs average — current month's PROJECTED net vs avg3
+
+  // 2. This month vs avg — PACE-ADJUSTED run-rate: scale this month's actual-so-far to a full month.
+  //    Guard: before day 5 the extrapolation is too noisy, show a placeholder.
   var curM=allMonths.find(function(m){return m.ym===todym;});
-  var curProjNet=curM?curM.net:0;
-  var vsAvgPct=avg3!==0?((curProjNet-avg3)/Math.abs(avg3)*100):0;
-  var vsAvgTxt=(vsAvgPct>=0?'+':'')+vsAvgPct.toFixed(0)+'% vs avg';
-  // 3. Months ahead of budget — current year completed months where actual spend < projected spend
+  var vsAvgVal,vsAvgCls,vsAvgSub;
+  if(dayOfMonth<5){
+    vsAvgVal='—';vsAvgCls='';vsAvgSub='too early to project pace';
+  } else {
+    var curAct=getActualsForMonth(todym);
+    // Run-rate net = income − (spend-so-far scaled to full month)
+    var spendRunRate=curAct.total/dayOfMonth*daysInMonth;
+    var netRunRate=(curM?curM.inc:0)-spendRunRate;
+    var vsAvgPct=avg3!==0?((netRunRate-avg3)/Math.abs(avg3)*100):0;
+    vsAvgVal=(vsAvgPct>=0?'+':'')+vsAvgPct.toFixed(0)+'% vs avg';
+    vsAvgCls=vsAvgPct>=0?'g':'r';
+    vsAvgSub='at current pace vs 3-mo avg';
+  }
+
+  // 3. Months under budget — current-year completed months where actual spend ≤ projected
   var cyCompleted=allMonths.filter(function(m){return m.year===curYr&&m.ym<todym&&getActualsForMonth(m.ym).total>0;});
   var underCount=cyCompleted.filter(function(m){return getActualsForMonth(m.ym).total<=m.spend;}).length;
-  // 4. Projected year-end balance — cumulative through Dec of current year
-  var cyMonths=allMonths.filter(function(m){return m.year===curYr;});
-  var yeBal=(typeof getEffectiveSeed==='function'&&cyMonths.length)?getEffectiveSeed(cyMonths[0].ym):seed;
-  cyMonths.forEach(function(m){
-    var a=getActualsForMonth(m.ym);
-    var net=(m.ym<todym&&a.total>0)?(m.inc-a.total):m.net; // actual for completed, projected otherwise
-    yeBal+=net;
+
+  // 4. Projected year-end — anchor from most recent ACTUAL snapshot, add remaining projected nets to Dec 31.
+  var yeBal,yeAnchorYM;
+  if(typeof BAL_SNAPSHOTS!=='undefined'&&Object.keys(BAL_SNAPSHOTS).length){
+    var snapKeys=Object.keys(BAL_SNAPSHOTS).filter(function(k){return k.slice(0,4)==String(curYr)||k<todym;}).sort();
+    // most recent snapshot at or before today
+    var useKey=null;
+    Object.keys(BAL_SNAPSHOTS).sort().forEach(function(k){if(k<=todym)useKey=k;});
+    if(useKey){yeBal=BAL_SNAPSHOTS[useKey];yeAnchorYM=useKey;}
+  }
+  if(yeBal===undefined){
+    // fallback: seed + completed nets so far this year
+    var cyStart=allMonths.filter(function(m){return m.year===curYr;});
+    yeBal=(typeof getEffectiveSeed==='function'&&cyStart.length)?getEffectiveSeed(cyStart[0].ym):seed;
+    yeAnchorYM=null;
+  }
+  // Add remaining months' projected nets: every month AFTER the anchor month, through Dec of current year
+  allMonths.forEach(function(m){
+    if(m.year!==curYr)return;
+    if(yeAnchorYM&&m.ym<=yeAnchorYM)return;   // already captured in the snapshot
+    if(!yeAnchorYM&&m.ym<todym){               // fallback path: add completed actual nets
+      var a=getActualsForMonth(m.ym);
+      yeBal+=(a.total>0?(m.inc-a.total):m.net);
+      return;
+    }
+    yeBal+=m.net; // projected net for remaining months
   });
+
   var cs=[
-    {cls:avg3>=0?'g':'r',l:'Avg monthly net',v:(avg3>=0?'+':'')+fmtR(avg3),s:'last 3 completed months'},
-    {cls:vsAvgPct>=0?'g':'r',l:'This month vs avg',v:vsAvgTxt,s:'projected net vs 3-mo avg'},
-    {cls:'a',l:'Months under budget',v:underCount+' of '+cyCompleted.length,s:curYr+' completed months'},
-    {cls:yeBal>=0?'g':'r',l:'Projected year-end',v:(yeBal>=0?'+':'')+fmtR(yeBal),s:'balance at Dec 31'}
+    {cls:avg3>=0?'g':'r',l:'Avg monthly net',v:(avg3>=0?'+':'')+fmtR(avg3),s:'avg net, last 3 full months'},
+    {cls:vsAvgCls,l:'This month vs avg',v:vsAvgVal,s:vsAvgSub},
+    {cls:'a',l:'Months under budget',v:underCount+' of '+cyCompleted.length,s:'actual under budget, '+curYr},
+    {cls:yeBal>=0?'g':'r',l:'Projected year-end',v:(yeBal>=0?'+':'')+fmtR(yeBal),s:'current balance + rest of year'}
   ];
   document.getElementById('proj-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+'</div>';}).join('');
   // Build range buttons dynamically from projection years
