@@ -2126,10 +2126,11 @@ function renderProjection(allMonths){
     // Run-rate net = income − (spend-so-far scaled to full month)
     var spendRunRate=curAct.total/dayOfMonth*daysInMonth;
     var netRunRate=(curM?curM.inc:0)-spendRunRate;
-    var vsAvgPct=avg3!==0?((netRunRate-avg3)/Math.abs(avg3)*100):0;
-    vsAvgVal=(vsAvgPct>=0?'+':'')+vsAvgPct.toFixed(0)+'% vs avg';
-    vsAvgCls=vsAvgPct>=0?'g':'r';
-    vsAvgSub='at current pace vs 3-mo avg';
+    var vsAvgDelta=netRunRate-avg3; // dollar difference vs the 3-mo average
+    var vsAvgPct=avg3!==0?(vsAvgDelta/Math.abs(avg3)*100):0;
+    vsAvgVal=(vsAvgDelta>=0?'+':'')+fmtR(vsAvgDelta);
+    vsAvgCls=vsAvgDelta>=0?'g':'r';
+    vsAvgSub='at current pace · '+(vsAvgPct>=0?'+':'')+vsAvgPct.toFixed(0)+'% vs 3-mo avg';
   }
 
   // 3. Months under budget — current-year completed months where actual spend ≤ projected
