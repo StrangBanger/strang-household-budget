@@ -555,7 +555,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 
 <!-- PROJECTION -->
 <div class="panel" id="tab-proj">
-  <div class="cards" id="proj-cards"><div class="card a"><div class="card-l">Monthly income</div><div class="card-v">$10,963</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,095</div></div><div class="card g"><div class="card-l">This month net</div><div class="card-v">+$1,868</div></div><div class="card g"><div class="card-l">Net position YTD</div><div class="card-v">+$23,145</div></div></div>
+  <div class="cards" id="proj-cards"><div class="card g"><div class="card-l">Avg monthly net</div><div class="card-v">—</div><div class="card-s">last 3 completed months</div></div><div class="card g"><div class="card-l">This month vs avg</div><div class="card-v">—</div><div class="card-s">projected net vs 3-mo avg</div></div><div class="card a"><div class="card-l">Months under budget</div><div class="card-v">—</div><div class="card-s">completed months</div></div><div class="card g"><div class="card-l">Projected year-end</div><div class="card-v">—</div><div class="card-s">balance at Dec 31</div></div></div>
   <div id="proj-range-btns" style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;"><span style="font-size:12px;color:var(--text3);font-weight:500;align-self:center;margin-right:4px;">Show:</span><button class="range-btn on">YTD</button><button class="range-btn">2026</button><button class="range-btn">2027</button><button class="range-btn">2028</button><button class="range-btn">2029</button><button class="range-btn">2030</button><button class="range-btn">2031</button></div>
   <div class="chart-box" style="margin-bottom:.75rem;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;">
@@ -1757,14 +1757,32 @@ function renderTrack(){
   var projInc=monthlyIncome(currentYM);
   var rem=projSpend-act.total;
   var netPos=projInc-act.total;
+  // Pace bar (current month only): compare % of budget spent vs % of month elapsed
+  var todym=todayYM();
+  var paceBar='';
+  if(currentYM===todym&&projSpend>0){
+    var now=new Date();
+    var dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    var timePct=Math.min(now.getDate()/dim*100,100);
+    var spentPct=Math.min(act.total/projSpend*100,100);
+    var onTrack=spentPct<=timePct;
+    var fillCol=onTrack?'var(--green)':'#C77A2E';
+    paceBar='<div style="margin-top:8px;">'
+      +'<div style="position:relative;height:7px;background:var(--surface2);border-radius:4px;overflow:visible;">'
+        +'<div style="position:absolute;left:0;top:0;height:100%;width:'+spentPct.toFixed(1)+'%;background:'+fillCol+';border-radius:4px;transition:width .3s;"></div>'
+        +'<div style="position:absolute;left:'+timePct.toFixed(1)+'%;top:-2px;height:11px;width:2px;background:var(--text2);border-radius:1px;" title="Today\'s pace"></div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--text3);margin-top:4px;">'+spentPct.toFixed(0)+'% spent · '+timePct.toFixed(0)+'% through month</div>'
+    +'</div>';
+  }
   var cs=[
     {cls:'a',l:'Income',v:fmtR(projInc)},
     {cls:'',l:'Projected spend',v:fmtR(projSpend)},
     {cls:'',l:'Logged so far',v:fmtC(act.total),s:Object.keys(act.bySource).filter(function(s){return act.bySource[s]>0;}).map(function(s){return SOURCE_LABELS[s]+' '+fmtR(act.bySource[s]);}).join(' · ')},
-    {cls:rem>=0?'g':'r',l:rem>=0?'Budget remaining':'Over budget',v:fmtC(Math.abs(rem))},
+    {cls:rem>=0?'g':'r',l:rem>=0?'Budget remaining':'Over budget',v:fmtC(Math.abs(rem)),pace:paceBar},
     {cls:netPos>=0?'g':'r',l:'Net monthly position',v:(netPos>=0?'+':'')+fmtC(netPos)}
   ];
-  document.getElementById('track-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+'</div>';}).join('');
+  document.getElementById('track-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+(c.pace||'')+'</div>';}).join('');
   var groups=['Household (Fixed)','Household (Variable)','Bryan','Ashley','Kids'];
   var h='<thead><tr><th>Line item</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Remaining</th></tr></thead><tbody>';
   var gTB=0,gTA=0;
@@ -2086,15 +2104,35 @@ function renderProjection(allMonths){
   var m0=allMonths[0];
   var sliceForCard=getSlice(allMonths);if(!sliceForCard.length)sliceForCard=allMonths.slice(0,12);
   var cumCard=seed;sliceForCard.forEach(function(m){cumCard+=m.net;});
-  var yr=parseInt(ACTIVE_RANGE);
-  var rangeLabel=ACTIVE_RANGE==='ytd'?'Net position YTD':(!isNaN(yr)?'Net position in '+yr:'Net position');
+  // ---- New insight cards ----
+  var curYr=parseInt(todym.split('-')[0]);
+  // 1. Avg monthly net — last 3 COMPLETED months (actual net where available, exclude current partial)
+  var completed=allMonths.filter(function(m){return m.ym<todym&&getActualsForMonth(m.ym).total>0;});
+  var last3=completed.slice(-3);
+  var avg3=last3.length?last3.reduce(function(s,m){var a=getActualsForMonth(m.ym);return s+(m.inc-a.total);},0)/last3.length:0;
+  // 2. This month vs average — current month's PROJECTED net vs avg3
+  var curM=allMonths.find(function(m){return m.ym===todym;});
+  var curProjNet=curM?curM.net:0;
+  var vsAvgPct=avg3!==0?((curProjNet-avg3)/Math.abs(avg3)*100):0;
+  var vsAvgTxt=(vsAvgPct>=0?'+':'')+vsAvgPct.toFixed(0)+'% vs avg';
+  // 3. Months ahead of budget — current year completed months where actual spend < projected spend
+  var cyCompleted=allMonths.filter(function(m){return m.year===curYr&&m.ym<todym&&getActualsForMonth(m.ym).total>0;});
+  var underCount=cyCompleted.filter(function(m){return getActualsForMonth(m.ym).total<=m.spend;}).length;
+  // 4. Projected year-end balance — cumulative through Dec of current year
+  var cyMonths=allMonths.filter(function(m){return m.year===curYr;});
+  var yeBal=(typeof getEffectiveSeed==='function'&&cyMonths.length)?getEffectiveSeed(cyMonths[0].ym):seed;
+  cyMonths.forEach(function(m){
+    var a=getActualsForMonth(m.ym);
+    var net=(m.ym<todym&&a.total>0)?(m.inc-a.total):m.net; // actual for completed, projected otherwise
+    yeBal+=net;
+  });
   var cs=[
-    {cls:'a',l:'Monthly income',v:fmtR(m0.inc)},
-    {cls:'',l:'Projected spend',v:fmtR(m0.spend)},
-    {cls:m0.net>=0?'g':'r',l:'This month net',v:(m0.net>=0?'+':'')+fmtR(m0.net)},
-    {cls:cumCard>=0?'g':'r',l:rangeLabel,v:(cumCard>=0?'+':'')+fmtR(cumCard)}
+    {cls:avg3>=0?'g':'r',l:'Avg monthly net',v:(avg3>=0?'+':'')+fmtR(avg3),s:'last 3 completed months'},
+    {cls:vsAvgPct>=0?'g':'r',l:'This month vs avg',v:vsAvgTxt,s:'projected net vs 3-mo avg'},
+    {cls:'a',l:'Months under budget',v:underCount+' of '+cyCompleted.length,s:curYr+' completed months'},
+    {cls:yeBal>=0?'g':'r',l:'Projected year-end',v:(yeBal>=0?'+':'')+fmtR(yeBal),s:'balance at Dec 31'}
   ];
-  document.getElementById('proj-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div></div>';}).join('');
+  document.getElementById('proj-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+'</div>';}).join('');
   // Build range buttons dynamically from projection years
   buildRangeButtons(allMonths);
 
