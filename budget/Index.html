@@ -64,6 +64,15 @@ button.hbtn.signout:hover{background:var(--surface2);color:var(--text2);}
 /* CARDS */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
 .cards-5{grid-template-columns:repeat(5,1fr);}
+/* Track tab: plan trio (narrower/lighter) + tracking cards (prominent) */
+.cards-track6{grid-template-columns:0.8fr 0.8fr 0.8fr 1fr 1fr 1fr;}
+.card.plan{background:var(--surface2);border-color:var(--border);padding:.7rem .85rem;}
+.card.plan .card-l{font-size:10px;color:var(--text3);}
+.card.plan .card-v{font-size:16px;font-weight:600;color:var(--text2);}
+.card.plan.g .card-v{color:var(--green);}
+.card.plan.r .card-v{color:var(--red);}
+.card.plan.a{background:var(--surface2);border-color:var(--border);}
+@media(max-width:760px){.cards-track6{grid-template-columns:repeat(2,1fr);}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1rem;}
 .card.a{background:var(--accent-bg);border-color:#B8D4F0;}
 .card.g{background:var(--green-bg);border-color:#A8DDD0;}
@@ -447,7 +456,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
       <button onclick="shiftMonth(1)" style="font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;">›</button>
     </div>
   </div>
-  <div class="cards cards-5" id="track-cards"><div class="card a"><div class="card-l">Income</div><div class="card-v">$10,988</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,720</div></div><div class="card "><div class="card-l">Logged so far</div><div class="card-v">$1,844.47</div><div class="card-s">Costco Credit $418 · Wealthsimple Credit $243 · Bank $1,183</div></div><div class="card g"><div class="card-l">Budget remaining</div><div class="card-v">$7,875.75</div></div><div class="card g"><div class="card-l">Net monthly position</div><div class="card-v">+$9,143.27</div></div></div>
+  <div class="cards cards-track6" id="track-cards"><div class="card a"><div class="card-l">Income</div><div class="card-v">$10,988</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,720</div></div><div class="card "><div class="card-l">Logged so far</div><div class="card-v">$1,844.47</div><div class="card-s">Costco Credit $418 · Wealthsimple Credit $243 · Bank $1,183</div></div><div class="card g"><div class="card-l">Budget remaining</div><div class="card-v">$7,875.75</div></div><div class="card g"><div class="card-l">Net monthly position</div><div class="card-v">+$9,143.27</div></div></div>
   <!-- Opening balance widget — below summary cards -->
   <div id="bal-widget" style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1775,14 +1784,16 @@ function renderTrack(){
       +'<div style="font-size:10px;color:var(--text3);margin-top:4px;">'+spentPct.toFixed(0)+'% spent · '+timePct.toFixed(0)+'% through month</div>'
     +'</div>';
   }
+  var projPos=projInc-projSpend; // expected end-of-month delta (income − projected spend)
   var cs=[
-    {cls:'a',l:'Income',v:fmtR(projInc)},
-    {cls:'',l:'Projected spend',v:fmtR(projSpend)},
+    {cls:'a',l:'Income',v:fmtR(projInc),plan:true},
+    {cls:'',l:'Projected spend',v:fmtR(projSpend),plan:true},
+    {cls:projPos>=0?'g':'r',l:'Projected position',v:(projPos>=0?'+':'')+fmtR(projPos),plan:true},
     {cls:'',l:'Logged so far',v:fmtC(act.total),s:Object.keys(act.bySource).filter(function(s){return act.bySource[s]>0;}).map(function(s){return SOURCE_LABELS[s]+' '+fmtR(act.bySource[s]);}).join(' · ')},
     {cls:rem>=0?'g':'r',l:rem>=0?'Budget remaining':'Over budget',v:fmtC(Math.abs(rem)),pace:paceBar},
     {cls:netPos>=0?'g':'r',l:'Net monthly position',v:(netPos>=0?'+':'')+fmtC(netPos)}
   ];
-  document.getElementById('track-cards').innerHTML=cs.map(function(c){return'<div class="card '+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+(c.pace||'')+'</div>';}).join('');
+  document.getElementById('track-cards').innerHTML=cs.map(function(c){return'<div class="card '+(c.plan?'plan ':'')+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+(c.pace||'')+'</div>';}).join('');
   var groups=['Household (Fixed)','Household (Variable)','Bryan','Ashley','Kids'];
   var h='<thead><tr><th>Line item</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Remaining</th></tr></thead><tbody>';
   var gTB=0,gTA=0;
