@@ -125,19 +125,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
       </div>
     </a>
 
-    <!-- TBD — future idea placeholder -->
-    <div class="tool-card soon">
+    <!-- Projects — LIVE -->
+    <a class="tool-card live" href="/projects/">
       <div class="tc-top">
-        <div class="tc-icon" style="background:#FFF7ED;">✨</div>
-        <span class="tc-status soon">Coming soon</span>
+        <div class="tc-icon" style="background:#FBF3E4;">🛠️</div>
+        <span class="tc-status on">Open</span>
       </div>
-      <h2>TBD</h2>
-      <p>Space for whatever's next — a new calculator or tracker as the household needs it.</p>
+      <h2>Projects</h2>
+      <p>Home projects and to-dos by stage — from soon to someday, with big-ticket costs and a done log.</p>
       <div class="tc-summary">
-        <span class="lbl">Status</span>
-        <span class="val" style="color:var(--text3);">—</span>
+        <span class="lbl">Open projects</span>
+        <span class="val" id="sum-projects" style="color:var(--text3);">—</span>
       </div>
-    </div>
+    </a>
 
   </div>
 
@@ -189,6 +189,7 @@ var HOUSEHOLD_ID='strang';
 async function loadSummaries(){
   loadBudgetSummary();
   loadNetWorthSummary();
+  loadProjectsSummary();
 }
 // Budget card — latest bank balance snapshot from budget_data.
 async function loadBudgetSummary(){
@@ -232,6 +233,20 @@ async function loadNetWorthSummary(){
     var el=document.getElementById('sum-networth');
     el.textContent=(nw<0?'-$':'$')+Math.abs(Math.round(nw)).toLocaleString();
     el.style.color=nw>=0?'var(--green)':'var(--red)';
+  }catch(e){/* best-effort */}
+}
+
+// Projects card — count of open (not-Done) projects from projects_data.
+// Best-effort: fails quietly if unavailable.
+async function loadProjectsSummary(){
+  try{
+    var res=await sbClient.from('projects_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error||!res.data||!res.data.data)return;
+    var tasks=res.data.data.tasks||[];
+    var open=tasks.filter(function(t){return t && t.bucket!=='Done';}).length;
+    var el=document.getElementById('sum-projects');
+    el.textContent=String(open);
+    el.style.color='var(--text2)';
   }catch(e){/* best-effort */}
 }
 
