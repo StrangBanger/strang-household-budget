@@ -456,7 +456,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
       <button onclick="shiftMonth(1)" style="font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;">›</button>
     </div>
   </div>
-  <div class="cards cards-track6" id="track-cards"><div class="card a"><div class="card-l">Income</div><div class="card-v">$10,988</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,720</div></div><div class="card "><div class="card-l">Logged so far</div><div class="card-v">$1,844.47</div><div class="card-s">Costco Credit $418 · Wealthsimple Credit $243 · Bank $1,183</div></div><div class="card g"><div class="card-l">Budget remaining</div><div class="card-v">$7,875.75</div></div><div class="card g"><div class="card-l">Net monthly position</div><div class="card-v">+$9,143.27</div></div></div>
+  <div class="cards cards-track6" id="track-cards"><div class="card a"><div class="card-l">Income</div><div class="card-v">$10,988</div></div><div class="card "><div class="card-l">Projected spend</div><div class="card-v">$9,720</div></div><div class="card "><div class="card-l">Logged so far</div><div class="card-v">$1,844.47</div><div class="card-s">Costco Credit $418 · Wealthsimple Credit $243 · Bank $1,183</div></div><div class="card g"><div class="card-l">Budget remaining</div><div class="card-v">$7,875.75</div></div><div class="card g"><div class="card-l">Projected month-end</div><div class="card-v">+$9,143.27</div></div></div>
   <!-- Opening balance widget — below summary cards -->
   <div id="bal-widget" style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1784,14 +1784,45 @@ function renderTrack(){
       +'<div style="font-size:10px;color:var(--text3);margin-top:4px;">'+spentPct.toFixed(0)+'% spent · '+timePct.toFixed(0)+'% through month</div>'
     +'</div>';
   }
-  var projPos=projInc-projSpend; // expected end-of-month delta (income − projected spend)
+  var projPos=projInc-projSpend; // "If on budget" — income minus projected spend
+
+  // Far-right forecast card: "Projected month-end" position.
+  //  - Current month: pace-adjusted run-rate (spend-so-far scaled to full month), with early guard.
+  //  - Past month: actual final position (income − actual spend).
+  //  - Future month: budgeted position (nothing logged yet).
+  var feLbl='Projected month-end',feVal,feCls,feSub;
+  if(isFutureMo){
+    feVal=(projPos>=0?'+':'')+fmtR(projPos);
+    feCls=projPos>=0?'g':'r';
+    feSub='budgeted (no spend yet)';
+  } else if(!isCurrMo){
+    // Past month — final actual position
+    var pastPos=projInc-act.total;
+    feVal=(pastPos>=0?'+':'')+fmtR(pastPos);
+    feCls=pastPos>=0?'g':'r';
+    feSub='final actual position';
+  } else {
+    // Current month — pace-adjusted forecast
+    var nowD=new Date(),dOfM=nowD.getDate(),dInM=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
+    if(dOfM<5){
+      feVal='—';feCls='';feSub='too early to project pace';
+    } else {
+      var spendRunRate=act.total/dOfM*dInM;
+      var fePos=projInc-spendRunRate;
+      var vsBudget=fePos-projPos; // how forecast compares to the "If on budget" number
+      feVal=(fePos>=0?'+':'')+fmtR(fePos);
+      feCls=fePos>=0?'g':'r';
+      feSub=(vsBudget>=0?'+':'−')+fmtR(Math.abs(vsBudget))+' vs budget · at current pace';
+    }
+  }
+
   var cs=[
     {cls:'a',l:'Income',v:fmtR(projInc),plan:true},
     {cls:'',l:'Projected spend',v:fmtR(projSpend),plan:true},
-    {cls:projPos>=0?'g':'r',l:'Projected position',v:(projPos>=0?'+':'')+fmtR(projPos),plan:true},
+    {cls:projPos>=0?'g':'r',l:'If on budget',v:(projPos>=0?'+':'')+fmtR(projPos),plan:true},
     {cls:'',l:'Logged so far',v:fmtC(act.total),s:Object.keys(act.bySource).filter(function(s){return act.bySource[s]>0;}).map(function(s){return SOURCE_LABELS[s]+' '+fmtR(act.bySource[s]);}).join(' · ')},
     {cls:rem>=0?'g':'r',l:rem>=0?'Budget remaining':'Over budget',v:fmtC(Math.abs(rem)),pace:paceBar},
-    {cls:netPos>=0?'g':'r',l:'Net monthly position',v:(netPos>=0?'+':'')+fmtC(netPos)}
+    {cls:feCls,l:feLbl,v:feVal,s:feSub}
   ];
   document.getElementById('track-cards').innerHTML=cs.map(function(c){return'<div class="card '+(c.plan?'plan ':'')+c.cls+'"><div class="card-l">'+c.l+'</div><div class="card-v">'+c.v+'</div>'+(c.s?'<div class="card-s">'+c.s+'</div>':'')+(c.pace||'')+'</div>';}).join('');
   var groups=['Household (Fixed)','Household (Variable)','Bryan','Ashley','Kids'];
