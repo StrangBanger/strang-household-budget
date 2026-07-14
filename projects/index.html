@@ -99,6 +99,25 @@ button.ef-save{font-size:12px;font-weight:500;padding:7px 16px;border-radius:6px
 button.ef-save:hover{opacity:.88;}
 button.ef-cancel{font-size:12px;font-weight:500;padding:7px 14px;border-radius:6px;background:var(--surface);color:var(--text3);border:1px solid var(--border-strong);cursor:pointer;}
 button.ef-cancel:hover{background:var(--surface2);color:var(--text2);}
+/* DRAG */
+.pcard{cursor:default;}
+.pcard.draggable-card{}
+.drag-grip{cursor:grab;color:var(--text3);font-size:14px;line-height:1;padding:2px 2px 0 0;user-select:none;opacity:.55;flex-shrink:0;align-self:flex-start;margin-top:1px;}
+.drag-grip:hover{opacity:1;color:var(--text2);}
+.pcard.dragging{opacity:.45;border-color:var(--accent);border-style:dashed;}
+.pcard.drop-above{box-shadow:0 -2px 0 var(--accent);}
+/* INLINE STAGE SELECT */
+select.stage-sel{font-size:11px;font-weight:500;padding:3px 6px;border:1px solid var(--border-strong);border-radius:5px;background:var(--surface);color:var(--text2);cursor:pointer;font-family:var(--font);max-width:112px;}
+select.stage-sel:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
+select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+/* META CHIPS */
+.chip{font-size:10px;font-weight:500;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;}
+.chip.month{color:var(--accent);background:var(--accent-bg);border-color:#B8D4F0;}
+.chip.done-dt{color:var(--green);background:var(--green-bg);border-color:#A8DDD0;}
+.pcard-note{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.4;word-break:break-word;}
+/* EDITOR TEXTAREA */
+.ef-field textarea{width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg);color:var(--text);font-family:var(--font);resize:vertical;min-height:38px;}
+.ef-field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 /* EMPTY STATE */
 .p-empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:2.5rem 2rem;text-align:center;color:var(--text3);}
 .p-empty .ph-icon{font-size:28px;margin-bottom:.6rem;}
@@ -151,7 +170,7 @@ button.ef-cancel:hover{background:var(--surface2);color:var(--text2);}
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  Strang Household — Projects tool  ·  Stage 1 (CRUD spine)
+//  Strang Household — Projects tool  ·  Stage 2 (moves + reorder + fields)
 //  Sibling of the Budget & Net Worth tools. Shares Supabase auth.
 //  Storage: its OWN table `projects_data`, one shared row keyed by
 //  HOUSEHOLD_ID='strang', whole state as a JSON blob in `data`.
@@ -164,7 +183,7 @@ var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
 var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 var HOUSEHOLD_ID='strang';
 var LOCAL_BUFFER_KEY='strangProjects_offlineBuffer';
-var APP_VERSION='Projects-Stage1';
+var APP_VERSION='Projects-Stage2';
 
 // ── Buckets: the five stages a task can live in. Order = tab order. ──
 var BUCKETS=['Soon','Later','Long Term','Big-Ticket','Done'];
@@ -253,6 +272,7 @@ function renderPanels(){
   }
   html+='</div>';
   host.innerHTML=html;
+  if(document.getElementById('ef-bucket'))syncEditorFields();
   var focusEl=document.getElementById('ef-name');
   if(focusEl)focusEl.focus();
 }
@@ -262,15 +282,32 @@ function emptyState(b){
     '<p>Add a project and it\u2019ll live here. You can move it to another stage anytime by editing it.</p></div>';
 }
 function taskCard(t){
-  var amt=Number(t.amount)||0;
-  var amtHtml=amt>0?'<span class="amt">'+fmtMoney(amt)+'</span>':'<span class="amt zero">\u2014</span>';
+  // money shown: for Done, prefer the actual cost if entered; else the estimate
+  var shownAmt=(t.bucket==='Done'&&t.actualCost!=null)?Number(t.actualCost):Number(t.amount);
+  var hasAmt=(t.bucket==='Done'&&t.actualCost!=null)?true:(Number(t.amount)>0);
+  var amtHtml=hasAmt?'<span class="amt">'+fmtMoney(shownAmt)+'</span>':'<span class="amt zero">\u2014</span>';
   var spaceHtml=t.space?'<span class="space-tag">'+esc(t.space)+'</span>':'';
-  return '<div class="pcard" data-id="'+t.id+'">'+
+  // stage-specific chips
+  var chips='';
+  if(t.bucket==='Later'&&t.targetMonth)chips+='<span class="chip month">'+esc(fmtMonthLabel(t.targetMonth))+'</span>';
+  if(t.bucket==='Done'&&t.completedDate)chips+='<span class="chip done-dt">'+esc(fmtDateLabel(t.completedDate))+'</span>';
+  var noteHtml=(t.bucket==='Later'&&t.notes)?'<div class="pcard-note">'+esc(t.notes)+'</div>':'';
+  var stageSel='<select class="stage-sel" title="Move to another stage" onchange="changeStage('+t.id+',this.value)">'+
+    BUCKETS.map(function(b){return '<option value="'+esc(b)+'"'+(b===t.bucket?' selected':'')+'>'+esc(b)+'</option>';}).join('')+
+    '</select>';
+  return '<div class="pcard draggable-card" data-id="'+t.id+'" draggable="true" '+
+      'ondragstart="taskDragStart(event,'+t.id+',\''+esc(t.bucket)+'\')" '+
+      'ondragover="taskDragOver(event,'+t.id+')" '+
+      'ondragleave="taskDragLeave(event,'+t.id+')" '+
+      'ondrop="taskDrop(event,'+t.id+')" ondragend="taskDragEnd(event)">'+
+    '<span class="drag-grip" title="Drag to reorder">\u283f</span>'+
     '<div class="pcard-main">'+
       '<div class="pcard-name">'+esc(t.name)+'</div>'+
-      '<div class="pcard-meta">'+spaceHtml+amtHtml+'</div>'+
+      '<div class="pcard-meta">'+spaceHtml+amtHtml+chips+'</div>'+
+      noteHtml+
     '</div>'+
     '<div class="pcard-actions">'+
+      stageSel+
       '<button class="pact edit" title="Edit" onclick="startEdit('+t.id+')">\u270e</button>'+
       '<button class="pact del" title="Delete" onclick="delTask('+t.id+')">\u00d7</button>'+
     '</div>'+
@@ -282,52 +319,151 @@ function editorCard(t,bucket){
   var space=t?t.space:'';
   var amount=(t&&t.amount!=null)?t.amount:'';
   var bk=t?t.bucket:bucket;
+  var targetMonth=(t&&t.targetMonth)?t.targetMonth:'';
+  var notes=(t&&t.notes)?t.notes:'';
+  var completedDate=(t&&t.completedDate)?t.completedDate:'';
+  var actualCost=(t&&t.actualCost!=null)?t.actualCost:'';
   var spaceOpts='<option value="">— space —</option>'+SPACES.map(function(s){
     return '<option value="'+esc(s)+'"'+(s===space?' selected':'')+'>'+esc(s)+'</option>';}).join('');
   var bucketOpts=BUCKETS.map(function(b){
     return '<option value="'+esc(b)+'"'+(b===bk?' selected':'')+'>'+esc(b)+'</option>';}).join('');
   var saveArg=isNew?'null':t.id;
+  var amtLabel=(bk==='Big-Ticket')?'Est. cost ($)':'Amount ($)';
   return '<div class="pcard editing"><div class="edit-grid">'+
     '<div class="ef-field grow"><label>Project</label>'+
       '<input id="ef-name" type="text" value="'+esc(name)+'" placeholder="e.g. Paint basement stairwell" '+
       'onkeydown="if(event.key===\'Enter\')saveEditor('+saveArg+');if(event.key===\'Escape\')cancelEditor()"></div>'+
     '<div class="ef-row">'+
       '<div class="ef-field grow"><label>Space</label><select id="ef-space">'+spaceOpts+'</select></div>'+
-      '<div class="ef-field"><label>Amount ($)</label>'+
+      '<div class="ef-field"><label id="ef-amount-lbl">'+amtLabel+'</label>'+
         '<input id="ef-amount" class="money" type="number" step="1" value="'+esc(amount)+'" placeholder="0"></div>'+
     '</div>'+
-    '<div class="ef-field"><label>Stage</label><select id="ef-bucket">'+bucketOpts+'</select></div>'+
+    '<div class="ef-field"><label>Stage</label><select id="ef-bucket" onchange="syncEditorFields()">'+bucketOpts+'</select></div>'+
+    // Later-only group
+    '<div id="ef-later-wrap" class="ef-row" style="display:none;">'+
+      '<div class="ef-field"><label>Target month <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+        '<input id="ef-target" type="month" value="'+esc(targetMonth)+'"></div>'+
+      '<div class="ef-field grow"><label>Notes <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+        '<textarea id="ef-notes" rows="2" placeholder="planning notes…">'+esc(notes)+'</textarea></div>'+
+    '</div>'+
+    // Done-only group
+    '<div id="ef-done-wrap" class="ef-row" style="display:none;">'+
+      '<div class="ef-field"><label>Completed date <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+        '<input id="ef-completed" type="date" value="'+esc(completedDate)+'"></div>'+
+      '<div class="ef-field"><label>Actual cost ($) <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+        '<input id="ef-actual" class="money" type="number" step="1" value="'+esc(actualCost)+'" placeholder="0"></div>'+
+    '</div>'+
     '<div class="ef-actions">'+
       '<button class="ef-cancel" onclick="cancelEditor()">Cancel</button>'+
       '<button class="ef-save" onclick="saveEditor('+saveArg+')">'+(isNew?'Add project':'Save')+'</button>'+
     '</div>'+
   '</div></div>';
 }
+// Show only the field group that matches the currently-selected stage.
+function syncEditorFields(){
+  var sel=document.getElementById('ef-bucket');if(!sel)return;
+  var bk=sel.value;
+  var lw=document.getElementById('ef-later-wrap');
+  var dw=document.getElementById('ef-done-wrap');
+  if(lw)lw.style.display=(bk==='Later')?'flex':'none';
+  if(dw)dw.style.display=(bk==='Done')?'flex':'none';
+  var lbl=document.getElementById('ef-amount-lbl');
+  if(lbl)lbl.textContent=(bk==='Big-Ticket')?'Est. cost ($)':'Amount ($)';
+}
 
 // ═══════════════ CRUD ═══════════════
 function startAdd(bucket){editingId='new:'+bucket;renderPanels();}
 function startEdit(id){editingId=id;renderPanels();}
 function cancelEditor(){editingId=null;renderPanels();}
+function getVal(id){var e=document.getElementById(id);return e?e.value:'';}
+function numOrNull(id){var v=getVal(id);return v===''?null:(Number(v)||0);}
+function strOrNull(id){var v=(getVal(id)||'').trim();return v||null;}
 function saveEditor(id){
   var name=(document.getElementById('ef-name').value||'').trim();
   if(!name){document.getElementById('ef-name').focus();return;}
-  var space=document.getElementById('ef-space').value;
-  var amtRaw=document.getElementById('ef-amount').value;
-  var amount=amtRaw===''?null:(Number(amtRaw)||0);
-  var bucket=document.getElementById('ef-bucket').value;
+  var space=getVal('ef-space');
+  var amount=numOrNull('ef-amount');
+  var bucket=getVal('ef-bucket');
+  // stage-specific (stored regardless; only shown where relevant)
+  var targetMonth=strOrNull('ef-target');
+  var notes=strOrNull('ef-notes');
+  var completedDate=strOrNull('ef-completed');
+  var actualCost=numOrNull('ef-actual');
   if(id==null){
     TASKS.push({id:_taskId++,name:name,space:space,amount:amount,bucket:bucket,
-      sortOrder:nextSortOrder(bucket),scheduledDate:null,targetMonth:null,notes:null,
-      completedDate:null,actualCost:null});
+      sortOrder:nextSortOrder(bucket),scheduledDate:null,
+      targetMonth:targetMonth,notes:notes,completedDate:completedDate,actualCost:actualCost});
     activeBucket=bucket; // jump to where it landed
   }else{
     var t=findTask(id);if(!t)return;
     var moved=(t.bucket!==bucket);
     t.name=name;t.space=space;t.amount=amount;
+    t.targetMonth=targetMonth;t.notes=notes;t.completedDate=completedDate;t.actualCost=actualCost;
     if(moved){t.bucket=bucket;t.sortOrder=nextSortOrder(bucket);activeBucket=bucket;}
   }
   editingId=null;
   renderTabs();renderPanels();scheduleCloudSave();
+}
+// ── Quick stage change from the inline dropdown on a card ──
+function changeStage(id,newBucket){
+  var t=findTask(id);if(!t||t.bucket===newBucket)return;
+  t.bucket=newBucket;t.sortOrder=nextSortOrder(newBucket);
+  editingId=null;
+  renderTabs();renderPanels();scheduleCloudSave();
+  showSavedBadge('Moved to '+newBucket+' \u2713');
+}
+// ── Drag-to-reorder within a stage (persisted via sortOrder) ──
+var _dragId=null,_dragBucket=null;
+function taskDragStart(e,id,bucket){
+  _dragId=id;_dragBucket=bucket;
+  e.dataTransfer.effectAllowed='move';
+  try{e.dataTransfer.setData('text/plain',String(id));}catch(_){}
+  var card=e.target.closest?e.target.closest('.pcard'):null;
+  if(card)card.classList.add('dragging');
+}
+function taskDragOver(e,overId){
+  if(_dragId===null)return;
+  var over=findTask(overId);
+  if(!over||over.bucket!==_dragBucket||over.id===_dragId)return; // only within same stage
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var card=e.target.closest?e.target.closest('.pcard'):null;
+  if(card)card.classList.add('drop-above');
+}
+function taskDragLeave(e,overId){
+  var card=e.target.closest?e.target.closest('.pcard'):null;
+  if(card)card.classList.remove('drop-above');
+}
+function taskDrop(e,targetId){
+  if(_dragId===null)return;
+  var dragged=findTask(_dragId),target=findTask(targetId);
+  if(!dragged||!target||dragged.bucket!==target.bucket||dragged.id===target.id){taskDragEnd(e);return;}
+  e.preventDefault();
+  var ordered=tasksIn(dragged.bucket);              // sorted by sortOrder
+  var di=ordered.findIndex(function(t){return t.id===dragged.id;});
+  var tiOrig=ordered.findIndex(function(t){return t.id===target.id;});
+  ordered.splice(di,1);
+  var tiNew=ordered.findIndex(function(t){return t.id===target.id;});
+  var insertAt=(di<tiOrig)?tiNew+1:tiNew;           // downward → after; upward → before
+  ordered.splice(insertAt,0,dragged);
+  ordered.forEach(function(t,i){t.sortOrder=(i+1)*10;});
+  _dragId=null;_dragBucket=null;
+  renderPanels();scheduleCloudSave();
+}
+function taskDragEnd(e){
+  _dragId=null;_dragBucket=null;
+  document.querySelectorAll('.pcard.dragging').forEach(function(c){c.classList.remove('dragging');});
+  document.querySelectorAll('.pcard.drop-above').forEach(function(c){c.classList.remove('drop-above');});
+}
+// ── Label formatters for stage-specific chips ──
+function fmtMonthLabel(ym){
+  if(!ym)return'';var p=String(ym).split('-');if(p.length<2)return ym;
+  var d=new Date(+p[0],+p[1]-1,1);
+  return d.toLocaleDateString('en-CA',{month:'short',year:'numeric'});
+}
+function fmtDateLabel(ds){
+  if(!ds)return'';var p=String(ds).split('-');if(p.length<3)return ds;
+  var d=new Date(+p[0],+p[1]-1,+p[2]);
+  return d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
 }
 function delTask(id){
   var t=findTask(id);if(!t)return;
