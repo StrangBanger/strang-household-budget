@@ -548,17 +548,24 @@ function normalizeTasks(list){
 function applyLoadedData(data,sourceLbl){
   if(!data)return;
   if(Array.isArray(data.tasks))TASKS=normalizeTasks(data.tasks);
-  // Merge saved spaces with the zone list: keeps any legacy space from the data
-  // (e.g. "Yard") while ensuring newly-added zone spaces always appear. Compared
-  // apostrophe-insensitively so "Regan's Room" doesn't land twice.
-  if(Array.isArray(data.spaces)&&data.spaces.length){
-    var merged=DEFAULT_SPACES.slice();
-    var seen={};merged.forEach(function(s){seen[normSpace(s)]=1;});
+  // Merge saved spaces with the zone list. Zoned spaces always appear; an unzoned
+  // legacy space (e.g. "Yard") is kept ONLY while some task still uses it, so it
+  // drops out of the dropdown on its own once retagged. Apostrophe-insensitive.
+  var merged=DEFAULT_SPACES.slice();
+  var seen={};merged.forEach(function(s){seen[normSpace(s)]=1;});
+  var inUse={};TASKS.forEach(function(t){if(t.space)inUse[normSpace(t.space)]=1;});
+  if(Array.isArray(data.spaces)){
     data.spaces.forEach(function(s){
-      if(s&&!seen[normSpace(s)]){merged.push(s);seen[normSpace(s)]=1;}
+      var n=normSpace(s);
+      if(s&&!seen[n]&&inUse[n]){merged.push(s);seen[n]=1;}
     });
-    SPACES=merged;
   }
+  // Also surface any space a task uses that isn't in the saved list at all.
+  TASKS.forEach(function(t){
+    var n=normSpace(t.space);
+    if(t.space&&!seen[n]){merged.push(t.space);seen[n]=1;}
+  });
+  SPACES=merged;
   _taskId=data.taskNextId||(TASKS.length?Math.max.apply(null,TASKS.map(function(t){return t.id||0;}))+1:1);
   SAVE_HISTORY=data.saveHistory||[];
   var d=new Date(data.savedAt||Date.now());
