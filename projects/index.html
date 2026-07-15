@@ -77,6 +77,23 @@ button.add-proj:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var
 .pcard-name{font-size:14px;font-weight:500;color:var(--text);letter-spacing:-.01em;word-break:break-word;}
 .pcard-meta{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;}
 .space-tag{font-size:10px;font-weight:600;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:.04em;}
+/* ZONE COLOURS — space tags coloured by zone */
+.space-tag.z-blue  {color:#185FA5;background:#EBF2FB;border-color:#BFD9F2;}
+.space-tag.z-green {color:#0F6E56;background:#E8F5F1;border-color:#A8DDD0;}
+.space-tag.z-brown {color:#7A5230;background:#F6EFE7;border-color:#DFCBB4;}
+.space-tag.z-orange{color:#A36000;background:#FBF3E4;border-color:#EFD9AC;}
+.space-tag.z-pink  {color:#A32D6B;background:#FBEAF3;border-color:#EFC2DA;}
+.space-tag.z-purple{color:#5B3EA8;background:#F1EDFB;border-color:#D3C7F0;}
+.space-tag.z-none  {color:var(--text3);background:var(--surface2);border-color:var(--border);}
+/* zone dot on the editor's space row */
+.zone-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle;background:var(--border-strong);}
+.zone-dot.z-blue{background:#185FA5;}.zone-dot.z-green{background:#0F6E56;}
+.zone-dot.z-brown{background:#7A5230;}.zone-dot.z-orange{background:#A36000;}
+.zone-dot.z-pink{background:#A32D6B;}.zone-dot.z-purple{background:#5B3EA8;}
+/* zone legend under the tab bar */
+.zone-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:-.5rem 0 1.15rem;}
+.zl-item{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;}
+.zl-sw{width:9px;height:9px;border-radius:3px;}
 .amt{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--green);}
 .amt.zero{color:var(--text3);font-weight:500;}
 .pcard-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;}
@@ -195,10 +212,24 @@ var BUCKET_META={
   'Done':      {icon:'✅', blurb:'Completed.'}
 };
 
-// ── Spaces: the "@ location" list, extensible in a later stage. ──
-var DEFAULT_SPACES=['Basement','Basement Bathroom','Kitchen','Living Room','Family Room',
-  'Sunroom','Hallway','Entrance','Master Bedroom','Kids\u2019 Room','Bathroom','Attic',
-  'Backyard','Frontyard','Side Yard','Driveway','Shed','House','Other'];
+// ── Spaces, grouped into colour-coded zones. Order here = order in the dropdown. ──
+var ZONES=[
+  {key:'blue',   label:'Basement',        spaces:['Basement','Basement Bathroom']},
+  {key:'purple', label:'Interior',        spaces:['Kitchen','Living Room','Family Room','Master Bedroom',
+                                                  'Bathroom','Hallway','Entrance','Regan\'s Room','Harrison\'s Room']},
+  {key:'green',  label:'Yard & Exterior', spaces:['Front Yard','Back Yard','Side Yard','Driveway']},
+  {key:'brown',  label:'Structures',      spaces:['Shed','Attic','Sunroom']},
+  {key:'orange', label:'House-wide',      spaces:['House']},
+  {key:'pink',   label:'Other',           spaces:['Other']}
+];
+// space -> zone key lookup (built once).
+// Apostrophes are normalized so "Regan's Room" and "Regan’s Room" both resolve.
+function normSpace(s){return String(s==null?'':s).replace(/[\u2018\u2019\u02BC]/g,'\'').trim();}
+var SPACE_ZONE={};
+ZONES.forEach(function(z){z.spaces.forEach(function(s){SPACE_ZONE[normSpace(s)]=z.key;});});
+function zoneOf(space){return SPACE_ZONE[normSpace(space)]||'none';}
+// Flat list of every zoned space, in zone order.
+var DEFAULT_SPACES=ZONES.reduce(function(acc,z){return acc.concat(z.spaces);},[]);
 
 // ── Global state (declared up-front with defaults) ──
 var TASKS=[];              // [{id,name,space,amount,bucket,sortOrder,scheduledDate,targetMonth,notes,completedDate,actualCost}]
@@ -255,6 +286,7 @@ function renderPanels(){
     '<h2>'+esc(b)+'</h2>'+
     '<div class="p-sub">'+esc(meta.blurb)+'</div></div>'+
     '<div class="p-total"><span class="lbl">Total</span>'+fmtMoney(total)+'</div></div>';
+  html+=zoneLegend();
   // add button (unless already adding here)
   if(editingId!=='new:'+b){
     html+='<button class="add-proj" onclick="startAdd(\''+b+'\')">+ Add project</button>';
@@ -276,6 +308,13 @@ function renderPanels(){
   var focusEl=document.getElementById('ef-name');
   if(focusEl)focusEl.focus();
 }
+// Colour key for the zones, shown under the tab bar.
+var ZONE_SWATCH={blue:'#185FA5',purple:'#5B3EA8',green:'#0F6E56',brown:'#7A5230',orange:'#A36000',pink:'#A32D6B'};
+function zoneLegend(){
+  return '<div class="zone-legend">'+ZONES.map(function(z){
+    return '<span class="zl-item"><span class="zl-sw" style="background:'+ZONE_SWATCH[z.key]+'"></span>'+esc(z.label)+'</span>';
+  }).join('')+'</div>';
+}
 function emptyState(b){
   return '<div class="p-empty"><div class="ph-icon">'+BUCKET_META[b].icon+'</div>'+
     '<h3>Nothing in '+esc(b)+' yet</h3>'+
@@ -286,7 +325,7 @@ function taskCard(t){
   var shownAmt=(t.bucket==='Done'&&t.actualCost!=null)?Number(t.actualCost):Number(t.amount);
   var hasAmt=(t.bucket==='Done'&&t.actualCost!=null)?true:(Number(t.amount)>0);
   var amtHtml=hasAmt?'<span class="amt">'+fmtMoney(shownAmt)+'</span>':'<span class="amt zero">\u2014</span>';
-  var spaceHtml=t.space?'<span class="space-tag">'+esc(t.space)+'</span>':'';
+  var spaceHtml=t.space?'<span class="space-tag z-'+zoneOf(t.space)+'">'+esc(t.space)+'</span>':'';
   // stage-specific chips
   var chips='';
   if(t.bucket==='Later'&&t.targetMonth)chips+='<span class="chip month">'+esc(fmtMonthLabel(t.targetMonth))+'</span>';
@@ -323,8 +362,23 @@ function editorCard(t,bucket){
   var notes=(t&&t.notes)?t.notes:'';
   var completedDate=(t&&t.completedDate)?t.completedDate:'';
   var actualCost=(t&&t.actualCost!=null)?t.actualCost:'';
-  var spaceOpts='<option value="">— space —</option>'+SPACES.map(function(s){
-    return '<option value="'+esc(s)+'"'+(s===space?' selected':'')+'>'+esc(s)+'</option>';}).join('');
+  // Space dropdown, grouped by zone (optgroups render natively on every browser).
+  // Any space in the data that isn't in a zone (e.g. legacy "Yard") is kept under "Unsorted".
+  var zoned={};
+  var nSpace=normSpace(space);
+  var spaceOpts='<option value="">— space —</option>';
+  ZONES.forEach(function(z){
+    var opts=z.spaces.filter(function(s){return SPACES.indexOf(s)>=0||DEFAULT_SPACES.indexOf(s)>=0;});
+    if(!opts.length)return;
+    spaceOpts+='<optgroup label="'+esc(z.label)+'">'+opts.map(function(s){
+      zoned[normSpace(s)]=1;
+      return '<option value="'+esc(s)+'"'+(normSpace(s)===nSpace?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</optgroup>';
+  });
+  var leftovers=SPACES.filter(function(s){return !zoned[normSpace(s)];});
+  if(leftovers.length){
+    spaceOpts+='<optgroup label="Unsorted">'+leftovers.map(function(s){
+      return '<option value="'+esc(s)+'"'+(normSpace(s)===nSpace?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</optgroup>';
+  }
   var bucketOpts=BUCKETS.map(function(b){
     return '<option value="'+esc(b)+'"'+(b===bk?' selected':'')+'>'+esc(b)+'</option>';}).join('');
   var saveArg=isNew?'null':t.id;
@@ -494,7 +548,17 @@ function normalizeTasks(list){
 function applyLoadedData(data,sourceLbl){
   if(!data)return;
   if(Array.isArray(data.tasks))TASKS=normalizeTasks(data.tasks);
-  if(Array.isArray(data.spaces)&&data.spaces.length)SPACES=data.spaces.slice();
+  // Merge saved spaces with the zone list: keeps any legacy space from the data
+  // (e.g. "Yard") while ensuring newly-added zone spaces always appear. Compared
+  // apostrophe-insensitively so "Regan's Room" doesn't land twice.
+  if(Array.isArray(data.spaces)&&data.spaces.length){
+    var merged=DEFAULT_SPACES.slice();
+    var seen={};merged.forEach(function(s){seen[normSpace(s)]=1;});
+    data.spaces.forEach(function(s){
+      if(s&&!seen[normSpace(s)]){merged.push(s);seen[normSpace(s)]=1;}
+    });
+    SPACES=merged;
+  }
   _taskId=data.taskNextId||(TASKS.length?Math.max.apply(null,TASKS.map(function(t){return t.id||0;}))+1:1);
   SAVE_HISTORY=data.saveHistory||[];
   var d=new Date(data.savedAt||Date.now());
