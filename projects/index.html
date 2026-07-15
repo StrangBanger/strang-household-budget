@@ -240,12 +240,16 @@ var BUCKET_META={
 // the drag engine below asks the scheme what a drop means, so it doesn't change.
 var GROUP_SCHEME={
   'Soon':'none',        // → 'date' (weekends) in Stage 4
-  'Later':'none',       // → 'manual' whenever you want it
-  'Long Term':'none',   // → 'manual' whenever you want it
+  'Later':'manual',
+  'Long Term':'manual',
   'Big-Ticket':'manual',
-  'Done':'none'
+  'Done':'manual'
 };
 function schemeFor(bucket){return GROUP_SCHEME[bucket]||'none';}
+// Rank numbers say "this is the priority order" — useful where you're deciding
+// what's next, meaningless on an archive. Done groups fine, it just isn't ranked.
+var SHOW_RANK={'Soon':false,'Later':true,'Long Term':true,'Big-Ticket':true,'Done':false};
+function ranksIn(bucket){return !!SHOW_RANK[bucket];}
 // Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder}], …}
 var GROUPS={};
 var _groupId=1;
@@ -441,7 +445,7 @@ function taskCard(t,rank){
   var shownAmt=(t.bucket==='Done'&&t.actualCost!=null)?Number(t.actualCost):Number(t.amount);
   var hasAmt=(t.bucket==='Done'&&t.actualCost!=null)?true:(Number(t.amount)>0);
   var amtHtml=hasAmt?'<span class="amt">'+fmtMoney(shownAmt)+'</span>':'<span class="amt zero">\u2014</span>';
-  var rankHtml=(rank!=null&&schemeFor(t.bucket)!=='none')?'<span class="rank-no">'+rank+'</span>':'';
+  var rankHtml=(rank!=null&&ranksIn(t.bucket))?'<span class="rank-no">'+rank+'</span>':'';
   var spaceHtml=t.space?'<span class="space-tag z-'+zoneOf(t.space)+'">'+esc(t.space)+'</span>':'';
   // stage-specific chips
   var chips='';
