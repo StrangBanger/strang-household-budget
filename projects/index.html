@@ -137,21 +137,37 @@ select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;borde
 .ef-field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 /* GROUP SECTIONS */
 .grp{margin-bottom:1.35rem;}
-.grp-head{display:flex;align-items:center;gap:8px;padding:6px 2px 7px;border-bottom:1px solid var(--border);margin-bottom:.7rem;}
-.grp-head.drop-in{background:var(--accent-bg);border-bottom-color:var(--accent);border-radius:5px 5px 0 0;}
-.grp-grip{cursor:grab;color:var(--text3);font-size:13px;opacity:.5;user-select:none;flex-shrink:0;}
+/* Group header = a solid rounded bar. Deliberately a HEAVIER register than the
+   pale zone tags on cards, so bar-colour (a group) and pill-colour (a space)
+   never read as the same language even when they share a hue. */
+.grp-head{display:flex;align-items:center;gap:9px;padding:8px 8px 8px 12px;border-radius:var(--radius);margin-bottom:.7rem;background:#6B6760;color:#fff;position:relative;}
+.grp-head.drop-in{outline:2px solid var(--accent);outline-offset:2px;}
+.grp-grip{cursor:grab;color:#fff;font-size:13px;opacity:.6;user-select:none;flex-shrink:0;}
 .grp-grip:hover{opacity:1;}
-.grp-name{font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.01em;cursor:text;padding:1px 4px;border-radius:4px;flex-shrink:0;}
-.grp-name:hover{background:var(--surface2);}
-.grp-name-input{font-size:13px;font-weight:700;font-family:var(--font);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:1px 4px;background:var(--surface);min-width:120px;}
-.grp-name-input:focus{outline:2px solid var(--accent);outline-offset:-1px;}
-.grp-meta{font-size:11px;color:var(--text3);font-weight:500;}
-.grp-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--text2);margin-left:auto;}
-button.grp-del{font-size:14px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;opacity:.4;flex-shrink:0;}
-button.grp-del:hover{color:var(--red);background:var(--red-bg);opacity:1;}
+.grp-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:-.01em;cursor:text;padding:1px 5px;border-radius:4px;flex-shrink:0;}
+.grp-name:hover{background:rgba(255,255,255,.16);}
+.grp-name-input{font-size:13px;font-weight:700;font-family:var(--font);color:var(--text);border:1px solid #fff;border-radius:4px;padding:1px 5px;background:#fff;min-width:130px;}
+.grp-name-input:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:1px;}
+.grp-meta{font-size:11px;color:rgba(255,255,255,.72);font-weight:500;}
+.grp-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:#fff;margin-left:auto;}
+button.grp-del,button.grp-swatch{background:none;border:none;cursor:pointer;flex-shrink:0;padding:2px 5px;border-radius:4px;line-height:1;}
+button.grp-del{font-size:14px;color:#fff;opacity:.55;}
+button.grp-del:hover{opacity:1;background:rgba(255,255,255,.18);}
+button.grp-swatch{display:flex;align-items:center;padding:3px;}
+button.grp-swatch .sw{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);display:block;}
+button.grp-swatch:hover{background:rgba(255,255,255,.18);}
+/* palette popover */
+.grp-palette{position:absolute;top:calc(100% + 5px);right:6px;z-index:50;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);padding:7px;display:flex;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.13);}
+.grp-palette button{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;}
+.grp-palette button:hover{transform:scale(1.14);}
+.grp-palette button.on{border-color:var(--text);}
 .grp.dragging{opacity:.5;}
 .grp-empty{font-size:12px;color:var(--text3);font-style:italic;padding:.65rem .2rem;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;}
+/* Ungrouped stays quiet — it's a leftover bin, not a peer group. */
+.grp-ungrouped .grp-head{background:none;color:var(--text3);border-bottom:1px solid var(--border);border-radius:0;padding:6px 2px 7px;}
 .grp-ungrouped .grp-name{color:var(--text3);font-weight:600;}
+.grp-ungrouped .grp-meta{color:var(--text3);}
+.grp-ungrouped .grp-sub{color:var(--text2);}
 button.add-grp{font-size:12px;font-weight:500;padding:7px 13px;border-radius:var(--radius);border:1px dashed var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;margin-left:8px;transition:background .15s,border-color .15s,color .15s;}
 button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
 .rank-no{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--surface2);border-radius:4px;padding:1px 5px;flex-shrink:0;align-self:flex-start;margin-top:1px;}
@@ -250,7 +266,24 @@ function schemeFor(bucket){return GROUP_SCHEME[bucket]||'none';}
 // what's next, meaningless on an archive. Done groups fine, it just isn't ranked.
 var SHOW_RANK={'Soon':false,'Later':true,'Long Term':true,'Big-Ticket':true,'Done':false};
 function ranksIn(bucket){return !!SHOW_RANK[bucket];}
-// Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder}], …}
+// Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder,color}], …}
+// `color` is a palette key, or null/'slate' for the neutral default — a new
+// group looks right immediately and colour is opt-in, never auto-assigned.
+var GROUP_PALETTE=[
+  {key:'slate', hex:'#6B6760', label:'Neutral'},
+  {key:'blue',  hex:'#185FA5', label:'Blue'},
+  {key:'green', hex:'#0F6E56', label:'Green'},
+  {key:'amber', hex:'#A36000', label:'Amber'},
+  {key:'red',   hex:'#A32D2D', label:'Red'},
+  {key:'purple',hex:'#5B3EA8', label:'Purple'},
+  {key:'pink',  hex:'#A32D6B', label:'Pink'}
+];
+function groupHex(g){
+  var k=(g&&g.color)?g.color:'slate';
+  var p=GROUP_PALETTE.find(function(x){return x.key===k;});
+  return p?p.hex:'#6B6760';
+}
+var _paletteFor=null;   // group id whose palette popover is open
 var GROUPS={};
 var _groupId=1;
 function groupsIn(bucket){
@@ -336,7 +369,7 @@ function renderTabs(){
 }
 function tabKey(b){return b.toLowerCase().replace(/[^a-z]+/g,'-');}
 function showTab(b){
-  activeBucket=b;editingId=null;renderTabs();renderPanels();
+  activeBucket=b;editingId=null;_paletteFor=null;renderTabs();renderPanels();
 }
 
 // ═══════════════ RENDER: PANELS ═══════════════
@@ -397,7 +430,8 @@ function renderGroupSection(b,g){
   // header — only shown for real groups, or for Ungrouped when groups exist
   if(g||hasGroups){
     var nm=g?g.name:'Ungrouped';
-    html+='<div class="grp-head" '+
+    var barStyle=g?(' style="background:'+groupHex(g)+'"'):'';
+    html+='<div class="grp-head"'+barStyle+' '+
       'ondragover="grpDragOver(event,'+(gid==null?'null':gid)+')" '+
       'ondragleave="grpDragLeave(event)" '+
       'ondrop="grpDrop(event,\''+esc(b)+'\','+(gid==null?'null':gid)+')">';
@@ -410,7 +444,18 @@ function renderGroupSection(b,g){
     }
     html+='<span class="grp-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>';
     html+='<span class="grp-sub">'+fmtMoney(sub)+'</span>';
-    if(g)html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
+    if(g){
+      html+='<button class="grp-swatch" title="Group colour" onclick="togglePalette('+gid+')">'+
+        '<span class="sw" style="background:'+groupHex(g)+'"></span></button>';
+      html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
+      if(_paletteFor===gid){
+        html+='<div class="grp-palette">'+GROUP_PALETTE.map(function(p){
+          var on=((g.color||'slate')===p.key)?' on':'';
+          return '<button class="'+on.trim()+'" title="'+esc(p.label)+'" style="background:'+p.hex+'" '+
+            'onclick="setGroupColor(\''+esc(b)+'\','+gid+',\''+p.key+'\')"></button>';
+        }).join('')+'</div>';
+      }
+    }
     html+='</div>';
   }
   if(!tasks.length){
@@ -596,12 +641,22 @@ function changeStage(id,newBucket){
   renderTabs();renderPanels();scheduleCloudSave();
   showSavedBadge('Moved to '+newBucket+' \u2713');
 }
+function togglePalette(gid){
+  _paletteFor=(_paletteFor===gid)?null:gid;
+  renderPanels();
+}
+function setGroupColor(bucket,gid,key){
+  var g=findGroup(bucket,gid);if(!g)return;
+  g.color=key;
+  _paletteFor=null;
+  renderPanels();scheduleCloudSave();
+}
 // ── Group CRUD (manual scheme) ──
 function addGroup(bucket){
   if(!GROUPS[bucket])GROUPS[bucket]=[];
-  var g={id:_groupId++,name:'New group',sortOrder:nextGroupSort(bucket)};
+  var g={id:_groupId++,name:'New group',sortOrder:nextGroupSort(bucket),color:'slate'};
   GROUPS[bucket].push(g);
-  editingId=null;renderPanels();scheduleCloudSave();
+  editingId=null;_paletteFor=null;renderPanels();scheduleCloudSave();
   // drop straight into renaming the new group
   var el=document.querySelector('.grp[data-gid="'+g.id+'"] .grp-name');
   if(el)renameGroup(bucket,g.id,el);
@@ -631,6 +686,7 @@ function delGroup(bucket,gid){
   TASKS.forEach(function(t){if(t.bucket===bucket&&t.groupId===gid)t.groupId=null;});
   GROUPS[bucket]=(GROUPS[bucket]||[]).filter(function(x){return x.id!==gid;});
   renumberGroup(bucket,null);
+  _paletteFor=null;
   renderPanels();scheduleCloudSave();
 }
 
