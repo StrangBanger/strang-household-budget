@@ -135,6 +135,26 @@ select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;borde
 /* EDITOR TEXTAREA */
 .ef-field textarea{width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg);color:var(--text);font-family:var(--font);resize:vertical;min-height:38px;}
 .ef-field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+/* GROUP SECTIONS */
+.grp{margin-bottom:1.35rem;}
+.grp-head{display:flex;align-items:center;gap:8px;padding:6px 2px 7px;border-bottom:1px solid var(--border);margin-bottom:.7rem;}
+.grp-head.drop-in{background:var(--accent-bg);border-bottom-color:var(--accent);border-radius:5px 5px 0 0;}
+.grp-grip{cursor:grab;color:var(--text3);font-size:13px;opacity:.5;user-select:none;flex-shrink:0;}
+.grp-grip:hover{opacity:1;}
+.grp-name{font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.01em;cursor:text;padding:1px 4px;border-radius:4px;flex-shrink:0;}
+.grp-name:hover{background:var(--surface2);}
+.grp-name-input{font-size:13px;font-weight:700;font-family:var(--font);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:1px 4px;background:var(--surface);min-width:120px;}
+.grp-name-input:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+.grp-meta{font-size:11px;color:var(--text3);font-weight:500;}
+.grp-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--text2);margin-left:auto;}
+button.grp-del{font-size:14px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;opacity:.4;flex-shrink:0;}
+button.grp-del:hover{color:var(--red);background:var(--red-bg);opacity:1;}
+.grp.dragging{opacity:.5;}
+.grp-empty{font-size:12px;color:var(--text3);font-style:italic;padding:.65rem .2rem;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;}
+.grp-ungrouped .grp-name{color:var(--text3);font-weight:600;}
+button.add-grp{font-size:12px;font-weight:500;padding:7px 13px;border-radius:var(--radius);border:1px dashed var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;margin-left:8px;transition:background .15s,border-color .15s,color .15s;}
+button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
+.rank-no{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--surface2);border-radius:4px;padding:1px 5px;flex-shrink:0;align-self:flex-start;margin-top:1px;}
 /* EMPTY STATE */
 .p-empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:2.5rem 2rem;text-align:center;color:var(--text3);}
 .p-empty .ph-icon{font-size:28px;margin-bottom:.6rem;}
@@ -187,7 +207,7 @@ select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;borde
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  Strang Household — Projects tool  ·  Stage 2 (moves + reorder + fields)
+//  Strang Household — Projects tool  ·  Stage 3a (grouping engine)
 //  Sibling of the Budget & Net Worth tools. Shares Supabase auth.
 //  Storage: its OWN table `projects_data`, one shared row keyed by
 //  HOUSEHOLD_ID='strang', whole state as a JSON blob in `data`.
@@ -200,7 +220,7 @@ var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
 var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 var HOUSEHOLD_ID='strang';
 var LOCAL_BUFFER_KEY='strangProjects_offlineBuffer';
-var APP_VERSION='Projects-Stage2';
+var APP_VERSION='Projects-Stage3a';
 
 // ── Buckets: the five stages a task can live in. Order = tab order. ──
 var BUCKETS=['Soon','Later','Long Term','Big-Ticket','Done'];
@@ -211,6 +231,46 @@ var BUCKET_META={
   'Big-Ticket':{icon:'💰', blurb:'Big future costs to save & prioritize.'},
   'Done':      {icon:'✅', blurb:'Completed.'}
 };
+
+// ── Grouping scheme: how each stage groups its cards. THE SEAM. ──
+//   'manual' → you create/name/order the groups (stored in GROUPS).
+//   'date'   → groups derived from the data (e.g. weekends). Stage 4.
+//   'none'   → one flat list, no headers.
+// Adding weekends to Soon later = flip it to 'date' + write its adapter;
+// the drag engine below asks the scheme what a drop means, so it doesn't change.
+var GROUP_SCHEME={
+  'Soon':'none',        // → 'date' (weekends) in Stage 4
+  'Later':'none',       // → 'manual' whenever you want it
+  'Long Term':'none',   // → 'manual' whenever you want it
+  'Big-Ticket':'manual',
+  'Done':'none'
+};
+function schemeFor(bucket){return GROUP_SCHEME[bucket]||'none';}
+// Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder}], …}
+var GROUPS={};
+var _groupId=1;
+function groupsIn(bucket){
+  return (GROUPS[bucket]||[]).slice().sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+}
+function findGroup(bucket,gid){
+  return (GROUPS[bucket]||[]).find(function(g){return g.id===gid;});
+}
+function tasksInGroup(bucket,gid){
+  return TASKS.filter(function(t){
+    return t.bucket===bucket && (gid===null ? !t.groupId : t.groupId===gid);
+  }).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+}
+function groupTotal(bucket,gid){
+  return tasksInGroup(bucket,gid).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+}
+// Renumber one group's tasks 10,20,30… so order is stable and gaps don't accrue.
+function renumberGroup(bucket,gid){
+  tasksInGroup(bucket,gid).forEach(function(t,i){t.sortOrder=(i+1)*10;});
+}
+function nextGroupSort(bucket){
+  var g=groupsIn(bucket);
+  return g.length?(g[g.length-1].sortOrder||0)+10:10;
+}
 
 // ── Spaces, grouped into colour-coded zones. Order here = order in the dropdown. ──
 var ZONES=[
@@ -256,8 +316,8 @@ function tasksIn(bucket){
 function bucketTotal(bucket){
   return tasksIn(bucket).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
 }
-function nextSortOrder(bucket){
-  var list=tasksIn(bucket);
+function nextSortOrder(bucket,gid){
+  var list=tasksInGroup(bucket,(gid===undefined?null:gid));
   return list.length?(list[list.length-1].sortOrder||0)+10:10;
 }
 
@@ -280,6 +340,7 @@ function renderPanels(){
   var host=document.getElementById('panels');
   var b=activeBucket,meta=BUCKET_META[b];
   var list=tasksIn(b),total=bucketTotal(b);
+  var scheme=schemeFor(b);
   var html='<div class="panel on">';
   // head
   html+='<div class="p-head"><div>'+
@@ -287,19 +348,22 @@ function renderPanels(){
     '<div class="p-sub">'+esc(meta.blurb)+'</div></div>'+
     '<div class="p-total"><span class="lbl">Total</span>'+fmtMoney(total)+'</div></div>';
   html+=zoneLegend();
-  // add button (unless already adding here)
+  // add controls
   if(editingId!=='new:'+b){
-    html+='<button class="add-proj" onclick="startAdd(\''+b+'\')">+ Add project</button>';
+    html+='<div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">'+
+      '<button class="add-proj" style="margin-bottom:0;" onclick="startAdd(\''+b+'\')">+ Add project</button>';
+    if(scheme==='manual')html+='<button class="add-grp" onclick="addGroup(\''+b+'\')">+ Add group</button>';
+    html+='</div>';
   }
-  // cards
-  html+='<div class="pcards">';
-  if(editingId==='new:'+b){html+=editorCard(null,b);}
-  if(!list.length && editingId!=='new:'+b){
-    html+='</div>'+emptyState(b);
+  // body
+  if(!list.length && editingId!=='new:'+b && !(GROUPS[b]||[]).length){
+    html+=emptyState(b);
+  }else if(scheme==='manual'){
+    html+=renderGrouped(b);
   }else{
-    list.forEach(function(t){
-      html+=(editingId===t.id)?editorCard(t,b):taskCard(t);
-    });
+    html+='<div class="pcards">';
+    if(editingId==='new:'+b)html+=editorCard(null,b);
+    list.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
     html+='</div>';
   }
   html+='</div>';
@@ -307,6 +371,58 @@ function renderPanels(){
   if(document.getElementById('ef-bucket'))syncEditorFields();
   var focusEl=document.getElementById('ef-name');
   if(focusEl)focusEl.focus();
+}
+// Manual-group layout: named groups in order, then the permanent Ungrouped
+// section. Ungrouped is a normal section, not an error state — a stage with
+// no groups at all still renders perfectly as one unnamed list.
+function renderGrouped(b){
+  var html='';
+  if(editingId==='new:'+b)html+='<div class="pcards" style="margin-bottom:1.35rem;">'+editorCard(null,b)+'</div>';
+  groupsIn(b).forEach(function(g){html+=renderGroupSection(b,g);});
+  var un=tasksInGroup(b,null);
+  var hasGroups=(GROUPS[b]||[]).length>0;
+  if(un.length||!hasGroups)html+=renderGroupSection(b,null);
+  return html;
+}
+function renderGroupSection(b,g){
+  var gid=g?g.id:null;
+  var tasks=tasksInGroup(b,gid);
+  var sub=groupTotal(b,gid);
+  var hasGroups=(GROUPS[b]||[]).length>0;
+  var html='<div class="grp'+(g?'':' grp-ungrouped')+'" data-gid="'+(gid==null?'':gid)+'">';
+  // header — only shown for real groups, or for Ungrouped when groups exist
+  if(g||hasGroups){
+    var nm=g?g.name:'Ungrouped';
+    html+='<div class="grp-head" '+
+      'ondragover="grpDragOver(event,'+(gid==null?'null':gid)+')" '+
+      'ondragleave="grpDragLeave(event)" '+
+      'ondrop="grpDrop(event,\''+esc(b)+'\','+(gid==null?'null':gid)+')">';
+    if(g){
+      html+='<span class="grp-grip" title="Drag to reorder group" draggable="true" '+
+        'ondragstart="grpDragStart(event,'+gid+',\''+esc(b)+'\')" ondragend="grpDragEnd(event)">\u283f</span>';
+      html+='<span class="grp-name" title="Click to rename" onclick="renameGroup(\''+esc(b)+'\','+gid+',this)">'+esc(nm)+'</span>';
+    }else{
+      html+='<span class="grp-name">'+esc(nm)+'</span>';
+    }
+    html+='<span class="grp-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>';
+    html+='<span class="grp-sub">'+fmtMoney(sub)+'</span>';
+    if(g)html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
+    html+='</div>';
+  }
+  if(!tasks.length){
+    html+='<div class="grp-empty" '+
+      'ondragover="grpDragOver(event,'+(gid==null?'null':gid)+')" '+
+      'ondragleave="grpDragLeave(event)" '+
+      'ondrop="grpDrop(event,\''+esc(b)+'\','+(gid==null?'null':gid)+')">Drag projects here</div>';
+  }else{
+    html+='<div class="pcards">';
+    tasks.forEach(function(t,i){
+      html+=(editingId===t.id)?editorCard(t,b):taskCard(t,i+1);
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
 }
 // Colour key for the zones, shown under the tab bar.
 var ZONE_SWATCH={blue:'#185FA5',purple:'#5B3EA8',green:'#0F6E56',brown:'#7A5230',orange:'#A36000',pink:'#A32D6B'};
@@ -320,11 +436,12 @@ function emptyState(b){
     '<h3>Nothing in '+esc(b)+' yet</h3>'+
     '<p>Add a project and it\u2019ll live here. You can move it to another stage anytime by editing it.</p></div>';
 }
-function taskCard(t){
+function taskCard(t,rank){
   // money shown: for Done, prefer the actual cost if entered; else the estimate
   var shownAmt=(t.bucket==='Done'&&t.actualCost!=null)?Number(t.actualCost):Number(t.amount);
   var hasAmt=(t.bucket==='Done'&&t.actualCost!=null)?true:(Number(t.amount)>0);
   var amtHtml=hasAmt?'<span class="amt">'+fmtMoney(shownAmt)+'</span>':'<span class="amt zero">\u2014</span>';
+  var rankHtml=(rank!=null&&schemeFor(t.bucket)!=='none')?'<span class="rank-no">'+rank+'</span>':'';
   var spaceHtml=t.space?'<span class="space-tag z-'+zoneOf(t.space)+'">'+esc(t.space)+'</span>':'';
   // stage-specific chips
   var chips='';
@@ -340,6 +457,7 @@ function taskCard(t){
       'ondragleave="taskDragLeave(event,'+t.id+')" '+
       'ondrop="taskDrop(event,'+t.id+')" ondragend="taskDragEnd(event)">'+
     '<span class="drag-grip" title="Drag to reorder">\u283f</span>'+
+    rankHtml+
     '<div class="pcard-main">'+
       '<div class="pcard-name">'+esc(t.name)+'</div>'+
       '<div class="pcard-meta">'+spaceHtml+amtHtml+chips+'</div>'+
@@ -445,15 +563,20 @@ function saveEditor(id){
   var actualCost=numOrNull('ef-actual');
   if(id==null){
     TASKS.push({id:_taskId++,name:name,space:space,amount:amount,bucket:bucket,
-      sortOrder:nextSortOrder(bucket),scheduledDate:null,
+      sortOrder:nextSortOrder(bucket),groupId:null,scheduledDate:null,
       targetMonth:targetMonth,notes:notes,completedDate:completedDate,actualCost:actualCost});
     activeBucket=bucket; // jump to where it landed
   }else{
     var t=findTask(id);if(!t)return;
     var moved=(t.bucket!==bucket);
+    var oldBucket=t.bucket,oldGid=t.groupId||null;
     t.name=name;t.space=space;t.amount=amount;
     t.targetMonth=targetMonth;t.notes=notes;t.completedDate=completedDate;t.actualCost=actualCost;
-    if(moved){t.bucket=bucket;t.sortOrder=nextSortOrder(bucket);activeBucket=bucket;}
+    if(moved){
+      t.bucket=bucket;t.groupId=null;t.sortOrder=nextSortOrder(bucket);
+      renumberGroup(oldBucket,oldGid);
+      activeBucket=bucket;
+    }
   }
   editingId=null;
   renderTabs();renderPanels();scheduleCloudSave();
@@ -461,24 +584,68 @@ function saveEditor(id){
 // ── Quick stage change from the inline dropdown on a card ──
 function changeStage(id,newBucket){
   var t=findTask(id);if(!t||t.bucket===newBucket)return;
-  t.bucket=newBucket;t.sortOrder=nextSortOrder(newBucket);
+  var oldBucket=t.bucket,oldGid=t.groupId||null;
+  // Leaving a stage forgets its group — the new stage files it its own way.
+  t.bucket=newBucket;t.groupId=null;t.sortOrder=nextSortOrder(newBucket);
+  renumberGroup(oldBucket,oldGid);
   editingId=null;
   renderTabs();renderPanels();scheduleCloudSave();
   showSavedBadge('Moved to '+newBucket+' \u2713');
 }
-// ── Drag-to-reorder within a stage (persisted via sortOrder) ──
-var _dragId=null,_dragBucket=null;
+// ── Group CRUD (manual scheme) ──
+function addGroup(bucket){
+  if(!GROUPS[bucket])GROUPS[bucket]=[];
+  var g={id:_groupId++,name:'New group',sortOrder:nextGroupSort(bucket)};
+  GROUPS[bucket].push(g);
+  editingId=null;renderPanels();scheduleCloudSave();
+  // drop straight into renaming the new group
+  var el=document.querySelector('.grp[data-gid="'+g.id+'"] .grp-name');
+  if(el)renameGroup(bucket,g.id,el);
+}
+function renameGroup(bucket,gid,el){
+  var g=findGroup(bucket,gid);if(!g||!el)return;
+  var input=document.createElement('input');
+  input.className='grp-name-input';input.value=g.name;
+  function commit(){
+    var v=(input.value||'').trim();
+    g.name=v||'Untitled group';
+    renderPanels();scheduleCloudSave();
+  }
+  input.onblur=commit;
+  input.onkeydown=function(e){
+    if(e.key==='Enter'){input.blur();}
+    if(e.key==='Escape'){input.onblur=null;renderPanels();}
+  };
+  el.replaceWith(input);input.focus();input.select();
+}
+function delGroup(bucket,gid){
+  var g=findGroup(bucket,gid);if(!g)return;
+  var n=tasksInGroup(bucket,gid).length;
+  var msg='Delete the group \u201c'+g.name+'\u201d?';
+  if(n)msg+='\n\nIts '+n+(n===1?' project moves':' projects move')+' to Ungrouped — nothing is deleted.';
+  if(!confirm(msg))return;
+  TASKS.forEach(function(t){if(t.bucket===bucket&&t.groupId===gid)t.groupId=null;});
+  GROUPS[bucket]=(GROUPS[bucket]||[]).filter(function(x){return x.id!==gid;});
+  renumberGroup(bucket,null);
+  renderPanels();scheduleCloudSave();
+}
+
+// ── Drag engine ──
+// Two drag kinds: a task, or a whole group header. A task drop resolves BOTH
+// which group it landed in and its position within it. Dropping on a group
+// header (or its empty zone) appends to that group.
+var _dragId=null,_dragBucket=null,_dragKind=null,_dragGroupId=null;
 function taskDragStart(e,id,bucket){
-  _dragId=id;_dragBucket=bucket;
+  _dragKind='task';_dragId=id;_dragBucket=bucket;
   e.dataTransfer.effectAllowed='move';
   try{e.dataTransfer.setData('text/plain',String(id));}catch(_){}
   var card=e.target.closest?e.target.closest('.pcard'):null;
   if(card)card.classList.add('dragging');
 }
 function taskDragOver(e,overId){
-  if(_dragId===null)return;
+  if(_dragKind!=='task'||_dragId===null)return;
   var over=findTask(overId);
-  if(!over||over.bucket!==_dragBucket||over.id===_dragId)return; // only within same stage
+  if(!over||over.bucket!==_dragBucket||over.id===_dragId)return;
   e.preventDefault();e.dataTransfer.dropEffect='move';
   var card=e.target.closest?e.target.closest('.pcard'):null;
   if(card)card.classList.add('drop-above');
@@ -488,25 +655,103 @@ function taskDragLeave(e,overId){
   if(card)card.classList.remove('drop-above');
 }
 function taskDrop(e,targetId){
-  if(_dragId===null)return;
+  if(_dragKind!=='task'||_dragId===null)return;
   var dragged=findTask(_dragId),target=findTask(targetId);
   if(!dragged||!target||dragged.bucket!==target.bucket||dragged.id===target.id){taskDragEnd(e);return;}
   e.preventDefault();
-  var ordered=tasksIn(dragged.bucket);              // sorted by sortOrder
-  var di=ordered.findIndex(function(t){return t.id===dragged.id;});
-  var tiOrig=ordered.findIndex(function(t){return t.id===target.id;});
-  ordered.splice(di,1);
-  var tiNew=ordered.findIndex(function(t){return t.id===target.id;});
-  var insertAt=(di<tiOrig)?tiNew+1:tiNew;           // downward → after; upward → before
-  ordered.splice(insertAt,0,dragged);
-  ordered.forEach(function(t,i){t.sortOrder=(i+1)*10;});
-  _dragId=null;_dragBucket=null;
+  var b=dragged.bucket;
+  var fromGid=dragged.groupId||null,toGid=target.groupId||null;
+  var sameGroup=(fromGid===toGid);
+  if(sameGroup){
+    var ordered=tasksInGroup(b,toGid);
+    var di=ordered.findIndex(function(t){return t.id===dragged.id;});
+    var tiOrig=ordered.findIndex(function(t){return t.id===target.id;});
+    ordered.splice(di,1);
+    var tiNew=ordered.findIndex(function(t){return t.id===target.id;});
+    var insertAt=(di<tiOrig)?tiNew+1:tiNew;
+    ordered.splice(insertAt,0,dragged);
+    ordered.forEach(function(t,i){t.sortOrder=(i+1)*10;});
+  }else{
+    // Landed in a different group: adopt it, insert just above the target.
+    dragged.groupId=toGid;
+    var dest=tasksInGroup(b,toGid).filter(function(t){return t.id!==dragged.id;});
+    var ti=dest.findIndex(function(t){return t.id===target.id;});
+    dest.splice(ti<0?dest.length:ti,0,dragged);
+    dest.forEach(function(t,i){t.sortOrder=(i+1)*10;});
+    renumberGroup(b,fromGid);
+  }
+  taskDragEnd(e);
   renderPanels();scheduleCloudSave();
 }
 function taskDragEnd(e){
-  _dragId=null;_dragBucket=null;
+  _dragId=null;_dragBucket=null;_dragKind=null;_dragGroupId=null;
   document.querySelectorAll('.pcard.dragging').forEach(function(c){c.classList.remove('dragging');});
   document.querySelectorAll('.pcard.drop-above').forEach(function(c){c.classList.remove('drop-above');});
+  document.querySelectorAll('.grp-head.drop-in').forEach(function(c){c.classList.remove('drop-in');});
+}
+// Drop onto a group header / empty zone → append to that group.
+function grpDragOver(e,gid){
+  if(_dragKind!=='task'&&_dragKind!=='group')return;
+  if(_dragId===null&&_dragGroupId===null)return;
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var h=e.target.closest?e.target.closest('.grp-head'):null;
+  if(h)h.classList.add('drop-in');
+}
+function grpDragLeave(e){
+  var h=e.target.closest?e.target.closest('.grp-head'):null;
+  if(h)h.classList.remove('drop-in');
+}
+function grpDrop(e,bucket,gid){
+  // A group header dropped on another group header = reorder the groups.
+  if(_dragKind==='group'){
+    e.preventDefault();
+    var changed=grpReorder(bucket,(gid==null)?null:gid);
+    grpDragEnd(e);
+    if(changed){renderPanels();scheduleCloudSave();}
+    return;
+  }
+  if(_dragKind!=='task'||_dragId===null){taskDragEnd(e);return;}
+  var dragged=findTask(_dragId);
+  if(!dragged||dragged.bucket!==bucket){taskDragEnd(e);return;}
+  e.preventDefault();
+  var fromGid=dragged.groupId||null;
+  var toGid=(gid==null)?null:gid;
+  if(fromGid!==toGid){
+    dragged.groupId=toGid;
+    dragged.sortOrder=(tasksInGroup(bucket,toGid).length+1)*10;
+    renumberGroup(bucket,fromGid);
+    renumberGroup(bucket,toGid);
+  }
+  taskDragEnd(e);
+  renderPanels();scheduleCloudSave();
+}
+// Group header reorder.
+function grpDragStart(e,gid,bucket){
+  _dragKind='group';_dragGroupId=gid;_dragBucket=bucket;
+  e.dataTransfer.effectAllowed='move';
+  try{e.dataTransfer.setData('text/plain','g'+gid);}catch(_){}
+  e.stopPropagation();
+  var sec=e.target.closest?e.target.closest('.grp'):null;
+  if(sec)sec.classList.add('dragging');
+}
+function grpDragEnd(e){
+  _dragKind=null;_dragGroupId=null;_dragBucket=null;
+  document.querySelectorAll('.grp.dragging').forEach(function(c){c.classList.remove('dragging');});
+  document.querySelectorAll('.grp-head.drop-in').forEach(function(c){c.classList.remove('drop-in');});
+}
+// A group dropped onto another group's header reorders the groups.
+function grpReorder(bucket,overGid){
+  if(_dragKind!=='group'||_dragGroupId===null||overGid===null)return false;
+  if(_dragGroupId===overGid)return false;
+  var list=groupsIn(bucket);
+  var di=list.findIndex(function(g){return g.id===_dragGroupId;});
+  var tiOrig=list.findIndex(function(g){return g.id===overGid;});
+  if(di<0||tiOrig<0)return false;
+  var moved=list.splice(di,1)[0];
+  var tiNew=list.findIndex(function(g){return g.id===overGid;});
+  list.splice((di<tiOrig)?tiNew+1:tiNew,0,moved);
+  list.forEach(function(g,i){g.sortOrder=(i+1)*10;});
+  return true;
 }
 // ── Label formatters for stage-specific chips ──
 function fmtMonthLabel(ym){
@@ -522,7 +767,9 @@ function fmtDateLabel(ds){
 function delTask(id){
   var t=findTask(id);if(!t)return;
   if(!confirm('Delete \u201c'+t.name+'\u201d?\n\nThis removes it permanently.'))return;
+  var b=t.bucket,gid=t.groupId||null;
   TASKS=TASKS.filter(function(x){return x.id!==id;});
+  renumberGroup(b,gid);
   editingId=null;renderTabs();renderPanels();scheduleCloudSave();
 }
 
@@ -532,7 +779,8 @@ function buildSavePayload(){
   SAVE_HISTORY.unshift(now);
   if(SAVE_HISTORY.length>10)SAVE_HISTORY.length=10;
   return{version:1,savedAt:now,appVersion:APP_VERSION,saveHistory:SAVE_HISTORY,
-    tasks:TASKS,taskNextId:_taskId,spaces:SPACES};
+    tasks:TASKS,taskNextId:_taskId,spaces:SPACES,
+    groups:GROUPS,groupNextId:_groupId};
 }
 function normalizeTasks(list){
   return (list||[]).map(function(t){
@@ -540,6 +788,7 @@ function normalizeTasks(list){
       amount:(t.amount==null?null:Number(t.amount)),
       bucket:BUCKETS.indexOf(t.bucket)>=0?t.bucket:'Later',
       sortOrder:t.sortOrder||0,
+      groupId:(t.groupId==null?null:t.groupId),
       scheduledDate:t.scheduledDate||null,targetMonth:t.targetMonth||null,
       notes:t.notes||null,completedDate:t.completedDate||null,
       actualCost:(t.actualCost==null?null:Number(t.actualCost))};
@@ -566,6 +815,18 @@ function applyLoadedData(data,sourceLbl){
     if(t.space&&!seen[n]){merged.push(t.space);seen[n]=1;}
   });
   SPACES=merged;
+  // Groups (manual scheme). Older saves have none — that's fine, everything
+  // simply renders ungrouped.
+  GROUPS=(data.groups&&typeof data.groups==='object')?data.groups:{};
+  BUCKETS.forEach(function(b){if(!Array.isArray(GROUPS[b]))GROUPS[b]=[];});
+  var maxG=0;
+  BUCKETS.forEach(function(b){GROUPS[b].forEach(function(g){if(g.id>maxG)maxG=g.id;});});
+  _groupId=data.groupNextId||(maxG+1);
+  // Heal orphans: a task pointing at a group that no longer exists (or that
+  // belongs to a different stage) falls back to Ungrouped rather than vanishing.
+  TASKS.forEach(function(t){
+    if(t.groupId!=null&&!findGroup(t.bucket,t.groupId))t.groupId=null;
+  });
   _taskId=data.taskNextId||(TASKS.length?Math.max.apply(null,TASKS.map(function(t){return t.id||0;}))+1:1);
   SAVE_HISTORY=data.saveHistory||[];
   var d=new Date(data.savedAt||Date.now());
