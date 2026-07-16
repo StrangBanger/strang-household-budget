@@ -175,33 +175,33 @@ button.add-grp{font-size:12px;font-weight:500;padding:7px 13px;border-radius:var
 button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
 .rank-no{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--surface2);border-radius:4px;padding:1px 5px;flex-shrink:0;align-self:flex-start;margin-top:1px;}
 /* WEEK SECTIONS (Soon) */
-/* Blue = scheduled. A weekend with work gets a faint wash + soft left stripe;
-   THIS weekend deepens to the full accent; a free weekend stays plain. So the
-   column reads at a glance: no blue = clear, faint = booked, strong = now.
-   Kept as a pale wash + stripe so it never competes with the zone pills on the
-   cards (colour there means "space") or the solid group bars. */
+/* Colour and position carry SEPARATE meanings, so neither muddies the other:
+     BLUE  = something is scheduled here (never "when" it is)
+     WEIGHT = which weekend it is — "This weekend" bold, "Next weekend" regular
+   A free weekend stays grey even if it's this one; that IS the signal. */
 .wk{margin-bottom:1.1rem;}
 .wk-head{display:flex;align-items:center;gap:9px;padding:8px 10px 8px 12px;border-radius:var(--radius);margin-bottom:.7rem;
   background:#F4F8FD;border:1px solid #DDE9F7;border-left:3px solid rgba(24,95,165,.34);}
-.wk-head .wk-when{font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.01em;}
+.wk-when{font-size:13px;letter-spacing:-.01em;}
+.wk-when.now-lbl{font-weight:700;color:var(--text);}
+.wk-when.next-lbl{font-weight:500;color:var(--text2);}
 .wk-head .wk-date{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--text2);}
 .wk-head .wk-meta{font-size:11px;color:var(--text3);font-weight:500;}
 .wk-head .wk-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--text2);margin-left:auto;}
-.wk-head.now{background:var(--accent-bg);border-color:#B8D4F0;border-left-color:var(--accent);}
-.wk-head.now .wk-when{color:var(--accent);}
-.wk-head.now .wk-date{color:var(--accent);}
 .wk-head.drop-in,.wk-free.drop-in{outline:2px solid var(--accent);outline-offset:2px;}
-/* a free weekend collapses to one quiet line — no wash, still a drop target */
+/* a free weekend collapses to one quiet grey line — still a drop target */
 .wk-free{display:flex;align-items:center;gap:9px;padding:6px 12px;border-radius:var(--radius);
   border:1px dashed var(--border);border-left:3px solid transparent;color:var(--text3);margin-bottom:.4rem;background:transparent;}
 .wk-free .wk-date{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--text3);}
 .wk-free .free-lbl{font-size:11px;color:var(--text3);font-style:italic;}
-.wk-free .wk-when{font-size:12px;font-weight:600;color:var(--text2);}
+.wk-free .wk-when{font-size:12px;}
+.wk-free .wk-when.now-lbl{font-weight:700;color:var(--text2);}
+.wk-free .wk-when.next-lbl{font-weight:500;color:var(--text3);}
 .wk-free:hover{border-color:var(--border-strong);background:var(--surface);}
-.wk-free.now{border-color:#B8D4F0;border-left-color:var(--accent);background:var(--accent-bg);}
 .wk-overdue .wk-head{background:var(--red-bg);border-color:#EFC2C2;border-left-color:var(--red);}
-.wk-overdue .wk-head .wk-when{color:var(--red);}
+.wk-overdue .wk-head .wk-when{color:var(--red);font-weight:700;}
 .wk-unsched .wk-head{background:var(--surface);border-style:dashed;border-left:3px solid var(--border-strong);}
+.wk-unsched .wk-head .wk-when{font-weight:700;color:var(--text);}
 button.wk-more{font-size:12px;font-weight:500;padding:7px 14px;border-radius:var(--radius);border:1px dashed var(--border-strong);
   background:var(--surface);color:var(--text2);cursor:pointer;display:block;margin:.25rem auto 0;}
 button.wk-more:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
@@ -515,8 +515,9 @@ function renderPanels(){
     if(scheme==='manual')html+='<button class="add-grp" onclick="addGroup(\''+b+'\')">+ Add group</button>';
     html+='</div>';
   }
-  // body
-  if(!list.length && editingId!=='new:'+b && !(GROUPS[b]||[]).length){
+  // body — note the 'date' scheme never falls back to the generic empty state:
+  // an empty Soon is exactly when you want to SEE your free weekends.
+  if(!list.length && editingId!=='new:'+b && !(GROUPS[b]||[]).length && scheme!=='date'){
     html+=emptyState(b);
   }else if(scheme==='manual'){
     html+=renderGrouped(b);
@@ -592,17 +593,20 @@ function renderWeek(b,weekKey){
   var heading=weekHeading(weekKey);
   var dateLbl=fmtWeekLabel(weekKey);
   var isNow=(weekKey===currentWeekKey());
+  // "This weekend" bold, "Next weekend" regular — weight says WHEN.
+  // Blue (below) says SCHEDULED. The two signals never overlap.
+  var whenHtml=heading?('<span class="wk-when '+(isNow?'now-lbl':'next-lbl')+'">'+esc(heading)+'</span>'):'';
   var dnd='ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
     'ondrop="wkDrop(event,\''+esc(b)+'\',\''+weekKey+'\')"';
-  // free weekend → one thin line, still droppable
+  // free weekend → one thin grey line, whatever week it is
   if(!tasks.length){
-    return '<div class="wk-free'+(isNow?' now':'')+'" '+dnd+'>'+
-      (heading?'<span class="wk-when">'+esc(heading)+'</span>':'')+
+    return '<div class="wk-free" '+dnd+'>'+
+      whenHtml+
       '<span class="wk-date">'+esc(dateLbl)+'</span>'+
       '<span class="free-lbl">free</span></div>';
   }
-  var html='<div class="wk"><div class="wk-head'+(isNow?' now':'')+'" '+dnd+'>'+
-    (heading?'<span class="wk-when">'+esc(heading)+'</span>':'')+
+  var html='<div class="wk"><div class="wk-head" '+dnd+'>'+
+    whenHtml+
     '<span class="wk-date">'+esc(dateLbl)+'</span>'+
     '<span class="wk-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>'+
     '<span class="wk-sub">'+fmtMoney(weekTotal(b,weekKey))+'</span>'+
