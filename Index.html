@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Strang Household · Money Tools</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#F7F6F3;--surface:#FFF;--surface2:#F0EEE9;
+  --border:#E2DDD6;--border-strong:#C8C2BA;
+  --text:#1A1916;--text2:#4A4740;--text3:#8A8580;
+  --accent:#185FA5;--accent-bg:#EBF2FB;
+  --green:#0F6E56;--green-bg:#E8F5F1;
+  --red:#A32D2D;--red-bg:#FBEAEA;
+  --radius:8px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Fira Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+
+/* ---------- Login ---------- */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+#login-screen.hidden{display:none;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2.25rem 2rem;width:100%;max-width:380px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.login-card .brand{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.35rem;}
+.login-card h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:1.5rem;line-height:1.2;}
+.field{margin-bottom:.875rem;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:.3rem;}
+.field input{width:100%;padding:9px 12px;font-size:14px;font-family:var(--font);border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);}
+.field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+#login-btn{width:100%;padding:10px;margin-top:.35rem;font-size:14px;font-weight:600;font-family:var(--font);color:#fff;background:var(--accent);border:none;border-radius:var(--radius);cursor:pointer;transition:background .15s;}
+#login-btn:hover{background:#12508c;}
+#login-btn:disabled{opacity:.6;cursor:default;}
+.login-err{font-size:12px;color:var(--red);margin-top:.75rem;min-height:16px;}
+
+/* ---------- Hub ---------- */
+#hub{min-height:100vh;padding:2.5rem 1.5rem 4rem;max-width:1000px;margin:0 auto;}
+#hub.hidden{display:none;}
+.hub-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:2.5rem;flex-wrap:wrap;}
+.hub-title .brand{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.25rem;}
+.hub-title h1{font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;}
+.hub-title .sub{font-size:13px;color:var(--text3);margin-top:.4rem;}
+.signout{font-size:13px;font-weight:500;color:var(--text2);background:var(--surface);border:1px solid var(--border-strong);border-radius:20px;padding:7px 16px;cursor:pointer;white-space:nowrap;transition:background .15s;}
+.signout:hover{background:var(--surface2);}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+
+.tool-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s,border-color .15s;min-height:180px;}
+.tool-card.live:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.07);border-color:var(--border-strong);}
+.tool-card .tc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.tool-card .tc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.tool-card .tc-status{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
+.tc-status.on{background:var(--green-bg);color:var(--green);}
+.tc-status.soon{background:var(--surface2);color:var(--text3);}
+.tool-card h2{font-size:17px;font-weight:700;letter-spacing:-.02em;margin-bottom:.35rem;}
+.tool-card p{font-size:13px;color:var(--text3);line-height:1.45;flex:1;}
+.tool-card .tc-summary{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);display:flex;align-items:baseline;justify-content:space-between;}
+.tc-summary .lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);}
+.tc-summary .val{font-size:16px;font-weight:700;font-family:var(--mono);}
+.tool-card.soon{opacity:.72;}
+.tool-card.soon .tc-icon{filter:grayscale(.4);}
+
+.hub-foot{margin-top:3rem;font-size:12px;color:var(--text3);text-align:center;}
+@media(max-width:520px){
+  #hub{padding:1.75rem 1rem 3rem;}
+  .hub-title h1{font-size:24px;}
+  .card-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <div class="brand">Strang Household</div>
+    <h1>Money Tools</h1>
+    <div class="field"><label>Email</label><input type="email" id="login-email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()"></div>
+    <div class="field"><label>Password</label><input type="password" id="login-pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()"></div>
+    <button id="login-btn" onclick="doSignIn()">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ============ HUB ============ -->
+<div id="hub" class="hidden">
+  <div class="hub-head">
+    <div class="hub-title">
+      <div class="brand">Strang Household</div>
+      <h1>Money Tools</h1>
+      <div class="sub" id="hub-greeting">Everything in one place.</div>
+    </div>
+    <button class="signout" onclick="doSignOut()">Sign out</button>
+  </div>
+
+  <div class="card-grid">
+
+    <!-- Budget tool — LIVE -->
+    <a class="tool-card live" href="/budget/">
+      <div class="tc-top">
+        <div class="tc-icon" style="background:var(--accent-bg);">📊</div>
+        <span class="tc-status on">Open</span>
+      </div>
+      <h2>Household Budget</h2>
+      <p>Track income, expenses, and transactions with a full year-end projection and dashboard.</p>
+      <div class="tc-summary">
+        <span class="lbl">Bank balance</span>
+        <span class="val" id="sum-budget" style="color:var(--text3);">—</span>
+      </div>
+    </a>
+
+    <!-- Net Worth — LIVE -->
+    <a class="tool-card live" href="/networth/">
+      <div class="tc-top">
+        <div class="tc-icon" style="background:var(--green-bg);">💰</div>
+        <span class="tc-status on">Open</span>
+      </div>
+      <h2>Net Worth</h2>
+      <p>Assets minus liabilities over time — accounts by owner and type, with growth projections.</p>
+      <div class="tc-summary">
+        <span class="lbl">Growth</span>
+        <span class="val" id="sum-networth" style="color:var(--text3);">—</span>
+      </div>
+    </a>
+
+    <!-- Projects — LIVE -->
+    <a class="tool-card live" href="/projects/">
+      <div class="tc-top">
+        <div class="tc-icon" style="background:#FBF3E4;">🛠️</div>
+        <span class="tc-status on">Open</span>
+      </div>
+      <h2>Projects</h2>
+      <p>Home projects and to-dos by stage — from soon to someday, with big-ticket costs and a done log.</p>
+      <div class="tc-summary">
+        <span class="lbl">Soon</span>
+        <span class="val" id="sum-projects" style="color:var(--text3);">—</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="hub-foot">Strang Household · strang.pro</div>
+</div>
+
+<script>
+// ---- Supabase (same project as every tool) ----
+var SUPABASE_URL='https://ldmoxearkzxhzjscprsh.supabase.co';
+var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
+var sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+function showLogin(){
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('hub').classList.add('hidden');
+}
+function showHub(){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('hub').classList.remove('hidden');
+  loadSummaries();
+}
+
+async function doSignIn(){
+  var email=document.getElementById('login-email').value.trim();
+  var pw=document.getElementById('login-pw').value;
+  var errEl=document.getElementById('login-err');
+  var btn=document.getElementById('login-btn');
+  errEl.textContent='';
+  if(!email||!pw){errEl.textContent='Enter your email and password.';return;}
+  btn.disabled=true;btn.textContent='Signing in…';
+  var res=await sbClient.auth.signInWithPassword({email:email,password:pw});
+  btn.disabled=false;btn.textContent='Sign in';
+  if(res.error){errEl.textContent=res.error.message;return;}
+  document.getElementById('login-pw').value='';
+  showHub();
+}
+
+async function doSignOut(){
+  await sbClient.auth.signOut();
+  showLogin();
+}
+
+// Pull a glance-level summary from each live tool's Supabase data.
+// The budget tool stores one JSON blob in budget_data keyed by
+// household_id='strang' (Bryan & Ashley share one household record).
+// We read the most recent balance snapshot to show on the card.
+// Best-effort: fails quietly if unavailable.
+var HOUSEHOLD_ID='strang';
+async function loadSummaries(){
+  loadBudgetSummary();
+  loadNetWorthSummary();
+  loadProjectsSummary();
+}
+// Budget card — latest bank balance snapshot from budget_data.
+async function loadBudgetSummary(){
+  try{
+    var res=await sbClient.from('budget_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error||!res.data||!res.data.data)return;
+    var d=res.data.data;
+    var snaps=d.balanceSnapshots||{};
+    var keys=Object.keys(snaps).sort();
+    if(keys.length){
+      var latest=snaps[keys[keys.length-1]];
+      var el=document.getElementById('sum-budget');
+      el.textContent='$'+Math.round(latest).toLocaleString();
+      el.style.color=latest>=0?'var(--green)':'var(--red)';
+    }
+  }catch(e){/* best-effort */}
+}
+// Net Worth card — percent change between the two most recent ACTUAL snapshot
+// months at/before the current month. This mirrors the net worth tool's own
+// "Change" card (renderTrackCards) on its default view, so the two agree:
+//   - gap months are skipped: it compares real snapshots, never carry-forward
+//   - closed accounts read $0 from their close month onward
+//   - future-dated snapshots are ignored (tool is bound to the current month)
+// The tool shows this as dollars; the hub shows it as a percent.
+// Denominator is abs(prior) so the sign always tracks the actual dollar
+// movement — identical to plain division while net worth is positive, and
+// correct rather than sign-flipped if it ever goes negative.
+// Best-effort: fails quietly if unavailable.
+function ymCmp(a,b){return a<b?-1:(a>b?1:0);}
+function pad2(n){return (n<10?'0':'')+n;}
+function todayYM(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1);}
+
+async function loadNetWorthSummary(){
+  try{
+    var res=await sbClient.from('networth_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error||!res.data||!res.data.data)return;
+    var accts=res.data.data.accounts||[];
+
+    // Port of the tool's effective(acct,ym) — value resolution respecting close.
+    function acctMonths(a){return Object.keys(a.values||{}).sort();}
+    function effective(a,ym){
+      if(a.closedYM && ymCmp(ym,a.closedYM)>=0) return 0;
+      if(a.values && a.values[ym]!==undefined) return a.values[ym];
+      var best=null;
+      acctMonths(a).forEach(function(k){
+        if(ymCmp(k,ym)<=0 && (best===null||ymCmp(k,best)>0)) best=k;
+      });
+      return best!==null?a.values[best]:0;
+    }
+    // Liabilities are stored negative, so a plain sum is assets minus debt —
+    // same as the tool's netWorth() = totalAssets() + totalLiabilities().
+    function netWorth(ym){
+      var t=0;accts.forEach(function(a){t+=effective(a,ym);});return t;
+    }
+    // Port of allSnapshotMonths(), bounded to the current month.
+    var set={};
+    accts.forEach(function(a){acctMonths(a).forEach(function(k){set[k]=1;});});
+    var cur=todayYM();
+    var snaps=Object.keys(set).sort().filter(function(m){return ymCmp(m,cur)<=0;});
+    if(snaps.length<2)return;                    // first snapshot — leave "—"
+
+    var prior=netWorth(snaps[snaps.length-2]);
+    var recent=netWorth(snaps[snaps.length-1]);
+    if(prior===0)return;                         // no denominator — leave "—"
+
+    var pct=(recent-prior)/Math.abs(prior)*100;
+    var el=document.getElementById('sum-networth');
+    el.textContent=(pct>=0?'+':'−')+Math.abs(pct).toFixed(1)+'%';
+    el.style.color=pct>=0?'var(--green)':'var(--red)';
+  }catch(e){/* best-effort */}
+}
+
+// Projects card — count of projects in the 'Soon' stage from projects_data.
+// Exact match is safe: the tool's normalizeTasks() coerces any unrecognized
+// bucket to 'Later' on load, so no legacy import can sit in the data as a
+// near-miss variant of 'Soon'.
+// 0 is a real answer (nothing scheduled soon); "—" means the data didn't load.
+// Best-effort: fails quietly if unavailable.
+async function loadProjectsSummary(){
+  try{
+    var res=await sbClient.from('projects_data').select('data').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error||!res.data||!res.data.data)return;
+    var tasks=res.data.data.tasks||[];
+    var soon=tasks.filter(function(t){return t && t.bucket==='Soon';}).length;
+    var el=document.getElementById('sum-projects');
+    el.textContent=String(soon);
+    el.style.color='var(--text2)';
+  }catch(e){/* best-effort */}
+}
+
+// On load: if already authenticated (session shared across strang.pro), show hub.
+(async function init(){
+  var sess=await sbClient.auth.getSession();
+  if(sess.data.session)showHub();
+  else showLogin();
+})();
+</script>
+</body>
+</html>
