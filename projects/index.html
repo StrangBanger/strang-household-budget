@@ -129,29 +129,48 @@ select.stage-sel:hover{border-color:var(--accent);color:var(--accent);background
 select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 /* META CHIPS */
 .chip{font-size:10px;font-weight:500;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;}
-.chip.month{color:var(--accent);background:var(--accent-bg);border-color:#B8D4F0;}
+.chip .k{font-weight:700;opacity:.75;margin-right:3px;}
+.chip.sched{color:var(--accent);background:var(--accent-bg);border-color:#B8D4F0;}
+.chip.month{color:var(--amber);background:var(--amber-bg);border-color:#EFD9AC;}
 .chip.done-dt{color:var(--green);background:var(--green-bg);border-color:#A8DDD0;}
+.chip.actual{color:var(--green);background:var(--green-bg);border-color:#A8DDD0;}
 .pcard-note{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.4;word-break:break-word;}
 /* EDITOR TEXTAREA */
 .ef-field textarea{width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg);color:var(--text);font-family:var(--font);resize:vertical;min-height:38px;}
 .ef-field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
 /* GROUP SECTIONS */
 .grp{margin-bottom:1.35rem;}
-.grp-head{display:flex;align-items:center;gap:8px;padding:6px 2px 7px;border-bottom:1px solid var(--border);margin-bottom:.7rem;}
-.grp-head.drop-in{background:var(--accent-bg);border-bottom-color:var(--accent);border-radius:5px 5px 0 0;}
-.grp-grip{cursor:grab;color:var(--text3);font-size:13px;opacity:.5;user-select:none;flex-shrink:0;}
+/* Group header = a solid rounded bar. Deliberately a HEAVIER register than the
+   pale zone tags on cards, so bar-colour (a group) and pill-colour (a space)
+   never read as the same language even when they share a hue. */
+.grp-head{display:flex;align-items:center;gap:9px;padding:8px 8px 8px 12px;border-radius:var(--radius);margin-bottom:.7rem;background:#6B6760;color:#fff;position:relative;}
+.grp-head.drop-in{outline:2px solid var(--accent);outline-offset:2px;}
+.grp-grip{cursor:grab;color:#fff;font-size:13px;opacity:.6;user-select:none;flex-shrink:0;}
 .grp-grip:hover{opacity:1;}
-.grp-name{font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.01em;cursor:text;padding:1px 4px;border-radius:4px;flex-shrink:0;}
-.grp-name:hover{background:var(--surface2);}
-.grp-name-input{font-size:13px;font-weight:700;font-family:var(--font);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:1px 4px;background:var(--surface);min-width:120px;}
-.grp-name-input:focus{outline:2px solid var(--accent);outline-offset:-1px;}
-.grp-meta{font-size:11px;color:var(--text3);font-weight:500;}
-.grp-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--text2);margin-left:auto;}
-button.grp-del{font-size:14px;line-height:1;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;opacity:.4;flex-shrink:0;}
-button.grp-del:hover{color:var(--red);background:var(--red-bg);opacity:1;}
+.grp-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:-.01em;cursor:text;padding:1px 5px;border-radius:4px;flex-shrink:0;}
+.grp-name:hover{background:rgba(255,255,255,.16);}
+.grp-name-input{font-size:13px;font-weight:700;font-family:var(--font);color:var(--text);border:1px solid #fff;border-radius:4px;padding:1px 5px;background:#fff;min-width:130px;}
+.grp-name-input:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:1px;}
+.grp-meta{font-size:11px;color:rgba(255,255,255,.72);font-weight:500;}
+.grp-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:#fff;margin-left:auto;}
+button.grp-del,button.grp-swatch{background:none;border:none;cursor:pointer;flex-shrink:0;padding:2px 5px;border-radius:4px;line-height:1;}
+button.grp-del{font-size:14px;color:#fff;opacity:.55;}
+button.grp-del:hover{opacity:1;background:rgba(255,255,255,.18);}
+button.grp-swatch{display:flex;align-items:center;padding:3px;}
+button.grp-swatch .sw{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);display:block;}
+button.grp-swatch:hover{background:rgba(255,255,255,.18);}
+/* palette popover */
+.grp-palette{position:absolute;top:calc(100% + 5px);right:6px;z-index:50;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);padding:7px;display:flex;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.13);}
+.grp-palette button{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;}
+.grp-palette button:hover{transform:scale(1.14);}
+.grp-palette button.on{border-color:var(--text);}
 .grp.dragging{opacity:.5;}
 .grp-empty{font-size:12px;color:var(--text3);font-style:italic;padding:.65rem .2rem;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;}
+/* Ungrouped stays quiet — it's a leftover bin, not a peer group. */
+.grp-ungrouped .grp-head{background:none;color:var(--text3);border-bottom:1px solid var(--border);border-radius:0;padding:6px 2px 7px;}
 .grp-ungrouped .grp-name{color:var(--text3);font-weight:600;}
+.grp-ungrouped .grp-meta{color:var(--text3);}
+.grp-ungrouped .grp-sub{color:var(--text2);}
 button.add-grp{font-size:12px;font-weight:500;padding:7px 13px;border-radius:var(--radius);border:1px dashed var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;margin-left:8px;transition:background .15s,border-color .15s,color .15s;}
 button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
 .rank-no{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--surface2);border-radius:4px;padding:1px 5px;flex-shrink:0;align-self:flex-start;margin-top:1px;}
@@ -240,13 +259,34 @@ var BUCKET_META={
 // the drag engine below asks the scheme what a drop means, so it doesn't change.
 var GROUP_SCHEME={
   'Soon':'none',        // → 'date' (weekends) in Stage 4
-  'Later':'none',       // → 'manual' whenever you want it
-  'Long Term':'none',   // → 'manual' whenever you want it
+  'Later':'manual',
+  'Long Term':'manual',
   'Big-Ticket':'manual',
-  'Done':'none'
+  'Done':'manual'
 };
 function schemeFor(bucket){return GROUP_SCHEME[bucket]||'none';}
-// Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder}], …}
+// Rank numbers say "this is the priority order" — useful where you're deciding
+// what's next, meaningless on an archive. Done groups fine, it just isn't ranked.
+var SHOW_RANK={'Soon':false,'Later':true,'Long Term':true,'Big-Ticket':true,'Done':false};
+function ranksIn(bucket){return !!SHOW_RANK[bucket];}
+// Manual groups, per stage: {'Big-Ticket':[{id,name,sortOrder,color}], …}
+// `color` is a palette key, or null/'slate' for the neutral default — a new
+// group looks right immediately and colour is opt-in, never auto-assigned.
+var GROUP_PALETTE=[
+  {key:'slate', hex:'#6B6760', label:'Neutral'},
+  {key:'blue',  hex:'#185FA5', label:'Blue'},
+  {key:'green', hex:'#0F6E56', label:'Green'},
+  {key:'amber', hex:'#A36000', label:'Amber'},
+  {key:'red',   hex:'#A32D2D', label:'Red'},
+  {key:'purple',hex:'#5B3EA8', label:'Purple'},
+  {key:'pink',  hex:'#A32D6B', label:'Pink'}
+];
+function groupHex(g){
+  var k=(g&&g.color)?g.color:'slate';
+  var p=GROUP_PALETTE.find(function(x){return x.key===k;});
+  return p?p.hex:'#6B6760';
+}
+var _paletteFor=null;   // group id whose palette popover is open
 var GROUPS={};
 var _groupId=1;
 function groupsIn(bucket){
@@ -261,7 +301,7 @@ function tasksInGroup(bucket,gid){
   }).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
 }
 function groupTotal(bucket,gid){
-  return tasksInGroup(bucket,gid).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+  return tasksInGroup(bucket,gid).reduce(function(s,t){return s+effAmount(t);},0);
 }
 // Renumber one group's tasks 10,20,30… so order is stable and gaps don't accrue.
 function renumberGroup(bucket,gid){
@@ -309,12 +349,20 @@ function fmtMoney(v){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];});}
 function findTask(id){return TASKS.find(function(t){return t.id===id;});}
+// The dollar figure a task actually counts for: a recorded actual beats an
+// estimate, whatever stage it's in. Cards AND totals both use this, so a
+// header subtotal can never disagree with the cards printed underneath it.
+function effAmount(t){
+  if(!t)return 0;
+  if(t.actualCost!=null)return Number(t.actualCost)||0;
+  return Number(t.amount)||0;
+}
 function tasksIn(bucket){
   return TASKS.filter(function(t){return t.bucket===bucket;})
     .sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
 }
 function bucketTotal(bucket){
-  return tasksIn(bucket).reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+  return tasksIn(bucket).reduce(function(s,t){return s+effAmount(t);},0);
 }
 function nextSortOrder(bucket,gid){
   var list=tasksInGroup(bucket,(gid===undefined?null:gid));
@@ -332,7 +380,7 @@ function renderTabs(){
 }
 function tabKey(b){return b.toLowerCase().replace(/[^a-z]+/g,'-');}
 function showTab(b){
-  activeBucket=b;editingId=null;renderTabs();renderPanels();
+  activeBucket=b;editingId=null;_paletteFor=null;renderTabs();renderPanels();
 }
 
 // ═══════════════ RENDER: PANELS ═══════════════
@@ -393,7 +441,8 @@ function renderGroupSection(b,g){
   // header — only shown for real groups, or for Ungrouped when groups exist
   if(g||hasGroups){
     var nm=g?g.name:'Ungrouped';
-    html+='<div class="grp-head" '+
+    var barStyle=g?(' style="background:'+groupHex(g)+'"'):'';
+    html+='<div class="grp-head"'+barStyle+' '+
       'ondragover="grpDragOver(event,'+(gid==null?'null':gid)+')" '+
       'ondragleave="grpDragLeave(event)" '+
       'ondrop="grpDrop(event,\''+esc(b)+'\','+(gid==null?'null':gid)+')">';
@@ -406,7 +455,18 @@ function renderGroupSection(b,g){
     }
     html+='<span class="grp-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>';
     html+='<span class="grp-sub">'+fmtMoney(sub)+'</span>';
-    if(g)html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
+    if(g){
+      html+='<button class="grp-swatch" title="Group colour" onclick="togglePalette('+gid+')">'+
+        '<span class="sw" style="background:'+groupHex(g)+'"></span></button>';
+      html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
+      if(_paletteFor===gid){
+        html+='<div class="grp-palette">'+GROUP_PALETTE.map(function(p){
+          var on=((g.color||'slate')===p.key)?' on':'';
+          return '<button class="'+on.trim()+'" title="'+esc(p.label)+'" style="background:'+p.hex+'" '+
+            'onclick="setGroupColor(\''+esc(b)+'\','+gid+',\''+p.key+'\')"></button>';
+        }).join('')+'</div>';
+      }
+    }
     html+='</div>';
   }
   if(!tasks.length){
@@ -437,17 +497,22 @@ function emptyState(b){
     '<p>Add a project and it\u2019ll live here. You can move it to another stage anytime by editing it.</p></div>';
 }
 function taskCard(t,rank){
-  // money shown: for Done, prefer the actual cost if entered; else the estimate
-  var shownAmt=(t.bucket==='Done'&&t.actualCost!=null)?Number(t.actualCost):Number(t.amount);
-  var hasAmt=(t.bucket==='Done'&&t.actualCost!=null)?true:(Number(t.amount)>0);
-  var amtHtml=hasAmt?'<span class="amt">'+fmtMoney(shownAmt)+'</span>':'<span class="amt zero">\u2014</span>';
-  var rankHtml=(rank!=null&&schemeFor(t.bucket)!=='none')?'<span class="rank-no">'+rank+'</span>':'';
+  // Money: a recorded actual beats an estimate, in any stage (see effAmount).
+  var eff=effAmount(t);
+  var amtHtml=eff>0?'<span class="amt">'+fmtMoney(eff)+'</span>':'<span class="amt zero">\u2014</span>';
+  var rankHtml=(rank!=null&&ranksIn(t.bucket))?'<span class="rank-no">'+rank+'</span>':'';
   var spaceHtml=t.space?'<span class="space-tag z-'+zoneOf(t.space)+'">'+esc(t.space)+'</span>':'';
-  // stage-specific chips
+  // Chips show whenever the data EXISTS — not only on the stage that "owns" the
+  // field. A note added in Long Term stays visible after it moves to Soon.
   var chips='';
-  if(t.bucket==='Later'&&t.targetMonth)chips+='<span class="chip month">'+esc(fmtMonthLabel(t.targetMonth))+'</span>';
-  if(t.bucket==='Done'&&t.completedDate)chips+='<span class="chip done-dt">'+esc(fmtDateLabel(t.completedDate))+'</span>';
-  var noteHtml=(t.bucket==='Later'&&t.notes)?'<div class="pcard-note">'+esc(t.notes)+'</div>':'';
+  if(t.scheduledDate)chips+='<span class="chip sched"><span class="k">Sched</span>'+esc(fmtDateLabel(t.scheduledDate))+'</span>';
+  if(t.targetMonth)chips+='<span class="chip month"><span class="k">Target</span>'+esc(fmtMonthLabel(t.targetMonth))+'</span>';
+  if(t.completedDate)chips+='<span class="chip done-dt"><span class="k">Done</span>'+esc(fmtDateLabel(t.completedDate))+'</span>';
+  // If an actual is recorded AND an estimate exists, surface the estimate too so
+  // the number on the card is never ambiguous.
+  if(t.actualCost!=null&&t.amount!=null&&Number(t.amount)!==Number(t.actualCost))
+    chips+='<span class="chip"><span class="k">Est</span>'+fmtMoney(t.amount)+'</span>';
+  var noteHtml=t.notes?'<div class="pcard-note">'+esc(t.notes)+'</div>':'';
   var stageSel='<select class="stage-sel" title="Move to another stage" onchange="changeStage('+t.id+',this.value)">'+
     BUCKETS.map(function(b){return '<option value="'+esc(b)+'"'+(b===t.bucket?' selected':'')+'>'+esc(b)+'</option>';}).join('')+
     '</select>';
@@ -501,6 +566,8 @@ function editorCard(t,bucket){
     return '<option value="'+esc(b)+'"'+(b===bk?' selected':'')+'>'+esc(b)+'</option>';}).join('');
   var saveArg=isNew?'null':t.id;
   var amtLabel=(bk==='Big-Ticket')?'Est. cost ($)':'Amount ($)';
+  var scheduledDate=(t&&t.scheduledDate)?t.scheduledDate:'';
+  var OPT=' <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span>';
   return '<div class="pcard editing"><div class="edit-grid">'+
     '<div class="ef-field grow"><label>Project</label>'+
       '<input id="ef-name" type="text" value="'+esc(name)+'" placeholder="e.g. Paint basement stairwell" '+
@@ -511,36 +578,34 @@ function editorCard(t,bucket){
         '<input id="ef-amount" class="money" type="number" step="1" value="'+esc(amount)+'" placeholder="0"></div>'+
     '</div>'+
     '<div class="ef-field"><label>Stage</label><select id="ef-bucket" onchange="syncEditorFields()">'+bucketOpts+'</select></div>'+
-    // Later-only group
-    '<div id="ef-later-wrap" class="ef-row" style="display:none;">'+
-      '<div class="ef-field"><label>Target month <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+    // Every field is always shown, whatever the stage. Fill one in here and it
+    // travels with the project — a note written in Long Term is still there
+    // when it reaches Soon.
+    '<div class="ef-row">'+
+      '<div class="ef-field"><label>Scheduled date'+OPT+'</label>'+
+        '<input id="ef-scheduled" type="date" value="'+esc(scheduledDate)+'"></div>'+
+      '<div class="ef-field"><label>Target month'+OPT+'</label>'+
         '<input id="ef-target" type="month" value="'+esc(targetMonth)+'"></div>'+
-      '<div class="ef-field grow"><label>Notes <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
-        '<textarea id="ef-notes" rows="2" placeholder="planning notes…">'+esc(notes)+'</textarea></div>'+
     '</div>'+
-    // Done-only group
-    '<div id="ef-done-wrap" class="ef-row" style="display:none;">'+
-      '<div class="ef-field"><label>Completed date <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+    '<div class="ef-row">'+
+      '<div class="ef-field"><label>Completed date'+OPT+'</label>'+
         '<input id="ef-completed" type="date" value="'+esc(completedDate)+'"></div>'+
-      '<div class="ef-field"><label>Actual cost ($) <span style="font-weight:400;text-transform:none;color:var(--text3);">optional</span></label>'+
+      '<div class="ef-field"><label>Actual cost ($)'+OPT+'</label>'+
         '<input id="ef-actual" class="money" type="number" step="1" value="'+esc(actualCost)+'" placeholder="0"></div>'+
     '</div>'+
+    '<div class="ef-field grow"><label>Notes'+OPT+'</label>'+
+      '<textarea id="ef-notes" rows="2" placeholder="planning notes\u2026">'+esc(notes)+'</textarea></div>'+
     '<div class="ef-actions">'+
       '<button class="ef-cancel" onclick="cancelEditor()">Cancel</button>'+
       '<button class="ef-save" onclick="saveEditor('+saveArg+')">'+(isNew?'Add project':'Save')+'</button>'+
     '</div>'+
   '</div></div>';
 }
-// Show only the field group that matches the currently-selected stage.
+// Stage no longer hides fields — it only relabels the amount for Big-Ticket.
 function syncEditorFields(){
   var sel=document.getElementById('ef-bucket');if(!sel)return;
-  var bk=sel.value;
-  var lw=document.getElementById('ef-later-wrap');
-  var dw=document.getElementById('ef-done-wrap');
-  if(lw)lw.style.display=(bk==='Later')?'flex':'none';
-  if(dw)dw.style.display=(bk==='Done')?'flex':'none';
   var lbl=document.getElementById('ef-amount-lbl');
-  if(lbl)lbl.textContent=(bk==='Big-Ticket')?'Est. cost ($)':'Amount ($)';
+  if(lbl)lbl.textContent=(sel.value==='Big-Ticket')?'Est. cost ($)':'Amount ($)';
 }
 
 // ═══════════════ CRUD ═══════════════
@@ -556,14 +621,15 @@ function saveEditor(id){
   var space=getVal('ef-space');
   var amount=numOrNull('ef-amount');
   var bucket=getVal('ef-bucket');
-  // stage-specific (stored regardless; only shown where relevant)
+  // every field is editable in any stage; all of them travel with the project
+  var scheduledDate=strOrNull('ef-scheduled');
   var targetMonth=strOrNull('ef-target');
   var notes=strOrNull('ef-notes');
   var completedDate=strOrNull('ef-completed');
   var actualCost=numOrNull('ef-actual');
   if(id==null){
     TASKS.push({id:_taskId++,name:name,space:space,amount:amount,bucket:bucket,
-      sortOrder:nextSortOrder(bucket),groupId:null,scheduledDate:null,
+      sortOrder:nextSortOrder(bucket),groupId:null,scheduledDate:scheduledDate,
       targetMonth:targetMonth,notes:notes,completedDate:completedDate,actualCost:actualCost});
     activeBucket=bucket; // jump to where it landed
   }else{
@@ -571,6 +637,7 @@ function saveEditor(id){
     var moved=(t.bucket!==bucket);
     var oldBucket=t.bucket,oldGid=t.groupId||null;
     t.name=name;t.space=space;t.amount=amount;
+    t.scheduledDate=scheduledDate;
     t.targetMonth=targetMonth;t.notes=notes;t.completedDate=completedDate;t.actualCost=actualCost;
     if(moved){
       t.bucket=bucket;t.groupId=null;t.sortOrder=nextSortOrder(bucket);
@@ -592,12 +659,22 @@ function changeStage(id,newBucket){
   renderTabs();renderPanels();scheduleCloudSave();
   showSavedBadge('Moved to '+newBucket+' \u2713');
 }
+function togglePalette(gid){
+  _paletteFor=(_paletteFor===gid)?null:gid;
+  renderPanels();
+}
+function setGroupColor(bucket,gid,key){
+  var g=findGroup(bucket,gid);if(!g)return;
+  g.color=key;
+  _paletteFor=null;
+  renderPanels();scheduleCloudSave();
+}
 // ── Group CRUD (manual scheme) ──
 function addGroup(bucket){
   if(!GROUPS[bucket])GROUPS[bucket]=[];
-  var g={id:_groupId++,name:'New group',sortOrder:nextGroupSort(bucket)};
+  var g={id:_groupId++,name:'New group',sortOrder:nextGroupSort(bucket),color:'slate'};
   GROUPS[bucket].push(g);
-  editingId=null;renderPanels();scheduleCloudSave();
+  editingId=null;_paletteFor=null;renderPanels();scheduleCloudSave();
   // drop straight into renaming the new group
   var el=document.querySelector('.grp[data-gid="'+g.id+'"] .grp-name');
   if(el)renameGroup(bucket,g.id,el);
@@ -627,6 +704,7 @@ function delGroup(bucket,gid){
   TASKS.forEach(function(t){if(t.bucket===bucket&&t.groupId===gid)t.groupId=null;});
   GROUPS[bucket]=(GROUPS[bucket]||[]).filter(function(x){return x.id!==gid;});
   renumberGroup(bucket,null);
+  _paletteFor=null;
   renderPanels();scheduleCloudSave();
 }
 
