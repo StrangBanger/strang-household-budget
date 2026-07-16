@@ -174,6 +174,30 @@ button.grp-swatch:hover{background:rgba(255,255,255,.18);}
 button.add-grp{font-size:12px;font-weight:500;padding:7px 13px;border-radius:var(--radius);border:1px dashed var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;margin-left:8px;transition:background .15s,border-color .15s,color .15s;}
 button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
 .rank-no{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--surface2);border-radius:4px;padding:1px 5px;flex-shrink:0;align-self:flex-start;margin-top:1px;}
+/* WEEK SECTIONS (Soon) */
+.wk{margin-bottom:1.1rem;}
+.wk-head{display:flex;align-items:center;gap:9px;padding:8px 10px 8px 12px;border-radius:var(--radius);margin-bottom:.7rem;background:var(--surface2);border:1px solid var(--border);}
+.wk-head .wk-when{font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.01em;}
+.wk-head .wk-date{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--text3);}
+.wk-head .wk-meta{font-size:11px;color:var(--text3);font-weight:500;}
+.wk-head .wk-sub{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--text2);margin-left:auto;}
+.wk-head.now{background:var(--accent-bg);border-color:#B8D4F0;}
+.wk-head.now .wk-when{color:var(--accent);}
+.wk-head.drop-in,.wk-free.drop-in{outline:2px solid var(--accent);outline-offset:2px;}
+/* a free weekend collapses to one quiet line — still a drop target */
+.wk-free{display:flex;align-items:center;gap:9px;padding:6px 12px;border-radius:var(--radius);
+  border:1px dashed var(--border);color:var(--text3);margin-bottom:.4rem;background:transparent;}
+.wk-free .wk-date{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--text3);}
+.wk-free .free-lbl{font-size:11px;color:var(--text3);font-style:italic;}
+.wk-free .wk-when{font-size:12px;font-weight:600;color:var(--text2);}
+.wk-free:hover{border-color:var(--border-strong);background:var(--surface);}
+.wk-free.now{border-color:#B8D4F0;background:var(--accent-bg);}
+.wk-overdue .wk-head{background:var(--red-bg);border-color:#EFC2C2;}
+.wk-overdue .wk-head .wk-when{color:var(--red);}
+.wk-unsched .wk-head{background:var(--surface);border-style:dashed;}
+button.wk-more{font-size:12px;font-weight:500;padding:7px 14px;border-radius:var(--radius);border:1px dashed var(--border-strong);
+  background:var(--surface);color:var(--text2);cursor:pointer;display:block;margin:.25rem auto 0;}
+button.wk-more:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
 /* EMPTY STATE */
 .p-empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:2.5rem 2rem;text-align:center;color:var(--text3);}
 .p-empty .ph-icon{font-size:28px;margin-bottom:.6rem;}
@@ -258,7 +282,7 @@ var BUCKET_META={
 // Adding weekends to Soon later = flip it to 'date' + write its adapter;
 // the drag engine below asks the scheme what a drop means, so it doesn't change.
 var GROUP_SCHEME={
-  'Soon':'none',        // → 'date' (weekends) in Stage 4
+  'Soon':'date',        // weekends — Mon-start weeks, labelled by their Fri–Sun
   'Later':'manual',
   'Long Term':'manual',
   'Big-Ticket':'manual',
@@ -312,7 +336,88 @@ function nextGroupSort(bucket){
   return g.length?(g[g.length-1].sortOrder||0)+10:10;
 }
 
-// ── Spaces, grouped into colour-coded zones. Order here = order in the dropdown. ──
+// ══════ WEEK ENGINE (Soon's 'date' scheme) ══════
+// Weeks run MONDAY→SUNDAY, so Fri/Sat/Sun sit at the END of a week. A task
+// dated Tuesday therefore files against the weekend that's COMING, not the one
+// just gone. Dates are parsed as LOCAL (not UTC) so a date never shifts a day.
+function parseYMD(s){
+  if(!s)return null;
+  var p=String(s).split('-');
+  if(p.length<3)return null;
+  var d=new Date(+p[0],+p[1]-1,+p[2]);
+  return isNaN(d.getTime())?null:d;
+}
+function ymd(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+function addDays(d,n){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x;}
+// Monday that starts the week containing d.
+function mondayOf(d){
+  var day=d.getDay();               // 0=Sun … 6=Sat
+  var off=(day===0)?-6:(1-day);     // Sunday belongs to the week that began Mon
+  return addDays(d,off);
+}
+function weekKeyOfDate(d){return ymd(mondayOf(d));}
+function weekKeyOf(dateStr){var d=parseYMD(dateStr);return d?weekKeyOfDate(d):null;}
+function currentWeekKey(){return weekKeyOfDate(new Date());}
+// The Fri/Sat/Sun of a week, from its Monday key.
+function weekendOf(weekKey){
+  var m=parseYMD(weekKey);
+  return {fri:addDays(m,4),sat:addDays(m,5),sun:addDays(m,6)};
+}
+// "Jul 17–19"  ·  "Jul 31 – Aug 2"  ·  adds year when it isn't this year.
+function fmtWeekLabel(weekKey){
+  var w=weekendOf(weekKey);
+  var M={0:'Jan',1:'Feb',2:'Mar',3:'Apr',4:'May',5:'Jun',6:'Jul',7:'Aug',8:'Sep',9:'Oct',10:'Nov',11:'Dec'};
+  var sameMonth=(w.fri.getMonth()===w.sun.getMonth());
+  var yr=(w.sun.getFullYear()!==new Date().getFullYear())?(' '+w.sun.getFullYear()):'';
+  if(sameMonth)return M[w.fri.getMonth()]+' '+w.fri.getDate()+'\u2013'+w.sun.getDate()+yr;
+  return M[w.fri.getMonth()]+' '+w.fri.getDate()+' \u2013 '+M[w.sun.getMonth()]+' '+w.sun.getDate()+yr;
+}
+function weekHeading(weekKey){
+  var cur=currentWeekKey();
+  if(weekKey===cur)return 'This weekend';
+  var next=ymd(addDays(parseYMD(cur),7));
+  if(weekKey===next)return 'Next weekend';
+  return null;
+}
+// Tasks in a stage filed under a week key; null = unscheduled.
+function tasksInWeek(bucket,weekKey){
+  return TASKS.filter(function(t){
+    if(t.bucket!==bucket)return false;
+    var k=weekKeyOf(t.scheduledDate);
+    return (weekKey===null)?(k===null):(k===weekKey);
+  }).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+}
+function weekTotal(bucket,weekKey){
+  return tasksInWeek(bucket,weekKey).reduce(function(s,t){return s+effAmount(t);},0);
+}
+function renumberWeek(bucket,weekKey){
+  tasksInWeek(bucket,weekKey).forEach(function(t,i){t.sortOrder=(i+1)*10;});
+}
+// Weeks entirely behind us that still hold work.
+function overdueTasks(bucket){
+  var cur=currentWeekKey();
+  return TASKS.filter(function(t){
+    if(t.bucket!==bucket||!t.scheduledDate)return false;
+    var k=weekKeyOf(t.scheduledDate);
+    return k!==null&&k<cur;
+  }).sort(function(a,b){return (a.scheduledDate<b.scheduledDate)?-1:1;});
+}
+// The weeks to render: the next N from today, PLUS any week that holds tasks
+// however far out — so nothing can ever be scheduled into invisibility.
+var _soonHorizon=12;
+function soonWeekKeys(bucket){
+  var cur=currentWeekKey(),m=parseYMD(cur),keys={},out=[];
+  for(var i=0;i<_soonHorizon;i++)keys[ymd(addDays(m,i*7))]=1;
+  TASKS.forEach(function(t){
+    if(t.bucket!==bucket||!t.scheduledDate)return;
+    var k=weekKeyOf(t.scheduledDate);
+    if(k&&k>=cur)keys[k]=1;
+  });
+  for(var k in keys)out.push(k);
+  out.sort();
+  return out;
+}
+function showMoreWeeks(){_soonHorizon+=12;renderPanels();}
 var ZONES=[
   {key:'blue',   label:'Basement',        spaces:['Basement','Basement Bathroom']},
   {key:'purple', label:'Interior',        spaces:['Kitchen','Living Room','Family Room','Master Bedroom',
@@ -408,6 +513,8 @@ function renderPanels(){
     html+=emptyState(b);
   }else if(scheme==='manual'){
     html+=renderGrouped(b);
+  }else if(scheme==='date'){
+    html+=renderDated(b);
   }else{
     html+='<div class="pcards">';
     if(editingId==='new:'+b)html+=editorCard(null,b);
@@ -430,6 +537,71 @@ function renderGrouped(b){
   var un=tasksInGroup(b,null);
   var hasGroups=(GROUPS[b]||[]).length>0;
   if(un.length||!hasGroups)html+=renderGroupSection(b,null);
+  return html;
+}
+// ── Soon: rolling weekend list ──
+// Order: Overdue → Unscheduled → this weekend → onward. A weekend with work
+// expands into cards; a free one collapses to a single quiet line you can still
+// drop onto. Scanning the column shows you your clear weekends at a glance.
+function renderDated(b){
+  var html='';
+  if(editingId==='new:'+b)html+='<div class="pcards" style="margin-bottom:1.2rem;">'+editorCard(null,b)+'</div>';
+  // Overdue
+  var od=overdueTasks(b);
+  if(od.length){
+    html+='<div class="wk wk-overdue"><div class="wk-head">'+
+      '<span class="wk-when">Overdue</span>'+
+      '<span class="wk-meta">'+od.length+(od.length===1?' item':' items')+'</span>'+
+      '<span class="wk-sub">'+fmtMoney(od.reduce(function(s,t){return s+effAmount(t);},0))+'</span>'+
+      '</div><div class="pcards">';
+    od.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+    html+='</div></div>';
+  }
+  // Unscheduled — the pile you drag from
+  var un=tasksInWeek(b,null);
+  html+='<div class="wk wk-unsched">'+
+    '<div class="wk-head" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+      'ondrop="wkDrop(event,\''+esc(b)+'\',null)">'+
+      '<span class="wk-when">Unscheduled</span>'+
+      '<span class="wk-meta">'+un.length+(un.length===1?' item':' items')+'</span>'+
+      '<span class="wk-sub">'+fmtMoney(weekTotal(b,null))+'</span>'+
+    '</div>';
+  if(un.length){
+    html+='<div class="pcards">';
+    un.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+    html+='</div>';
+  }else{
+    html+='<div class="grp-empty" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+      'ondrop="wkDrop(event,\''+esc(b)+'\',null)">Nothing waiting \u2014 drag here to unschedule</div>';
+  }
+  html+='</div>';
+  // Weekends
+  soonWeekKeys(b).forEach(function(k){html+=renderWeek(b,k);});
+  html+='<button class="wk-more" onclick="showMoreWeeks()">Show more weekends</button>';
+  return html;
+}
+function renderWeek(b,weekKey){
+  var tasks=tasksInWeek(b,weekKey);
+  var heading=weekHeading(weekKey);
+  var dateLbl=fmtWeekLabel(weekKey);
+  var isNow=(weekKey===currentWeekKey());
+  var dnd='ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+    'ondrop="wkDrop(event,\''+esc(b)+'\',\''+weekKey+'\')"';
+  // free weekend → one thin line, still droppable
+  if(!tasks.length){
+    return '<div class="wk-free'+(isNow?' now':'')+'" '+dnd+'>'+
+      (heading?'<span class="wk-when">'+esc(heading)+'</span>':'')+
+      '<span class="wk-date">'+esc(dateLbl)+'</span>'+
+      '<span class="free-lbl">free</span></div>';
+  }
+  var html='<div class="wk"><div class="wk-head'+(isNow?' now':'')+'" '+dnd+'>'+
+    (heading?'<span class="wk-when">'+esc(heading)+'</span>':'')+
+    '<span class="wk-date">'+esc(dateLbl)+'</span>'+
+    '<span class="wk-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>'+
+    '<span class="wk-sub">'+fmtMoney(weekTotal(b,weekKey))+'</span>'+
+    '</div><div class="pcards">';
+  tasks.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+  html+='</div></div>';
   return html;
 }
 function renderGroupSection(b,g){
@@ -738,6 +910,22 @@ function taskDrop(e,targetId){
   if(!dragged||!target||dragged.bucket!==target.bucket||dragged.id===target.id){taskDragEnd(e);return;}
   e.preventDefault();
   var b=dragged.bucket;
+  // The scheme decides what a drop MEANS: under 'date', landing on a card adopts
+  // that card's weekend; under 'manual', it adopts that card's group.
+  if(schemeFor(b)==='date'){
+    var fromK=weekKeyOf(dragged.scheduledDate),toK=weekKeyOf(target.scheduledDate);
+    if(fromK!==toK){
+      dragged.scheduledDate=(toK===null)?null:ymd(weekendOf(toK).sat);
+    }
+    var destW=tasksInWeek(b,toK).filter(function(t){return t.id!==dragged.id;});
+    var tiW=destW.findIndex(function(t){return t.id===target.id;});
+    destW.splice(tiW<0?destW.length:tiW,0,dragged);
+    destW.forEach(function(t,i){t.sortOrder=(i+1)*10;});
+    if(fromK!==toK)renumberWeek(b,fromK);
+    taskDragEnd(e);
+    renderPanels();scheduleCloudSave();
+    return;
+  }
   var fromGid=dragged.groupId||null,toGid=target.groupId||null;
   var sameGroup=(fromGid===toGid);
   if(sameGroup){
@@ -760,6 +948,38 @@ function taskDrop(e,targetId){
   }
   taskDragEnd(e);
   renderPanels();scheduleCloudSave();
+}
+// ── Soon: drop onto a weekend (or Unscheduled) ──
+// Dropping on a weekend sets Saturday; the editor can fine-tune to any day.
+// Dropping on Unscheduled clears the date.
+function wkDragOver(e){
+  if(_dragKind!=='task'||_dragId===null)return;
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var h=e.target.closest?(e.target.closest('.wk-head')||e.target.closest('.wk-free')||e.target.closest('.grp-empty')):null;
+  if(h)h.classList.add('drop-in');
+}
+function wkDragLeave(e){
+  var h=e.target.closest?(e.target.closest('.wk-head')||e.target.closest('.wk-free')||e.target.closest('.grp-empty')):null;
+  if(h)h.classList.remove('drop-in');
+}
+function wkDrop(e,bucket,weekKey){
+  if(_dragKind!=='task'||_dragId===null){taskDragEnd(e);return;}
+  var t=findTask(_dragId);
+  if(!t||t.bucket!==bucket){taskDragEnd(e);return;}
+  e.preventDefault();
+  var fromKey=weekKeyOf(t.scheduledDate);
+  var toKey=(weekKey==null||weekKey==='null')?null:weekKey;
+  if(toKey===null){
+    t.scheduledDate=null;
+  }else{
+    t.scheduledDate=ymd(weekendOf(toKey).sat);   // land on the Saturday
+  }
+  t.sortOrder=(tasksInWeek(bucket,toKey).length+1)*10;
+  renumberWeek(bucket,fromKey);
+  renumberWeek(bucket,toKey);
+  taskDragEnd(e);
+  renderPanels();scheduleCloudSave();
+  showSavedBadge(toKey?('Scheduled '+fmtWeekLabel(toKey)+' \u2713'):'Unscheduled \u2713');
 }
 function taskDragEnd(e){
   _dragId=null;_dragBucket=null;_dragKind=null;_dragGroupId=null;
