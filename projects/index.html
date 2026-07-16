@@ -1084,9 +1084,13 @@ function fmtMonthLabel(ym){
   return d.toLocaleDateString('en-CA',{month:'short',year:'numeric'});
 }
 function fmtDateLabel(ds){
-  if(!ds)return'';var p=String(ds).split('-');if(p.length<3)return ds;
-  var d=new Date(+p[0],+p[1]-1,+p[2]);
-  return d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
+  var d=parseYMD(ds);
+  if(!d)return ds||'';
+  // Weekday matters here — "Sat" tells you more than the number does. The year
+  // is dropped when it's this year, which buys back the width the weekday costs.
+  var opts={weekday:'short',month:'short',day:'numeric'};
+  if(d.getFullYear()!==new Date().getFullYear())opts.year='numeric';
+  return d.toLocaleDateString('en-CA',opts);
 }
 function delTask(id){
   var t=findTask(id);if(!t)return;
