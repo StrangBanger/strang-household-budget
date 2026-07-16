@@ -202,6 +202,12 @@ button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(
 .wk-overdue .wk-head .wk-when{color:var(--red);font-weight:700;}
 .wk-unsched .wk-head{background:var(--surface);border-style:dashed;border-left:3px solid var(--border-strong);}
 .wk-unsched .wk-head .wk-when{font-weight:700;color:var(--text);}
+/* An empty Unscheduled pile is just clutter — but it's also the drop target for
+   REMOVING a date, so it can't simply not exist. Hide it when empty, and reveal
+   it the moment you pick up a scheduled card. Toggled by a body class, not a
+   re-render, so it can't interrupt a drag in progress. */
+.wk-unsched.empty{display:none;}
+body.dragging-scheduled .wk-unsched.empty{display:block;}
 button.wk-more{font-size:12px;font-weight:500;padding:7px 14px;border-radius:var(--radius);border:1px dashed var(--border-strong);
   background:var(--surface);color:var(--text2);cursor:pointer;display:block;margin:.25rem auto 0;}
 button.wk-more:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(--accent);}
@@ -565,9 +571,10 @@ function renderDated(b){
     od.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
     html+='</div></div>';
   }
-  // Unscheduled — the pile you drag from
+  // Unscheduled — the pile you drag from. Hidden when empty (see CSS), but kept
+  // in the DOM so it can reappear as a drop target mid-drag.
   var un=tasksInWeek(b,null);
-  html+='<div class="wk wk-unsched">'+
+  html+='<div class="wk wk-unsched'+(un.length?'':' empty')+'">'+
     '<div class="wk-head" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
       'ondrop="wkDrop(event,\''+esc(b)+'\',null)">'+
       '<span class="wk-when">Unscheduled</span>'+
@@ -902,6 +909,11 @@ function taskDragStart(e,id,bucket){
   try{e.dataTransfer.setData('text/plain',String(id));}catch(_){}
   var card=e.target.closest?e.target.closest('.pcard'):null;
   if(card)card.classList.add('dragging');
+  // Picking up a card that HAS a date reveals the (hidden) Unscheduled drop
+  // zone, so there's always somewhere to drop to clear the date.
+  var t=findTask(id);
+  if(document.body&&t&&schemeFor(bucket)==='date'&&t.scheduledDate)
+    document.body.classList.add('dragging-scheduled');
 }
 function taskDragOver(e,overId){
   if(_dragKind!=='task'||_dragId===null)return;
@@ -994,6 +1006,7 @@ function wkDrop(e,bucket,weekKey){
 }
 function taskDragEnd(e){
   _dragId=null;_dragBucket=null;_dragKind=null;_dragGroupId=null;
+  if(document.body)document.body.classList.remove('dragging-scheduled');
   document.querySelectorAll('.pcard.dragging').forEach(function(c){c.classList.remove('dragging');});
   document.querySelectorAll('.pcard.drop-above').forEach(function(c){c.classList.remove('drop-above');});
   document.querySelectorAll('.grp-head.drop-in').forEach(function(c){c.classList.remove('drop-in');});
