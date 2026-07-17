@@ -113,6 +113,56 @@ body {
   max-width: 1280px; margin: 0 auto;
 }
 
+/* ============ EDITABLE EXPENSE ROWS ============ */
+.drag-handle {
+  cursor: grab; color: var(--border-strong);
+  padding: 0 6px 0 2px; display: inline-flex; align-items: center;
+  vertical-align: middle; flex: none;
+}
+.drag-handle:active { cursor: grabbing; }
+tr.dragging { opacity: 0.4; }
+tr.drop-above td { box-shadow: inset 0 2px 0 var(--ochre); }
+tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
+
+.name-cell { display: flex; align-items: center; gap: 2px; }
+.txt-input {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--teal);
+  background: transparent; border: 1px solid transparent;
+  padding: 3px 5px; width: 100%; min-width: 0;
+}
+.txt-input:hover { border-color: var(--border); background: var(--linen); }
+.txt-input:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.txt-input.note { font-size: 11px; color: var(--text-muted); }
+
+.basis-btn {
+  font-family: var(--font-mono, var(--font-sans)); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--linen); color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  padding: 2px 5px; cursor: pointer; flex: none; min-width: 34px;
+}
+.basis-btn.monthly { background: var(--ochre); color: var(--linen); border-color: var(--ochre); }
+.basis-btn:hover { border-color: var(--ochre); }
+
+.row-del {
+  background: transparent; border: none; color: var(--border-strong);
+  font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 5px;
+}
+.row-del:hover { color: var(--danger); }
+
+.add-row td { padding: 4px 6px 10px 30px !important; border-bottom: 1px solid var(--border); }
+.add-btn {
+  font-family: var(--font-sans); font-size: 11.5px; color: var(--ochre);
+  background: transparent; border: none; cursor: pointer; padding: 3px 0;
+}
+.add-btn:hover { text-decoration: underline; }
+
+.annual-hint {
+  display: block; font-size: 9.5px; color: var(--text-muted);
+  text-align: right; padding-right: 3px; margin-top: 1px;
+  font-variant-numeric: tabular-nums; min-height: 12px;
+}
+
 /* ============ HEADER ============ */
 .page-header {
   background: var(--teal);
@@ -794,67 +844,67 @@ const DEFAULTS = {
 // Ongoing operating expenses — [Year1, Year2, Year3, Year4, Year5], grouped by category
 const OPEX_ITEMS = [
   { cat: 'Licensing and compliance', items: [
-    { label: 'E&O insurance (ON+BC+AB)', vals: [0,0,0,0,0], note: '3-province specialist' },
-    { label: 'Provincial licence renewals', vals: [0,0,0,0,0], note: 'All provinces incl. corporate' },
-    { label: 'Compliance and CE credits', vals: [0,0,0,0,0], note: 'Continuing education' },
+    { id: 'o1', label: 'E&O insurance (ON+BC+AB)', basis: 'annual', vals: [0,0,0,0,0], note: '3-province specialist' },
+    { id: 'o2', label: 'Provincial licence renewals', basis: 'annual', vals: [0,0,0,0,0], note: 'All provinces incl. corporate' },
+    { id: 'o3', label: 'Compliance and CE credits', basis: 'annual', vals: [0,0,0,0,0], note: 'Continuing education' },
   ]},
   { cat: 'Legal and accounting', items: [
-    { label: 'Year-end corporate tax filing', vals: [0,0,0,0,0], note: 'Accountant for T2 only' },
-    { label: 'HST + payroll remittances admin', vals: [0,0,0,0,0], note: 'Quarterly review' },
-    { label: 'Legal (ad hoc)', vals: [0,0,0,0,0], note: 'MGA, referral agreements' },
+    { id: 'o4', label: 'Year-end corporate tax filing', basis: 'annual', vals: [0,0,0,0,0], note: 'Accountant for T2 only' },
+    { id: 'o5', label: 'HST + payroll remittances admin', basis: 'annual', vals: [0,0,0,0,0], note: 'Quarterly review' },
+    { id: 'o6', label: 'Legal (ad hoc)', basis: 'annual', vals: [0,0,0,0,0], note: 'MGA, referral agreements' },
   ]},
   { cat: 'Software subscriptions', items: [
-    { label: 'Pipedrive CRM', vals: [0,0,0,0,0], note: '$55/mo' },
-    { label: 'QuickBooks Online', vals: [0,0,0,0,0], note: '$35/mo' },
-    { label: 'DocuSign', vals: [0,0,0,0,0], note: '$25/mo' },
-    { label: 'Google Workspace', vals: [0,0,0,0,0], note: '$20/mo' },
-    { label: 'Zoom Pro', vals: [0,0,0,0,0], note: '$20/mo' },
-    { label: 'Adobe Acrobat', vals: [0,0,0,0,0], note: '$25/mo' },
-    { label: 'LinkedIn Sales Navigator', vals: [0,0,0,0,0], note: '$100/mo' },
-    { label: 'Password manager', vals: [0,0,0,0,0], note: '$5/mo' },
-    { label: 'Calendly', vals: [0,0,0,0,0], note: '$10/mo' },
-    { label: 'AI tools', vals: [0,0,0,0,0], note: '$20/mo' },
-    { label: 'VoIP phone', vals: [0,0,0,0,0], note: '$25/mo' },
+    { id: 'o7', label: 'Pipedrive CRM', basis: 'annual', vals: [0,0,0,0,0], note: '$55/mo' },
+    { id: 'o8', label: 'QuickBooks Online', basis: 'annual', vals: [0,0,0,0,0], note: '$35/mo' },
+    { id: 'o9', label: 'DocuSign', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
+    { id: 'o10', label: 'Google Workspace', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o11', label: 'Zoom Pro', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o12', label: 'Adobe Acrobat', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
+    { id: 'o13', label: 'LinkedIn Sales Navigator', basis: 'annual', vals: [0,0,0,0,0], note: '$100/mo' },
+    { id: 'o14', label: 'Password manager', basis: 'annual', vals: [0,0,0,0,0], note: '$5/mo' },
+    { id: 'o15', label: 'Calendly', basis: 'annual', vals: [0,0,0,0,0], note: '$10/mo' },
+    { id: 'o16', label: 'AI tools', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o17', label: 'VoIP phone', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
   ]},
   { cat: 'Website and digital', items: [
-    { label: 'Website hosting', vals: [0,0,0,0,0], note: '$50/mo managed' },
-    { label: 'Domain renewals', vals: [0,0,0,0,0], note: 'Annual' },
+    { id: 'o18', label: 'Website hosting', basis: 'annual', vals: [0,0,0,0,0], note: '$50/mo managed' },
+    { id: 'o19', label: 'Domain renewals', basis: 'annual', vals: [0,0,0,0,0], note: 'Annual' },
   ]},
   { cat: 'Marketing and client experience', items: [
-    { label: 'Marketing (ads, content, SEO)', vals: [0,0,0,0,0], note: 'Light — referral-first' },
-    { label: 'Client gifts and experience', vals: [0,0,0,0,0], note: '~$150/client, scales with volume' },
-    { label: 'Postage and courier', vals: [0,0,0,0,0], note: 'Policy docs, gifts' },
-    { label: 'Office supplies and printing', vals: [0,0,0,0,0], note: 'Home office' },
+    { id: 'o20', label: 'Marketing (ads, content, SEO)', basis: 'annual', vals: [0,0,0,0,0], note: 'Light — referral-first' },
+    { id: 'o21', label: 'Client gifts and experience', basis: 'annual', vals: [0,0,0,0,0], note: '~$150/client, scales with volume' },
+    { id: 'o22', label: 'Postage and courier', basis: 'annual', vals: [0,0,0,0,0], note: 'Policy docs, gifts' },
+    { id: 'o23', label: 'Office supplies and printing', basis: 'annual', vals: [0,0,0,0,0], note: 'Home office' },
   ]},
   { cat: 'Travel', items: [
-    { label: 'Travel — advisor and client meetings', vals: [0,0,0,0,0], note: 'ON + BC/AB trips' },
+    { id: 'o24', label: 'Travel — advisor and client meetings', basis: 'annual', vals: [0,0,0,0,0], note: 'ON + BC/AB trips' },
   ]},
   { cat: 'Home office (deductible portion)', items: [
-    { label: 'Internet — 40% business use', vals: [0,0,0,0,0], note: '$67.80/mo x 40%' },
-    { label: 'Cell phones — 60% business use', vals: [0,0,0,0,0], note: '$140/mo x 60%' },
+    { id: 'o25', label: 'Internet', basis: 'annual', vals: [0,0,0,0,0], note: 'Business-use portion' },
+    { id: 'o26', label: 'Cell phones', basis: 'annual', vals: [0,0,0,0,0], note: 'Business-use portion' },
   ]},
   { cat: 'Insurance', items: [
-    { label: 'Business liability insurance', vals: [0,0,0,0,0], note: 'Home-based' },
+    { id: 'o27', label: 'Business liability insurance', basis: 'annual', vals: [0,0,0,0,0], note: 'Home-based' },
   ]},
 ];
 
 // One-time startup costs (Month 1 only)
 const STARTUP_ITEMS = [
   { cat: 'Legal', items: [
-    { label: 'Ontario corp incorporation', val: 0, note: 'Ontario Business Registry' },
-    { label: 'Lawyer — shareholder agreement', val: 0, note: 'If shareholder agreement required' },
-    { label: 'Trademark — Modern Pension', val: 0, note: 'CIPO filing + agent fee' },
-    { label: 'Virtual mailbox / registered address', val: 0, note: '~$25/mo, first year' },
+    { id: 's1', label: 'Ontario corp incorporation', val: 0, note: 'Ontario Business Registry' },
+    { id: 's2', label: 'Lawyer — shareholder agreement', val: 0, note: 'If shareholder agreement required' },
+    { id: 's3', label: 'Trademark — Modern Pension', val: 0, note: 'CIPO filing + agent fee' },
+    { id: 's4', label: 'Virtual mailbox / registered address', val: 0, note: '~$25/mo, first year' },
   ]},
   { cat: 'Licensing', items: [
-    { label: 'LLQP exam + study materials', val: 0, note: 'Complete before launch' },
-    { label: 'Ontario FSRA — individual + corporate', val: 0, note: 'Both registrations' },
+    { id: 's5', label: 'LLQP exam + study materials', val: 0, note: 'Complete before launch' },
+    { id: 's6', label: 'Ontario FSRA — individual + corporate', val: 0, note: 'Both registrations' },
   ]},
   { cat: 'Brand and website', items: [
-    { label: 'Website design and development', val: 0, note: 'Custom build' },
-    { label: 'Domain registrations', val: 0, note: 'Multiple domains, first year' },
-    { label: 'Logo and brand design', val: 0, note: 'Freelance designer' },
-    { label: 'Launch marketing materials', val: 0, note: 'Cards, one-pager, advisor kit' },
+    { id: 's7', label: 'Website design and development', val: 0, note: 'Custom build' },
+    { id: 's8', label: 'Domain registrations', val: 0, note: 'Multiple domains, first year' },
+    { id: 's9', label: 'Logo and brand design', val: 0, note: 'Freelance designer' },
+    { id: 's10', label: 'Launch marketing materials', val: 0, note: 'Cards, one-pager, advisor kit' },
   ]},
 ];
 
@@ -946,10 +996,17 @@ const Engine = (function () {
 
   // ---- Opex ----
   // expenseState: { opex: [[y1..y5] per item across all categories flattened], startup: [items] }
+  // itemAnnual: an opex row stores EITHER a monthly rate or an annual amount,
+  // per its `basis`. Everything downstream wants annual, so normalise here.
+  function itemAnnual(item, yearIndex) {
+    const v = Number(item.vals[yearIndex]) || 0;
+    return item.basis === 'monthly' ? v * 12 : v;
+  }
+
   function annualOpexTotal(expenseState, yearIndex) {
     // yearIndex 0-4 for Year 1-5
     let total = 0;
-    expenseState.opexFlat.forEach(item => { total += item.vals[yearIndex]; });
+    expenseState.opexFlat.forEach(item => { total += itemAnnual(item, yearIndex); });
     return total;
   }
 
@@ -1111,7 +1168,7 @@ const Engine = (function () {
 
   return {
     federalTax, ontarioTax, employeeCPP, employerCPP, netAnnual, grossForNet,
-    commissionPerSale, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
+    commissionPerSale, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
   };
 })();
 
@@ -1163,10 +1220,11 @@ const State = {
 
 function initExpenseState() {
   State.expense.opexFlat = OPEX_ITEMS.flatMap(cat => cat.items.map(item => ({
-    cat: cat.cat, label: item.label, note: item.note, vals: [...item.vals],
+    id: item.id, cat: cat.cat, label: item.label, note: item.note,
+    basis: item.basis || 'annual', vals: [...item.vals],
   })));
   State.expense.startupFlat = STARTUP_ITEMS.flatMap(cat => cat.items.map(item => ({
-    cat: cat.cat, label: item.label, note: item.note, val: item.val,
+    id: item.id, cat: cat.cat, label: item.label, note: item.note, val: item.val,
   })));
 }
 
@@ -1284,7 +1342,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 1;
+var PAYLOAD_VERSION  = 2;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1330,11 +1388,40 @@ function buildSavePayload() {
   };
 }
 
-// migrateData: stub for now — every payload is v1. Kept so that adding
-// fields later (named versions, etc.) is a additive change, not a rewrite.
+// migrateData: v1 -> v2 added per-item `id` (stable identity under reorder/
+// delete) and `basis` ('monthly' | 'annual'). The migration is non-destructive:
+// v1 rows were all annual amounts, so basis:'annual' reproduces them exactly.
+// No re-import needed for an existing saved model.
 function migrateData(data) {
   if (!data.version) data.version = 1;
+
+  if (data.version < 2) {
+    var n = 0;
+    if (data.expense && data.expense.opexFlat) {
+      data.expense.opexFlat.forEach(function (it) {
+        if (!it.id) it.id = 'o' + (++n);
+        if (!it.basis) it.basis = 'annual';
+      });
+    }
+    var m = 0;
+    if (data.expense && data.expense.startupFlat) {
+      data.expense.startupFlat.forEach(function (it) {
+        if (!it.id) it.id = 's' + (++m);
+      });
+    }
+    data.version = 2;
+  }
   return data;
+}
+
+// newItemId: monotonic, collision-proof against whatever ids already exist.
+function newItemId(prefix, list) {
+  var max = 0;
+  list.forEach(function (it) {
+    var m = /^([a-z]+)(\d+)$/.exec(it.id || '');
+    if (m && m[1] === prefix) max = Math.max(max, Number(m[2]));
+  });
+  return prefix + (max + 1);
 }
 
 // applyLoadedData: exact mirror of buildSavePayload.
@@ -1919,33 +2006,77 @@ function renderExpensesTab() {
 
   const yearHeaders = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
 
+  // Category list = source order, unioned with anything the saved payload adds.
+  // Rendering a category even when empty keeps its "+ Add" button reachable,
+  // so deleting the last row in a group isn't a one-way door.
+  function catList(sourceItems, stateItems) {
+    const cats = sourceItems.map(c => c.cat);
+    stateItems.forEach(it => { if (cats.indexOf(it.cat) === -1) cats.push(it.cat); });
+    return cats;
+  }
+
+  const dragSvg = '<svg width="9" height="13" viewBox="0 0 10 14" fill="currentColor">'
+    + '<circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/>'
+    + '<circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/>'
+    + '<circle cx="2.5" cy="11.5" r="1.3"/><circle cx="7.5" cy="11.5" r="1.3"/></svg>';
+
+  // ---- Opex ----
   let opexRows = '';
-  let lastCat = null;
-  State.expense.opexFlat.forEach((item, idx) => {
-    if (item.cat !== lastCat) {
-      opexRows += `<tr class="expense-cat-row"><td colspan="7">${item.cat}</td></tr>`;
-      lastCat = item.cat;
-    }
-    opexRows += `<tr>
-      <td>${item.label}</td>
-      ${item.vals.map((v, yi) => `<td><input class="expense-input" type="number" min="0" step="50"
-        data-kind="opex" data-idx="${idx}" data-year="${yi}" value="${v}"></td>`).join('')}
-      <td style="text-align:left;color:var(--text-muted);font-size:11px">${item.note}</td>
-    </tr>`;
+  catList(OPEX_ITEMS, State.expense.opexFlat).forEach(cat => {
+    opexRows += `<tr class="expense-cat-row"><td colspan="8">${escHtml(cat)}</td></tr>`;
+    State.expense.opexFlat.forEach(item => {
+      if (item.cat !== cat) return;
+      const mo = item.basis === 'monthly';
+      opexRows += `<tr draggable="true" data-id="${item.id}" data-kind="opex">
+        <td>
+          <div class="name-cell">
+            <span class="drag-handle" title="Drag to reorder">${dragSvg}</span>
+            <input class="txt-input" data-field="label" data-id="${item.id}" data-kind="opex"
+              value="${escAttr(item.label)}" placeholder="Expense item">
+            <button class="basis-btn ${mo ? 'monthly' : ''}" data-id="${item.id}"
+              title="${mo ? 'Entering a MONTHLY rate — annualised ×12' : 'Entering an ANNUAL amount'}"
+              >${mo ? '/mo' : '/yr'}</button>
+          </div>
+        </td>
+        ${item.vals.map((v, yi) => `<td>
+          <input class="expense-input" type="number" min="0" step="${mo ? 5 : 50}"
+            data-kind="opex" data-id="${item.id}" data-year="${yi}" value="${v}">
+          <span class="annual-hint">${mo && v ? '= ' + fmtCurrency(v * 12) : ''}</span>
+        </td>`).join('')}
+        <td><input class="txt-input note" data-field="note" data-id="${item.id}" data-kind="opex"
+          value="${escAttr(item.note || '')}" placeholder="—"></td>
+        <td><button class="row-del" data-id="${item.id}" data-kind="opex" title="Remove">×</button></td>
+      </tr>`;
+    });
+    opexRows += `<tr class="add-row"><td colspan="8">
+      <button class="add-btn" data-kind="opex" data-cat="${escAttr(cat)}">+ Add ${escHtml(cat.toLowerCase())} item</button>
+    </td></tr>`;
   });
 
+  // ---- Startup ----
   let startupRows = '';
-  let lastStartupCat = null;
-  State.expense.startupFlat.forEach((item, idx) => {
-    if (item.cat !== lastStartupCat) {
-      startupRows += `<tr class="expense-cat-row"><td colspan="3">${item.cat}</td></tr>`;
-      lastStartupCat = item.cat;
-    }
-    startupRows += `<tr>
-      <td>${item.label}</td>
-      <td><input class="expense-input" type="number" min="0" step="50" data-kind="startup" data-idx="${idx}" value="${item.val}"></td>
-      <td style="text-align:left;color:var(--text-muted);font-size:11px">${item.note}</td>
-    </tr>`;
+  catList(STARTUP_ITEMS, State.expense.startupFlat).forEach(cat => {
+    startupRows += `<tr class="expense-cat-row"><td colspan="4">${escHtml(cat)}</td></tr>`;
+    State.expense.startupFlat.forEach(item => {
+      if (item.cat !== cat) return;
+      startupRows += `<tr draggable="true" data-id="${item.id}" data-kind="startup">
+        <td>
+          <div class="name-cell">
+            <span class="drag-handle" title="Drag to reorder">${dragSvg}</span>
+            <input class="txt-input" data-field="label" data-id="${item.id}" data-kind="startup"
+              value="${escAttr(item.label)}" placeholder="Item">
+          </div>
+        </td>
+        <td><input class="expense-input" type="number" min="0" step="50"
+          data-kind="startup" data-id="${item.id}" value="${item.val}"></td>
+        <td><input class="txt-input note" data-field="note" data-id="${item.id}" data-kind="startup"
+          value="${escAttr(item.note || '')}" placeholder="—"></td>
+        <td><button class="row-del" data-id="${item.id}" data-kind="startup" title="Remove">×</button></td>
+      </tr>`;
+    });
+    startupRows += `<tr class="add-row"><td colspan="4">
+      <button class="add-btn" data-kind="startup" data-cat="${escAttr(cat)}">+ Add ${escHtml(cat.toLowerCase())} item</button>
+    </td></tr>`;
   });
 
   const yearTotals = [0, 1, 2, 3, 4].map(yi => Engine.annualOpexTotal(getExpenseStateForEngine(), yi));
@@ -1953,7 +2084,11 @@ function renderExpensesTab() {
 
   container.innerHTML = `
     <div class="panel">
-      <div class="eyebrow">Ongoing operating expenses — feeds Monthly Detail column "Opex/mo"</div>
+      <div class="eyebrow">Ongoing operating expenses — feeds Monthly Detail column &ldquo;Opex/mo&rdquo;</div>
+      <p style="font-size:11.5px;color:var(--text-muted);margin:-0.4rem 0 0.9rem">
+        Toggle <strong>/yr</strong> to <strong>/mo</strong> to enter a monthly rate instead — it is annualised ×12
+        in the subtotal. Drag the handle to reorder within a category.
+      </p>
       <div class="table-scroll expense-table-wrap">
         <table>
           <thead>
@@ -1961,14 +2096,15 @@ function renderExpensesTab() {
               <th>Expense item</th>
               ${yearHeaders.map(h => `<th>${h}</th>`).join('')}
               <th style="text-align:left">Notes</th>
+              <th style="width:28px"></th>
             </tr>
           </thead>
           <tbody id="opex-tbody">
             ${opexRows}
             <tr class="expense-total-row">
               <td>Annual subtotal</td>
-              ${yearTotals.map(t => `<td id="opex-total-display">${fmtCurrency(t)}</td>`).join('')}
-              <td></td>
+              ${yearTotals.map(t => `<td>${fmtCurrency(t)}</td>`).join('')}
+              <td></td><td></td>
             </tr>
           </tbody>
         </table>
@@ -1980,11 +2116,9 @@ function renderExpensesTab() {
       <div class="table-scroll expense-table-wrap">
         <table>
           <thead>
-            <tr><th>Item</th><th>Cost</th><th style="text-align:left">Notes</th></tr>
+            <tr><th>Item</th><th>Cost</th><th style="text-align:left">Notes</th><th style="width:28px"></th></tr>
           </thead>
-          <tbody id="startup-tbody">
-            ${startupRows}
-          </tbody>
+          <tbody id="startup-tbody">${startupRows}</tbody>
         </table>
       </div>
       <div class="startup-grand-total">
@@ -1997,23 +2131,170 @@ function renderExpensesTab() {
   attachExpenseInputHandlers();
 }
 
+function escHtml(t) {
+  return String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+function escAttr(t) {
+  return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function expList(kind) {
+  return kind === 'opex' ? State.expense.opexFlat : State.expense.startupFlat;
+}
+function findItem(kind, id) {
+  return expList(kind).find(it => it.id === id);
+}
+// Structural edits (add/delete/reorder) re-render; value edits do not.
+function expenseChanged(structural) {
+  invalidateCache();
+  scheduleCloudSave();
+  if (structural) renderExpensesTab();
+  else updateExpenseTotals();
+}
+
 function attachExpenseInputHandlers() {
+  // ---- numeric value edits ----
   document.querySelectorAll('.expense-input').forEach(input => {
     input.addEventListener('change', () => {
       const kind = input.dataset.kind;
-      const idx = Number(input.dataset.idx);
-      const val = Number(input.value) || 0;
+      const item = findItem(kind, input.dataset.id);
+      if (!item) return;
+      const val = Math.max(0, Number(input.value) || 0);
+      input.value = val;
       if (kind === 'opex') {
-        const yearIdx = Number(input.dataset.year);
-        State.expense.opexFlat[idx].vals[yearIdx] = val;
-      } else if (kind === 'startup') {
-        State.expense.startupFlat[idx].val = val;
+        item.vals[Number(input.dataset.year)] = val;
+        // keep the "= $X" annualised hint in step with the field
+        const hint = input.parentElement.querySelector('.annual-hint');
+        if (hint) hint.textContent = (item.basis === 'monthly' && val) ? '= ' + fmtCurrency(val * 12) : '';
+      } else {
+        item.val = val;
       }
-      invalidateCache();
-      scheduleCloudSave();
-      updateExpenseTotals();
+      expenseChanged(false);
     });
   });
+
+  // ---- label / note edits ----
+  document.querySelectorAll('.txt-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const item = findItem(input.dataset.kind, input.dataset.id);
+      if (!item) return;
+      const field = input.dataset.field;
+      const v = input.value.trim();
+      if (field === 'label' && !v) { input.value = item.label; return; } // labels can't be blank
+      item[field] = v;
+      expenseChanged(false);
+    });
+  });
+
+  // ---- basis toggle ----
+  // Flipping basis CONVERTS the stored figure so the annual total is unchanged.
+  // Toggling a unit should never move money.
+  document.querySelectorAll('.basis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = findItem('opex', btn.dataset.id);
+      if (!item) return;
+      if (item.basis === 'monthly') {
+        item.basis = 'annual';
+        item.vals = item.vals.map(v => Math.round((Number(v) || 0) * 12 * 100) / 100);
+      } else {
+        item.basis = 'monthly';
+        item.vals = item.vals.map(v => Math.round(((Number(v) || 0) / 12) * 100) / 100);
+      }
+      expenseChanged(true);
+    });
+  });
+
+  // ---- add ----
+  document.querySelectorAll('.add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.kind;
+      const cat = btn.dataset.cat;
+      const list = expList(kind);
+      const item = (kind === 'opex')
+        ? { id: newItemId('o', list), cat, label: 'New expense', note: '', basis: 'annual', vals: [0, 0, 0, 0, 0] }
+        : { id: newItemId('s', list), cat, label: 'New item', note: '', val: 0 };
+      // insert after the last row of this category so groups stay contiguous
+      let insertAt = list.length;
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i].cat === cat) { insertAt = i + 1; break; }
+      }
+      list.splice(insertAt, 0, item);
+      expenseChanged(true);
+      // focus the new label so it's immediately typeable
+      const el = document.querySelector(`.txt-input[data-field="label"][data-id="${item.id}"]`);
+      if (el) { el.focus(); el.select(); }
+    });
+  });
+
+  // ---- delete ----
+  document.querySelectorAll('.row-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.kind;
+      const list = expList(kind);
+      const idx = list.findIndex(it => it.id === btn.dataset.id);
+      if (idx === -1) return;
+      const item = list[idx];
+      const hasMoney = kind === 'opex' ? item.vals.some(v => v > 0) : item.val > 0;
+      if (hasMoney && !confirm(`Remove "${item.label}"? It still has figures against it.`)) return;
+      list.splice(idx, 1);
+      expenseChanged(true);
+    });
+  });
+
+  attachExpenseDragHandlers();
+}
+
+// ---- drag reorder ----
+// Constrained to within a category: the flat array is rendered by grouping on
+// `cat`, so allowing cross-category drops would split a group into two headers.
+let _dragId = null, _dragKind = null;
+
+function attachExpenseDragHandlers() {
+  document.querySelectorAll('tr[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      _dragId = row.dataset.id; _dragKind = row.dataset.kind;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _dragId); // Firefox needs a payload
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      clearDropMarkers();
+      _dragId = null; _dragKind = null;
+    });
+    row.addEventListener('dragover', e => {
+      if (!_dragId || row.dataset.kind !== _dragKind) return;
+      const src = findItem(_dragKind, _dragId);
+      const tgt = findItem(_dragKind, row.dataset.id);
+      if (!src || !tgt || src.cat !== tgt.cat || src.id === tgt.id) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      const below = (e.clientY - r.top) > r.height / 2;
+      clearDropMarkers();
+      row.classList.add(below ? 'drop-below' : 'drop-above');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-above', 'drop-below'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!_dragId || row.dataset.kind !== _dragKind) return;
+      if (row.dataset.id === _dragId) { clearDropMarkers(); return; } // self-drop = no-op
+      const list = expList(_dragKind);
+      const from = list.findIndex(it => it.id === _dragId);
+      const tgtIdx = list.findIndex(it => it.id === row.dataset.id);
+      if (from === -1 || tgtIdx === -1 || list[from].cat !== list[tgtIdx].cat) return;
+      const r = row.getBoundingClientRect();
+      const below = (e.clientY - r.top) > r.height / 2;
+      const moved = list.splice(from, 1)[0];
+      // recompute target AFTER the splice — removing an earlier element shifts it
+      let to = list.findIndex(it => it.id === row.dataset.id) + (below ? 1 : 0);
+      list.splice(to, 0, moved);
+      clearDropMarkers();
+      expenseChanged(true);
+    });
+  });
+}
+function clearDropMarkers() {
+  document.querySelectorAll('.drop-above, .drop-below').forEach(el =>
+    el.classList.remove('drop-above', 'drop-below'));
 }
 
 function updateExpenseTotals() {
