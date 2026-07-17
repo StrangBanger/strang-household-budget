@@ -185,6 +185,15 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
 .dep-readout .row.naive .v { color: var(--text-muted); font-weight: 500; }
 .dep-gap { font-size: 10px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
 
+.hh-savings-col { background: rgba(204,119,34,0.055); }
+.subtotal-row td {
+  background: var(--linen); border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600; font-size: 11.5px; color: var(--teal);
+}
+.subtotal-row td.lbl { text-align: left; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; color: var(--ochre); }
+.subtotal-row td.na { color: var(--border-strong); font-weight: 400; }
+
 /* ============ HEADER ============ */
 .page-header {
   background: var(--teal);
@@ -865,6 +874,13 @@ const DEFAULTS = {
     high: { amt: 0, w: 25 },
   },
 
+  // Personal bank account OUTSIDE the corp. This is the pool the household
+  // actually draws on: money in the CCPC is not spendable money — the only pipe
+  // out is payroll, and payroll is throttled exactly when the corp is low. So a
+  // corp seed and a household buffer are two different things and the model
+  // needs both.
+  hhSavingsStart: 0,
+
   // ---- Salary policy ----
   // Salary is a CONTROL problem, not a threshold problem. Re-deciding it every
   // month against a balance made it chatter: pay the ceiling -> balance drops
@@ -1140,7 +1156,7 @@ const Engine = (function () {
     const {
       deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
-      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio
+      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart
     } = params;
 
     const reviewEvery = Math.max(1, Number(salaryReviewMonths) || 12);
@@ -1160,6 +1176,9 @@ const Engine = (function () {
 
     const months = [];
     const revHistory = [];       // trailing gross commission, for the run rate
+    let hhSavings = Number(hhSavingsStart) || 0; // personal account; absorbs every surplus/deficit
+    let hhRuinMonth = null;      // first month the household account goes negative
+    let hhSavingsLow = hhSavings;
     let heldTarget = floorGross; // month 1 opens at floor — no trailing revenue yet
     let corpBalance = corpFunding;
     let lossCarryforward = 0;
@@ -1271,6 +1290,14 @@ const Engine = (function () {
       const totalHHNet = yourNetMonthly + adam + ashleyMonthly;
       const hhSurplus = totalHHNet - hhBurnMonthly;
 
+      // The household account absorbs the month: a deficit is a DRAW on savings,
+      // a surplus rebuilds it. Allowed to go negative on purpose — going negative
+      // is the finding, not an error to clamp away. hhRuinMonth is the answer to
+      // "how long can this go".
+      hhSavings += hhSurplus;
+      if (hhSavings < hhSavingsLow) hhSavingsLow = hhSavings;
+      if (hhSavings < 0 && hhRuinMonth === null) hhRuinMonth = monthNum;
+
       // Record AFTER the decision: the run rate must be strictly trailing, or a
       // review would be reading revenue it hasn't banked yet.
       revHistory.push(grossCommission);
@@ -1281,11 +1308,14 @@ const Engine = (function () {
         netCashFlow, taxableIncome: taxableIncomeThisMonth, lossCarryforward, corpTaxOwed,
         corpBalance, regime,
         annualizedGross, yourNetMonthly, adam, ashleyMonthly,
-        totalHHNet, hhBurnMonthly, hhSurplus,
+        totalHHNet, hhBurnMonthly, hhSurplus, hhSavings,
       });
     }
 
-    return { months, comm, surplusThreshold, floorChain, ceilingChain: salaryChain(ceilingGross) };
+    return {
+      months, comm, surplusThreshold, floorChain, ceilingChain: salaryChain(ceilingGross),
+      hhRuinMonth, hhSavingsLow, hhSavingsEnd: hhSavings,
+    };
   }
 
   return {
@@ -1302,6 +1332,7 @@ const Engine = (function () {
 const State = {
   // Runway tab sliders
   deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
+  hhSavingsStart: DEFAULTS.hhSavingsStart,
   salaryReviewMonths: DEFAULTS.salaryReviewMonths,
   runRateWindowMonths: DEFAULTS.runRateWindowMonths,
   salaryStep: DEFAULTS.salaryStep,
@@ -1371,6 +1402,7 @@ function runSimulation(scenarioKey) {
   const key = JSON.stringify({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
+    hhSavingsStart: State.hhSavingsStart,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     corpTaxRate: State.corpTaxRate,
     expense: State.expense, sales: State.sales, scenarioKey,
@@ -1381,6 +1413,7 @@ function runSimulation(scenarioKey) {
   const result = Engine.simulate({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
+    hhSavingsStart: State.hhSavingsStart,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
     adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
@@ -1470,7 +1503,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 4;
+var PAYLOAD_VERSION  = 5;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1502,6 +1535,7 @@ function buildSavePayload() {
       hhBurnMonthly: State.hhBurnMonthly,
       adamMonthly: State.adamMonthly,
       adamMonthsActive: State.adamMonthsActive,
+      hhSavingsStart: State.hhSavingsStart,
       salaryReviewMonths: State.salaryReviewMonths,
       runRateWindowMonths: State.runRateWindowMonths,
       salaryStep: State.salaryStep,
@@ -1580,6 +1614,16 @@ function migrateData(data) {
     }
     data.version = 4;
   }
+
+  // v4 -> v5: household savings account. Defaults to 0, which is honest — the
+  // model shouldn't invent a buffer you may not have. Numbers don't move; this
+  // adds a reported quantity rather than changing any existing one.
+  if (data.version < 5) {
+    if (data.assumptions && data.assumptions.hhSavingsStart === undefined) {
+      data.assumptions.hhSavingsStart = DEFAULTS.hhSavingsStart;
+    }
+    data.version = 5;
+  }
   return data;
 }
 
@@ -1601,7 +1645,8 @@ function applyLoadedData(data, sourceLbl) {
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
    'adamMonthly','adamMonthsActive',
-   'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'].forEach(function (k) {
+   'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
+   'hhSavingsStart'].forEach(function (k) {
     if (a[k] !== undefined) State[k] = a[k];
   });
 
@@ -1747,7 +1792,7 @@ function resetToDefaults() {
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
    'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
-   'coverageRatio'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+   'coverageRatio','hhSavingsStart'].forEach(function (k) { State[k] = DEFAULTS[k]; });
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
   State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
@@ -1910,6 +1955,7 @@ function renderRunwayTab() {
           <div class="input-section-title">Household</div>
           ${numFieldHTML('hhBurnMonthly', 'Monthly household burn', State.hhBurnMonthly, '$', '/mo', 250)}
           ${numFieldHTML('ashleyMonthly', "Ashley's net income", State.ashleyMonthly, '$', '/mo', 100)}
+          ${numFieldHTML('hhSavingsStart', 'Personal savings (outside corp)', State.hhSavingsStart, '$', '', 5000)}
         </div>
 
         <div class="input-section">
@@ -2046,7 +2092,8 @@ function attachNumFieldHandlers(rerenderFn) {
   const keys = ['floorGross','ceilingGross','corpFunding','minBuffer',
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
                  'ashleyMonthly','hhBurnMonthly',
-                 'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'];
+                 'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
+                 'hhSavingsStart'];
   keys.forEach(key => {
     const el = document.getElementById('input-' + key);
     if (!el) return;
@@ -2120,7 +2167,20 @@ function renderRunwayStats(result) {
   const lowestCls = lowestBalance >= State.minBuffer ? 'good' : lowestBalance >= 0 ? 'warn' : 'bad';
   const worstHHCls = worstHH >= 0 ? 'good' : worstHH >= -1000 ? 'warn' : 'bad';
 
+  // The leap question, answered directly: does the personal account survive?
+  const ruin = result.hhRuinMonth;
+  const savLow = result.hhSavingsLow;
+  const savCls = ruin ? 'bad' : savLow < State.hhSavingsStart * 0.25 ? 'warn' : 'good';
+
   document.getElementById('runway-stats').innerHTML = `
+    <div class="stat-card ${savCls}">
+      <div class="stat-label">${ruin ? 'Personal savings run out' : 'Personal savings hold'}</div>
+      <div class="stat-value ${savCls}">${ruin ? 'Month ' + ruin : 'All 60 months'}</div>
+    </div>
+    <div class="stat-card ${savCls}">
+      <div class="stat-label">Savings low point</div>
+      <div class="stat-value ${savCls}">${fmtCurrency(savLow)}</div>
+    </div>
     <div class="stat-card good">
       <div class="stat-label">Ending corp balance (month 60)</div>
       <div class="stat-value good">${fmtCurrency(endingBalance)}</div>
@@ -3118,6 +3178,7 @@ function renderMonthlyTab() {
               <th>HH Net Total</th>
               <th>HH Burn</th>
               <th>HH Surplus/Deficit</th>
+              <th class="hh-savings-col">Savings Balance</th>
             </tr>
           </thead>
           <tbody id="monthly-tbody"></tbody>
@@ -3147,12 +3208,48 @@ function renderMonthlyTableBody() {
     months = months.slice(yi * 12, yi * 12 + 12);
   }
 
-  const rows = months.map(m => {
+  // Year subtotals. FLOWS sum (revenue, opex, salary, tax); STOCKS do not — a
+  // balance is a point in time, so we show its CLOSING value. Summing a bank
+  // balance across 12 months would be a meaningless number.
+  const FLOW = ['sales','grossCommission','opex','grossSalaryPaid','employerCppPaid',
+                'netCashFlow','taxableIncome','corpTaxOwed','yourNetMonthly','adam',
+                'ashleyMonthly','totalHHNet','hhBurnMonthly','hhSurplus'];
+
+  function subtotalRow(chunk, label) {
+    const t = {};
+    FLOW.forEach(k => { t[k] = chunk.reduce((a, m) => a + (m[k] || 0), 0); });
+    const last = chunk[chunk.length - 1];
+    return `<tr class="subtotal-row">
+      <td class="lbl">${label}</td>
+      <td>${fmtNum1(t.sales)}</td>
+      <td>${fmtCurrency(t.grossCommission)}</td>
+      <td>${fmtCurrency(t.opex)}</td>
+      <td class="na">—</td>
+      <td>${fmtCurrency(t.grossSalaryPaid)}</td>
+      <td>${fmtCurrency(t.employerCppPaid)}</td>
+      <td>${fmtCurrency(t.netCashFlow)}</td>
+      <td class="tax-col">${fmtCurrency(t.taxableIncome)}</td>
+      <td class="tax-col na">—</td>
+      <td class="tax-col">${t.corpTaxOwed > 0 ? fmtCurrency(t.corpTaxOwed) : '—'}</td>
+      <td class="corp-balance-col">${fmtCurrency(last.corpBalance)}</td>
+      <td class="na">—</td>
+      <td class="na">—</td>
+      <td>${fmtCurrency(t.yourNetMonthly)}</td>
+      <td>${fmtCurrency(t.adam)}</td>
+      <td>${fmtCurrency(t.ashleyMonthly)}</td>
+      <td>${fmtCurrency(t.totalHHNet)}</td>
+      <td>${fmtCurrency(t.hhBurnMonthly)}</td>
+      <td>${fmtCurrencySigned(t.hhSurplus)}</td>
+      <td class="hh-savings-col">${fmtCurrency(last.hhSavings)}</td>
+    </tr>`;
+  }
+
+  const monthRow = m => {
     const isCliff = m.month === 13;
     const isYearEnd = m.corpTaxOwed > 0;
     const rowClass = isCliff ? 'cliff-row' : (isYearEnd ? 'yearend-row' : '');
     return `<tr class="${rowClass}">
-      <td>Month ${m.month}${isCliff ? ' ⚠' : ''}${isYearEnd ? ' 🧾' : ''}</td>
+      <td>Month ${m.month}${isCliff ? ' ⚠' : ''}${isYearEnd ? ' 🧾' : ''}${m.reviewed ? ' ⟳' : ''}</td>
       <td>${fmtNum1(m.sales)}</td>
       <td>${fmtCurrency(m.grossCommission)}</td>
       <td>${fmtCurrency(m.opex)}</td>
@@ -3172,8 +3269,24 @@ function renderMonthlyTableBody() {
       <td>${fmtCurrency(m.totalHHNet)}</td>
       <td>${fmtCurrency(m.hhBurnMonthly)}</td>
       <td><span class="pill ${m.hhSurplus >= 0 ? 'good' : m.hhSurplus > -1000 ? 'warn' : 'bad'}">${fmtCurrencySigned(m.hhSurplus)}</span></td>
+      <td class="hh-savings-col"><span class="pill ${m.hhSavings >= 0 ? 'good' : 'bad'}">${fmtCurrency(m.hhSavings)}</span></td>
     </tr>`;
-  }).join('');
+  };
+
+  // Group by year so a subtotal can follow each block, whatever the filter.
+  let rows = '';
+  const byYear = {};
+  months.forEach(m => { const y = Math.floor((m.month - 1) / 12); (byYear[y] = byYear[y] || []).push(m); });
+  Object.keys(byYear).map(Number).sort((a, b) => a - b).forEach(y => {
+    const chunk = byYear[y];
+    rows += chunk.map(monthRow).join('');
+    rows += subtotalRow(chunk, `Year ${y + 1} total${chunk.length < 12 ? ' (partial)' : ''}`);
+  });
+
+  // Grand total only when every month is on screen.
+  if (State.monthlyDetailYearFilter === 'all' && months.length === 60) {
+    rows += subtotalRow(months, '60-month total');
+  }
 
   document.getElementById('monthly-tbody').innerHTML = rows;
 }
