@@ -163,6 +163,28 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
   font-variant-numeric: tabular-nums; min-height: 12px;
 }
 
+/* ============ DEPOSIT DISTRIBUTION ============ */
+.dep-grid { display: grid; grid-template-columns: 42px 1fr 62px; gap: 5px 6px; align-items: center; margin-bottom: 0.6rem; }
+.dep-grid .hdr { font-size: 9px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.dep-grid .hdr.r { text-align: right; }
+.dep-lbl { font-size: 11.5px; color: var(--text-muted); }
+.dep-in {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--teal);
+  background: var(--linen); border: 1px solid var(--border-strong);
+  padding: 5px 7px; width: 100%; text-align: right; font-variant-numeric: tabular-nums;
+}
+.dep-in:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.dep-wsum { font-size: 10.5px; text-align: right; margin: -0.3rem 0 0.7rem; color: var(--text-muted); }
+.dep-wsum.off { color: var(--ochre); }
+.dep-readout {
+  border-top: 1px solid var(--border); padding-top: 0.6rem; font-size: 11.5px;
+}
+.dep-readout .row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.dep-readout .k { color: var(--text-muted); }
+.dep-readout .v { font-variant-numeric: tabular-nums; color: var(--teal); font-weight: 600; }
+.dep-readout .row.naive .v { color: var(--text-muted); font-weight: 500; }
+.dep-gap { font-size: 10px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
+
 /* ============ HEADER ============ */
 .page-header {
   background: var(--teal);
@@ -829,7 +851,19 @@ const CORP_TAX = {
 
 // Default adjustable assumptions (sliders control these at runtime)
 const DEFAULTS = {
-  avgDeposit: 0,
+  // Deposit size is modelled as a 3-point distribution, not a single average.
+  // Commission is graded (2.5/2.0/1.5), so it is concave in deposit size —
+  // meaning E[f(X)] <= f(E[X]). The gap is small (0-4%, and exactly 0 when the
+  // whole spread sits above the $200k kink, where the curve is linear), but the
+  // real value is that stating low/mid/high forces the implied mean into the
+  // open instead of hiding it behind one unfalsifiable "average".
+  // Weights are relative — they are normalised by their own sum, so they need
+  // not total exactly 100.
+  deposits: {
+    low:  { amt: 0, w: 25 },
+    mid:  { amt: 0, w: 50 },
+    high: { amt: 0, w: 25 },
+  },
   floorGross: 0,
   ceilingGross: 0,
   corpFunding: 0,
@@ -1037,18 +1071,38 @@ const Engine = (function () {
   }
 
   // ---- Full 60-month simulation ----
-  // params: { avgDeposit, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+  // params: { deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
   //           ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey }
+  // expectedCommission: probability-weighted commission across the deposit
+  // distribution. Deterministic (no sampling) so it stays Excel-checkable.
+  // Weights are normalised by their sum; a zero-sum falls back to the mid point.
+  function expectedCommission(deposits) {
+    const pts = [deposits.low, deposits.mid, deposits.high];
+    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
+    if (sum <= 0) return commissionPerSale(Number(deposits.mid.amt) || 0);
+    return pts.reduce((t, p) =>
+      t + ((Number(p.w) || 0) / sum) * commissionPerSale(Number(p.amt) || 0), 0);
+  }
+
+  // meanDeposit: the average this distribution actually implies. Surfaced in the
+  // UI because it is the number most likely to differ from what you'd have typed.
+  function meanDeposit(deposits) {
+    const pts = [deposits.low, deposits.mid, deposits.high];
+    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
+    if (sum <= 0) return Number(deposits.mid.amt) || 0;
+    return pts.reduce((t, p) => t + ((Number(p.w) || 0) / sum) * (Number(p.amt) || 0), 0);
+  }
+
   function simulate(params) {
     const {
-      avgDeposit, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+      deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
       corpTaxRate
     } = params;
 
     const taxRate = (corpTaxRate !== undefined) ? corpTaxRate : CORP_TAX.smallBusinessRate;
 
-    const comm = commissionPerSale(avgDeposit);
+    const comm = expectedCommission(deposits);
     const sales = salesArr || SCENARIO_SALES[scenarioKey];
 
     // Surplus Threshold = months x (Floor total monthly corp cost + Year 1 monthly opex)
@@ -1168,7 +1222,7 @@ const Engine = (function () {
 
   return {
     federalTax, ontarioTax, employeeCPP, employerCPP, netAnnual, grossForNet,
-    commissionPerSale, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
+    commissionPerSale, expectedCommission, meanDeposit, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
   };
 })();
 
@@ -1179,7 +1233,7 @@ const Engine = (function () {
 
 const State = {
   // Runway tab sliders
-  avgDeposit: DEFAULTS.avgDeposit,
+  deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
   floorGross: DEFAULTS.floorGross,
   ceilingGross: DEFAULTS.ceilingGross,
   corpFunding: DEFAULTS.corpFunding,
@@ -1243,7 +1297,7 @@ function getExpenseStateForEngine() {
 
 function runSimulation(scenarioKey) {
   const key = JSON.stringify({
-    avgDeposit: State.avgDeposit, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     corpTaxRate: State.corpTaxRate,
     expense: State.expense, sales: State.sales, scenarioKey,
@@ -1252,7 +1306,7 @@ function runSimulation(scenarioKey) {
     return State.cache.results[scenarioKey];
   }
   const result = Engine.simulate({
-    avgDeposit: State.avgDeposit, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
     adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
@@ -1342,7 +1396,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 2;
+var PAYLOAD_VERSION  = 3;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1360,8 +1414,10 @@ function buildSavePayload() {
     version: PAYLOAD_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: APP_VERSION,
+    // deposits is TOP-LEVEL, not under assumptions — migrateData and
+    // applyLoadedData both address it as data.deposits. Keep them in step.
+    deposits: State.deposits,
     assumptions: {
-      avgDeposit: State.avgDeposit,
       floorGross: State.floorGross,
       ceilingGross: State.ceilingGross,
       corpFunding: State.corpFunding,
@@ -1411,6 +1467,26 @@ function migrateData(data) {
     }
     data.version = 2;
   }
+
+  // v2 -> v3: a single `avgDeposit` becomes a 3-point distribution. Seeding it
+  // as a DEGENERATE distribution (all three points equal, all weight on mid)
+  // makes E[f(X)] collapse to f(avgDeposit) exactly — so an existing model's
+  // numbers cannot move. You opt into a real spread by editing the points.
+  if (data.version < 3) {
+    if (data.assumptions && data.assumptions.avgDeposit !== undefined && !data.deposits) {
+      var avg = data.assumptions.avgDeposit;
+      data.deposits = {
+        low:  { amt: avg, w: 0 },
+        mid:  { amt: avg, w: 100 },
+        high: { amt: avg, w: 0 },
+      };
+      delete data.assumptions.avgDeposit;
+    }
+    if (!data.deposits) {
+      data.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
+    }
+    data.version = 3;
+  }
   return data;
 }
 
@@ -1429,11 +1505,13 @@ function applyLoadedData(data, sourceLbl) {
   data = migrateData(data);
 
   var a = data.assumptions || {};
-  ['avgDeposit','floorGross','ceilingGross','corpFunding','minBuffer',
+  ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
    'adamMonthly','adamMonthsActive'].forEach(function (k) {
     if (a[k] !== undefined) State[k] = a[k];
   });
+
+  if (data.deposits) State.deposits = data.deposits;
 
   if (data.expense) {
     if (data.expense.opexFlat)    State.expense.opexFlat    = data.expense.opexFlat;
@@ -1572,10 +1650,11 @@ function resetToDefaults() {
     'numbers. It overwrites your saved model with an empty one.\n\n' +
     'Export a backup first if you have not.'
   )) return;
-  ['avgDeposit','floorGross','ceilingGross','corpFunding','minBuffer',
+  ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
    'adamMonthsActive'].forEach(function (k) { State[k] = DEFAULTS[k]; });
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
+  State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
   State.scenario = 'base';
   initExpenseState();
@@ -1706,7 +1785,7 @@ function renderRunwayTab() {
 
         <div class="input-section">
           <div class="input-section-title">Business</div>
-          ${numFieldHTML('avgDeposit', 'Average deposit per client', State.avgDeposit, '$', '', 25000)}
+          ${depositBlockHTML()}
           ${numFieldHTML('floorGross', 'Annual salary floor', State.floorGross, '$', '', 1000)}
           ${numFieldHTML('ceilingGross', 'Annual salary ceiling', State.ceilingGross, '$', '', 1000)}
         </div>
@@ -1761,6 +1840,8 @@ function renderRunwayTab() {
   `;
 
   attachNumFieldHandlers(renderRunwayTab);
+  attachDepositHandlers(renderRunwayTab);
+  renderDepositReadout();
   attachScenarioButtonHandlers('runway-scenario-bar', renderRunwayTab);
 
   const result = runSimulation(State.scenario);
@@ -1788,8 +1869,73 @@ function scenarioDesc(key) {
   return (State.scenarioDesc && State.scenarioDesc[key]) || SCENARIO_META[key].desc || '';
 }
 
+
+// ============================================================
+// DEPOSIT DISTRIBUTION (3-point)
+// ============================================================
+function depositBlockHTML() {
+  const d = State.deposits;
+  const row = (k, lbl) => `
+    <div class="dep-lbl">${lbl}</div>
+    <input class="dep-in" type="number" min="0" step="25000" data-dep="${k}" data-f="amt" value="${d[k].amt}">
+    <input class="dep-in" type="number" min="0" step="5" data-dep="${k}" data-f="w" value="${d[k].w}">`;
+  return `
+    <div class="dep-grid">
+      <div class="hdr"></div><div class="hdr r">Deposit</div><div class="hdr r">Weight</div>
+      ${row('low', 'Low')}
+      ${row('mid', 'Mid')}
+      ${row('high', 'High')}
+    </div>
+    <div class="dep-wsum" id="dep-wsum"></div>
+    <div class="dep-readout" id="dep-readout"></div>`;
+}
+
+// The readout exists to make the assumption visible: the implied mean is the
+// number most likely to differ from whatever single "average" you'd have typed.
+// The naive line shows f(mean) — what a single-average model would have paid —
+// so the concavity gap is on screen rather than buried in the engine.
+function renderDepositReadout() {
+  const d = State.deposits;
+  const wsum = ['low', 'mid', 'high'].reduce((t, k) => t + (Number(d[k].w) || 0), 0);
+  const el = document.getElementById('dep-wsum');
+  if (el) {
+    el.textContent = wsum === 100 ? 'Weights sum to 100%'
+      : wsum <= 0 ? 'No weights set — using Mid only'
+      : `Weights sum to ${(Math.round(wsum * 10) / 10)}% — normalised`;
+    el.className = 'dep-wsum' + (wsum === 100 ? '' : ' off');
+  }
+  const out = document.getElementById('dep-readout');
+  if (!out) return;
+  const mean = Engine.meanDeposit(d);
+  const exp = Engine.expectedCommission(d);
+  const naive = Engine.commissionPerSale(mean);
+  const gap = naive - exp;
+  out.innerHTML = `
+    <div class="row"><span class="k">Implied mean deposit</span><span class="v">${fmtCurrency(mean)}</span></div>
+    <div class="row"><span class="k">Expected commission / sale</span><span class="v">${fmtCurrency(exp)}</span></div>
+    <div class="row naive"><span class="k">Naive — single average</span><span class="v">${fmtCurrency(naive)}</span></div>
+    <div class="dep-gap">${gap > 0.5
+      ? `Averaging the deposit first would overstate commission by <strong>${fmtCurrency(gap)}</strong>/sale
+         (${(gap / naive * 100).toFixed(1)}%) — the grade is concave, so E[f(X)] &lt; f(E[X]).`
+      : `No gap — the spread sits in the flat 1.5% band above ${fmtCurrency(COMMISSION.tier2Cap)},
+         where the grade is linear and averaging first is exact.`}</div>`;
+}
+
+function attachDepositHandlers(rerenderFn) {
+  document.querySelectorAll('.dep-in').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const val = Math.max(0, Number(inp.value) || 0);
+      inp.value = val;
+      State.deposits[inp.dataset.dep][inp.dataset.f] = val;
+      invalidateCache();
+      scheduleCloudSave();
+      rerenderFn();
+    });
+  });
+}
+
 function attachNumFieldHandlers(rerenderFn) {
-  const keys = ['avgDeposit','floorGross','ceilingGross','corpFunding','minBuffer',
+  const keys = ['floorGross','ceilingGross','corpFunding','minBuffer',
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
                  'ashleyMonthly','hhBurnMonthly'];
   keys.forEach(key => {
@@ -1819,7 +1965,7 @@ function sliderHTML(key, label, value, min, max, step, formatter) {
 }
 
 function attachSliderHandlers(rerenderFn) {
-  ['avgDeposit', 'floorGross', 'ceilingGross', 'corpFunding', 'minBuffer', 'surplusTriggerMonths', 'corpTaxRate'].forEach(key => {
+  ['floorGross', 'ceilingGross', 'corpFunding', 'minBuffer', 'surplusTriggerMonths', 'corpTaxRate'].forEach(key => {
     const el = document.getElementById('slider-' + key);
     if (!el) return;
     el.addEventListener('input', () => {
