@@ -864,6 +864,21 @@ const DEFAULTS = {
     mid:  { amt: 0, w: 50 },
     high: { amt: 0, w: 25 },
   },
+
+  // ---- Salary policy ----
+  // Salary is a CONTROL problem, not a threshold problem. Re-deciding it every
+  // month against a balance made it chatter: pay the ceiling -> balance drops
+  // under the trigger -> revert to floor -> rebuild -> repeat. Three changes fix it:
+  //   1. Review interval  — salary is set and HELD; you don't re-run payroll monthly.
+  //   2. Run-rate test    — raise on trailing REVENUE (a flow), not balance (a stock,
+  //                         which conflates earned money with seed capital).
+  //   3. Asymmetry        — raising needs sustained revenue AND a cushion; cutting is
+  //                         immediate but sticks to the next review. That IS the
+  //                         hysteresis band.
+  salaryReviewMonths: 12,   // set salary at months 1, 13, 25, 37, 49
+  runRateWindowMonths: 6,   // trailing window for the revenue run rate
+  salaryStep: 10000,        // round sustainable salary DOWN to this (round T4 figures)
+  coverageRatio: 1.25,      // raise only when revenue covers 1.25x the cost of doing so
   floorGross: 0,
   ceilingGross: 0,
   corpFunding: 0,
@@ -1093,12 +1108,45 @@ const Engine = (function () {
     return pts.reduce((t, p) => t + ((Number(p.w) || 0) / sum) * (Number(p.amt) || 0), 0);
   }
 
+  // salaryCandidates: the discrete salary levels we'd actually consider — the
+  // floor, then round `step` multiples above it, then the ceiling. Round numbers,
+  // because a real T4 is a round number.
+  function salaryCandidates(floorGross, ceilingGross, step) {
+    const out = [floorGross];
+    if (step > 0) {
+      let g = Math.ceil(floorGross / step) * step;
+      for (; g < ceilingGross; g += step) if (g > floorGross) out.push(g);
+    }
+    if (ceilingGross > floorGross) out.push(ceilingGross);
+    return out;
+  }
+
+  // maxSustainableGross: the highest candidate salary whose full corporate cost,
+  // plus opex, is covered `coverage`x over by the annualised run rate.
+  // Deliberately a FLOW test — seed capital cannot buy you a raise.
+  function maxSustainableGross(runRateAnnual, annualOpex, floorGross, ceilingGross, step, coverage) {
+    const cov = coverage > 0 ? coverage : 1;
+    const budget = (runRateAnnual / cov) - annualOpex; // what salary+erCPP may cost
+    if (budget <= 0) return floorGross;
+    const cands = salaryCandidates(floorGross, ceilingGross, step);
+    let best = floorGross;
+    for (const g of cands) {
+      if (salaryChain(g).totalCorpCost <= budget) best = Math.max(best, g);
+    }
+    return best;
+  }
+
   function simulate(params) {
     const {
       deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
-      corpTaxRate
+      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio
     } = params;
+
+    const reviewEvery = Math.max(1, Number(salaryReviewMonths) || 12);
+    const rrWindow    = Math.max(1, Number(runRateWindowMonths) || 6);
+    const step        = Math.max(0, Number(salaryStep) || 0);
+    const coverage    = Math.max(0.01, Number(coverageRatio) || 1);
 
     const taxRate = (corpTaxRate !== undefined) ? corpTaxRate : CORP_TAX.smallBusinessRate;
 
@@ -1111,6 +1159,8 @@ const Engine = (function () {
     const surplusThreshold = surplusTriggerMonths * (floorChain.totalCorpCost / 12 + year1MonthlyOpex);
 
     const months = [];
+    const revHistory = [];       // trailing gross commission, for the run rate
+    let heldTarget = floorGross; // month 1 opens at floor — no trailing revenue yet
     let corpBalance = corpFunding;
     let lossCarryforward = 0;
     let fiscalYearTaxableIncome = 0; // accumulates across the 12 months of the current fiscal year
@@ -1129,33 +1179,47 @@ const Engine = (function () {
 
       const availAfterOpex = corpBalance + grossCommission - opex;
 
-      // Five-regime logic
-      // Regime 5 test: revenue covers all costs including ceiling this month
-      const ceilingGrossMo = ceilingGross / 12;
-      const ceilingEcppMo = employerCPP(ceilingGross) / 12;
-      const regime5Test = (grossCommission - opex - ceilingGrossMo - ceilingEcppMo) > 0;
+      // ---- SALARY REVIEW ----
+      // Salary is re-set only on review months, then HELD. This is what kills the
+      // chatter: a single month of noise can no longer flip the salary.
+      const isReviewMonth = ((monthNum - 1) % reviewEvery) === 0;
+      let reviewed = false;
+      if (isReviewMonth && i > 0) {
+        reviewed = true;
+        // Trailing run rate: sum the window, annualise it. A FLOW — unlike the old
+        // balance test, seed capital cannot masquerade as earning power.
+        const win = Math.min(rrWindow, revHistory.length);
+        const trailing = revHistory.slice(-win).reduce((a, b) => a + b, 0);
+        const runRateAnnual = win > 0 ? trailing * (12 / win) : 0;
+        const annualOpexNow = annualOpexTotal(expenseState, Math.min(Math.floor(i / 12), 4));
+
+        heldTarget = maxSustainableGross(
+          runRateAnnual, annualOpexNow, floorGross, ceilingGross, step, coverage);
+
+        // Second gate: earning it isn't enough, you also want a cushion behind you.
+        // This is what keeps surplusTriggerMonths meaningful.
+        if (corpBalance < surplusThreshold) heldTarget = floorGross;
+      }
 
       let targetGross;
       let regime;
       if (availAfterOpex <= minBuffer) {
-        // Regime 1: corp below buffer, salary throttled
+        // EMERGENCY CUT — immediate, any month, and it STICKS until the next
+        // review. Without the stickiness the balance recovers next month and the
+        // chatter comes straight back.
+        heldTarget = floorGross;
         targetGross = Math.min(floorGross, hhNeededGross);
         regime = 1;
-      } else if (availAfterOpex < surplusThreshold) {
-        // Regimes 2 or 3: recovering, below surplus threshold
-        if (hhNeededGross < floorGross) {
-          // HH needs less than floor — pay only what's needed, conserving cash
-          targetGross = hhNeededGross;
-          regime = 2;
-        } else {
-          // HH needs at or above floor — pay the floor (it's the cap here)
-          targetGross = floorGross;
-          regime = 3;
-        }
+      } else if (heldTarget <= floorGross && hhNeededGross < floorGross && corpBalance < surplusThreshold) {
+        // Household needs less than the floor and we're not flush — don't overpay
+        // salary just because we can; leave the cash in the corp.
+        targetGross = hhNeededGross;
+        regime = 2;
       } else {
-        // Regimes 4 or 5: at or above surplus threshold, pay the ceiling
-        targetGross = ceilingGross;
-        regime = regime5Test ? 5 : 4;
+        targetGross = heldTarget;
+        regime = (targetGross >= ceilingGross) ? 5
+               : (targetGross > floorGross)    ? 4
+               : 3;
       }
 
       const neededGrossMo = targetGross / 12;
@@ -1207,8 +1271,12 @@ const Engine = (function () {
       const totalHHNet = yourNetMonthly + adam + ashleyMonthly;
       const hhSurplus = totalHHNet - hhBurnMonthly;
 
+      // Record AFTER the decision: the run rate must be strictly trailing, or a
+      // review would be reading revenue it hasn't banked yet.
+      revHistory.push(grossCommission);
+
       months.push({
-        month: monthNum, sales: salesThisMonth, grossCommission, opex,
+        month: monthNum, sales: salesThisMonth, grossCommission, opex, reviewed,
         targetGross, grossSalaryPaid, employerCppPaid,
         netCashFlow, taxableIncome: taxableIncomeThisMonth, lossCarryforward, corpTaxOwed,
         corpBalance, regime,
@@ -1234,6 +1302,10 @@ const Engine = (function () {
 const State = {
   // Runway tab sliders
   deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
+  salaryReviewMonths: DEFAULTS.salaryReviewMonths,
+  runRateWindowMonths: DEFAULTS.runRateWindowMonths,
+  salaryStep: DEFAULTS.salaryStep,
+  coverageRatio: DEFAULTS.coverageRatio,
   floorGross: DEFAULTS.floorGross,
   ceilingGross: DEFAULTS.ceilingGross,
   corpFunding: DEFAULTS.corpFunding,
@@ -1298,6 +1370,7 @@ function getExpenseStateForEngine() {
 function runSimulation(scenarioKey) {
   const key = JSON.stringify({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     corpTaxRate: State.corpTaxRate,
     expense: State.expense, sales: State.sales, scenarioKey,
@@ -1307,6 +1380,7 @@ function runSimulation(scenarioKey) {
   }
   const result = Engine.simulate({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
     adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
@@ -1343,8 +1417,8 @@ function regimeLabel(r) {
     1: '1 — Constrained',
     2: '2 — Below Floor',
     3: '3 — At Floor',
-    4: '4 — At Ceiling',
-    5: '5 — Full Ceiling + Growing',
+    4: '4 — Between Floor & Ceiling',
+    5: '5 — At Ceiling',
   };
   return labels[r] || String(r);
 }
@@ -1396,7 +1470,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 3;
+var PAYLOAD_VERSION  = 4;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1428,6 +1502,10 @@ function buildSavePayload() {
       hhBurnMonthly: State.hhBurnMonthly,
       adamMonthly: State.adamMonthly,
       adamMonthsActive: State.adamMonthsActive,
+      salaryReviewMonths: State.salaryReviewMonths,
+      runRateWindowMonths: State.runRateWindowMonths,
+      salaryStep: State.salaryStep,
+      coverageRatio: State.coverageRatio,
     },
     expense: {
       opexFlat: State.expense.opexFlat,
@@ -1487,6 +1565,21 @@ function migrateData(data) {
     }
     data.version = 3;
   }
+
+  // v3 -> v4: salary policy params.
+  // NOTE — unlike every earlier migration, this one DOES change your numbers,
+  // and that is the point: v3 re-decided salary every month against the corp
+  // BALANCE, which made it oscillate (floor, floor, ceiling, floor...) and let
+  // seed capital buy raises. v4 reviews annually against trailing REVENUE.
+  // The old behaviour was the bug; there is nothing to preserve.
+  if (data.version < 4) {
+    if (data.assumptions) {
+      ['salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'].forEach(function (k) {
+        if (data.assumptions[k] === undefined) data.assumptions[k] = DEFAULTS[k];
+      });
+    }
+    data.version = 4;
+  }
   return data;
 }
 
@@ -1507,7 +1600,8 @@ function applyLoadedData(data, sourceLbl) {
   var a = data.assumptions || {};
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
-   'adamMonthly','adamMonthsActive'].forEach(function (k) {
+   'adamMonthly','adamMonthsActive',
+   'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'].forEach(function (k) {
     if (a[k] !== undefined) State[k] = a[k];
   });
 
@@ -1652,7 +1746,8 @@ function resetToDefaults() {
   )) return;
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
-   'adamMonthsActive'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+   'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
+   'coverageRatio'].forEach(function (k) { State[k] = DEFAULTS[k]; });
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
   State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
@@ -1791,6 +1886,19 @@ function renderRunwayTab() {
         </div>
 
         <div class="input-section">
+          <div class="input-section-title">Salary policy</div>
+          ${numFieldHTML('salaryReviewMonths', 'Review salary every', State.salaryReviewMonths, '', ' months', 1)}
+          ${numFieldHTML('runRateWindowMonths', 'Run-rate window', State.runRateWindowMonths, '', ' months', 1)}
+          ${numFieldHTML('salaryStep', 'Round salary down to', State.salaryStep, '$', '', 1000)}
+          ${numFieldHTML('coverageRatio', 'Coverage required to raise', State.coverageRatio, '', '\u00d7', 0.05)}
+          <div class="adam-gross-note" style="margin-top:.5rem">
+            Salary is set at review months and held. Raising needs trailing revenue to cover
+            <strong>${State.coverageRatio}&times;</strong> the cost of the raise <em>and</em> a balance above the
+            surplus threshold. A drop below the minimum buffer cuts to floor immediately, until the next review.
+          </div>
+        </div>
+
+        <div class="input-section">
           <div class="input-section-title">Corporate account</div>
           ${numFieldHTML('corpFunding', 'Initial funding', State.corpFunding, '$', '', 5000)}
           ${numFieldHTML('minBuffer', 'Minimum buffer', State.minBuffer, '$', '', 5000)}
@@ -1828,8 +1936,8 @@ function renderRunwayTab() {
             <span><span class="legend-dot" style="background:#b3392e"></span>1 — Constrained</span>
             <span><span class="legend-dot" style="background:#8a9eb5"></span>2 — Below Floor</span>
             <span><span class="legend-dot" style="background:#CC7722"></span>3 — At Floor</span>
-            <span><span class="legend-dot" style="background:#1A3D3A"></span>4 — At Ceiling</span>
-            <span><span class="legend-dot" style="background:#1e7a52"></span>5 — Full Ceiling + Growing</span>
+            <span><span class="legend-dot" style="background:#1A3D3A"></span>4 — Between</span>
+            <span><span class="legend-dot" style="background:#1e7a52"></span>5 — At Ceiling</span>
             <span><span class="legend-dot" style="background:#CC7722;border-radius:0;height:3px;width:14px;display:inline-block;vertical-align:middle"></span>Corp bank balance (right axis)</span>
           </div>
           <canvas id="runway-chart" height="90"></canvas>
@@ -1937,7 +2045,8 @@ function attachDepositHandlers(rerenderFn) {
 function attachNumFieldHandlers(rerenderFn) {
   const keys = ['floorGross','ceilingGross','corpFunding','minBuffer',
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
-                 'ashleyMonthly','hhBurnMonthly'];
+                 'ashleyMonthly','hhBurnMonthly',
+                 'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'];
   keys.forEach(key => {
     const el = document.getElementById('input-' + key);
     if (!el) return;
@@ -2029,7 +2138,7 @@ function renderRunwayStats(result) {
       <div class="stat-value">${deficitMonths} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
     </div>
     <div class="stat-card good">
-      <div class="stat-label">Months at ceiling (Regimes 4+5)</div>
+      <div class="stat-label">Months above floor (Regimes 4+5)</div>
       <div class="stat-value good">${r4r5} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
     </div>
     <div class="stat-card">
@@ -2081,8 +2190,8 @@ function renderRunwayChart(result) {
     1: '#b3392e',  // Constrained — red
     2: '#8a9eb5',  // Below Floor — muted blue-grey (conserving, calm)
     3: '#CC7722',  // At Floor — ochre (recovering, working)
-    4: '#1A3D3A',  // At Ceiling — deep teal (surplus)
-    5: '#1e7a52',  // Full Ceiling + Growing — green (thriving)
+    4: '#1A3D3A',  // Between Floor & Ceiling — deep teal (earning a raise)
+    5: '#1e7a52',  // At Ceiling — green (thriving)
   };
 
   const labels = result.months.map(m => 'M' + m.month);
