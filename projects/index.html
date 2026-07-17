@@ -138,6 +138,27 @@ select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;borde
 /* EDITOR TEXTAREA */
 .ef-field textarea{width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg);color:var(--text);font-family:var(--font);resize:vertical;min-height:38px;}
 .ef-field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;gap:8px;margin:-.6rem 0 1.25rem;flex-wrap:wrap;}
+.fb-search{position:relative;flex:1;min-width:190px;max-width:340px;}
+.fb-search .fb-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none;}
+.fb-search input{width:100%;padding:7px 10px 7px 26px;font-size:13px;font-family:var(--font);color:var(--text);
+  border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);}
+.fb-search input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+#zone-filter{padding:7px 9px;font-size:12px;font-family:var(--font);color:var(--text2);
+  border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);cursor:pointer;}
+#zone-filter:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+button.fb-clear{font-size:12px;font-weight:500;padding:7px 12px;border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text2);cursor:pointer;}
+button.fb-clear:hover{background:var(--surface2);color:var(--text);}
+.fb-summary{font-size:11px;color:var(--text3);font-weight:500;}
+.fb-summary .hit{color:var(--accent);font-weight:600;}
+/* while filtering, counts are partial — say so rather than mislead */
+.filtered-note{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--accent);background:var(--accent-bg);border:1px solid #B8D4F0;border-radius:20px;padding:1px 7px;}
+.no-hits{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);
+  padding:2rem;text-align:center;color:var(--text3);font-size:13px;}
+.no-hits strong{color:var(--text2);font-weight:600;}
 /* GROUP SECTIONS */
 .grp{margin-bottom:1.35rem;}
 /* Group header = a solid rounded bar. Deliberately a HEAVIER register than the
@@ -258,6 +279,18 @@ button.wk-more:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(
 
 <div class="tabs" id="tabs-bar"></div>
 
+<!-- Search / filter. Lives OUTSIDE #panels so re-rendering results never
+     steals focus from the box you're typing in. -->
+<div class="filter-bar">
+  <div class="fb-search">
+    <span class="fb-icon">⌕</span>
+    <input type="search" id="q" placeholder="Search projects and notes…" oninput="applyFilter()" autocomplete="off">
+  </div>
+  <select id="zone-filter" onchange="applyFilter()"></select>
+  <button class="fb-clear" id="fb-clear" onclick="clearFilter()" style="display:none;">Clear</button>
+  <span class="fb-summary" id="fb-summary"></span>
+</div>
+
 <!-- one panel per bucket, injected by JS -->
 <div id="panels"></div>
 
@@ -351,7 +384,54 @@ function nextGroupSort(bucket){
   return g.length?(g[g.length-1].sortOrder||0)+10:10;
 }
 
-// ══════ WEEK ENGINE (Soon's 'date' scheme) ══════
+// ══════ SEARCH / FILTER ══════
+// Applied at RENDER time only. The tasksIn*/renumber* functions stay unfiltered
+// on purpose: if sortOrder were ever computed from a filtered list, dragging
+// while filtered would silently scramble the cards you couldn't see.
+var FILTER_TEXT='',FILTER_ZONE='';
+function isFiltering(){return FILTER_TEXT!==''||FILTER_ZONE!=='';}
+function matchesFilter(t){
+  if(FILTER_ZONE&&zoneOf(t.space)!==FILTER_ZONE)return false;
+  if(FILTER_TEXT){
+    var q=FILTER_TEXT;
+    var hay=((t.name||'')+' '+(t.notes||'')+' '+(t.space||'')).toLowerCase();
+    if(hay.indexOf(q)<0)return false;
+  }
+  return true;
+}
+function vis(list){return isFiltering()?list.filter(matchesFilter):list;}
+function visTotal(list){return vis(list).reduce(function(s,t){return s+effAmount(t);},0);}
+function initFilterBar(){
+  var sel=document.getElementById('zone-filter');
+  if(!sel)return;
+  sel.innerHTML='<option value="">All spaces</option>'+ZONES.map(function(z){
+    return '<option value="'+esc(z.key)+'">'+esc(z.label)+'</option>';}).join('');
+}
+function applyFilter(){
+  var q=document.getElementById('q');
+  var z=document.getElementById('zone-filter');
+  FILTER_TEXT=q?(q.value||'').trim().toLowerCase():'';
+  FILTER_ZONE=z?(z.value||''):'';
+  var clr=document.getElementById('fb-clear');
+  if(clr)clr.style.display=isFiltering()?'inline-block':'none';
+  updateFilterSummary();
+  editingId=null;_paletteFor=null;
+  renderTabs();renderPanels();
+}
+function clearFilter(){
+  var q=document.getElementById('q');if(q)q.value='';
+  var z=document.getElementById('zone-filter');if(z)z.value='';
+  applyFilter();
+}
+function updateFilterSummary(){
+  var el=document.getElementById('fb-summary');
+  if(!el)return;
+  if(!isFiltering()){el.innerHTML='';return;}
+  var total=TASKS.filter(matchesFilter).length;
+  var here=vis(tasksIn(activeBucket)).length;
+  el.innerHTML='<span class="hit">'+total+'</span> match'+(total===1?'':'es')+
+    ' across all stages \u00b7 '+here+' in '+esc(activeBucket);
+}
 // Weeks run MONDAY→SUNDAY, so Fri/Sat/Sun sit at the END of a week. A task
 // dated Tuesday therefore files against the weekend that's COMING, not the one
 // just gone. Dates are parsed as LOCAL (not UTC) so a date never shifts a day.
@@ -492,40 +572,48 @@ function nextSortOrder(bucket,gid){
 // ═══════════════ RENDER: TABS ═══════════════
 function renderTabs(){
   var bar=document.getElementById('tabs-bar');
+  // While filtering the badge is the MATCH count, so you can see which stage
+  // holds the thing you're looking for and click straight to it.
   bar.innerHTML=BUCKETS.map(function(b){
-    var n=tasksIn(b).length;
-    return '<button class="tab'+(b===activeBucket?' on':'')+'" id="tab-'+tabKey(b)+'" onclick="showTab(\''+b+'\')">'+
-      esc(b)+'<span class="cnt">'+n+'</span></button>';
+    var n=vis(tasksIn(b)).length;
+    var dim=(isFiltering()&&n===0)?' style="opacity:.45;"':'';
+    return '<button class="tab'+(b===activeBucket?' on':'')+'" id="tab-'+tabKey(b)+'"'+dim+
+      ' onclick="showTab(\''+b+'\')">'+esc(b)+'<span class="cnt">'+n+'</span></button>';
   }).join('');
 }
 function tabKey(b){return b.toLowerCase().replace(/[^a-z]+/g,'-');}
 function showTab(b){
-  activeBucket=b;editingId=null;_paletteFor=null;renderTabs();renderPanels();
+  activeBucket=b;editingId=null;_paletteFor=null;
+  renderTabs();renderPanels();updateFilterSummary();
 }
 
 // ═══════════════ RENDER: PANELS ═══════════════
 function renderPanels(){
   var host=document.getElementById('panels');
   var b=activeBucket,meta=BUCKET_META[b];
-  var list=tasksIn(b),total=bucketTotal(b);
+  var all=tasksIn(b),list=vis(all);
+  var total=isFiltering()?visTotal(all):bucketTotal(b);
   var scheme=schemeFor(b);
+  var filtering=isFiltering();
   var html='<div class="panel on">';
   // head
   html+='<div class="p-head"><div>'+
     '<h2>'+esc(b)+'</h2>'+
     '<div class="p-sub">'+esc(meta.blurb)+'</div></div>'+
-    '<div class="p-total"><span class="lbl">Total</span>'+fmtMoney(total)+'</div></div>';
+    '<div class="p-total"><span class="lbl">'+(filtering?'Filtered total':'Total')+'</span>'+fmtMoney(total)+'</div></div>';
   html+=zoneLegend();
-  // add controls
-  if(editingId!=='new:'+b){
+  // add controls — hidden while filtering (adding into a filtered view is
+  // disorienting: the new card may not match and would vanish on save)
+  if(editingId!=='new:'+b && !filtering){
     html+='<div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">'+
       '<button class="add-proj" style="margin-bottom:0;" onclick="startAdd(\''+b+'\')">+ Add project</button>';
     if(scheme==='manual')html+='<button class="add-grp" onclick="addGroup(\''+b+'\')">+ Add group</button>';
     html+='</div>';
   }
-  // body — note the 'date' scheme never falls back to the generic empty state:
-  // an empty Soon is exactly when you want to SEE your free weekends.
-  if(!list.length && editingId!=='new:'+b && !(GROUPS[b]||[]).length && scheme!=='date'){
+  // body
+  if(filtering && !list.length){
+    html+=noHits(b);
+  }else if(!list.length && editingId!=='new:'+b && !(GROUPS[b]||[]).length && scheme!=='date'){
     html+=emptyState(b);
   }else if(scheme==='manual'){
     html+=renderGrouped(b);
@@ -543,6 +631,14 @@ function renderPanels(){
   var focusEl=document.getElementById('ef-name');
   if(focusEl)focusEl.focus();
 }
+// Nothing matched in THIS stage — point at the stages that did.
+function noHits(b){
+  var others=BUCKETS.filter(function(x){return x!==b&&vis(tasksIn(x)).length;});
+  var hint=others.length
+    ? 'Matches in: '+others.map(function(x){return '<strong>'+esc(x)+'</strong> ('+vis(tasksIn(x)).length+')';}).join(' \u00b7 ')
+    : 'No matches in any stage.';
+  return '<div class="no-hits">Nothing in <strong>'+esc(b)+'</strong> matches that.<br>'+hint+'</div>';
+}
 // Manual-group layout: named groups in order, then the permanent Ungrouped
 // section. Ungrouped is a normal section, not an error state — a stage with
 // no groups at all still renders perfectly as one unnamed list.
@@ -550,9 +646,9 @@ function renderGrouped(b){
   var html='';
   if(editingId==='new:'+b)html+='<div class="pcards" style="margin-bottom:1.35rem;">'+editorCard(null,b)+'</div>';
   groupsIn(b).forEach(function(g){html+=renderGroupSection(b,g);});
-  var un=tasksInGroup(b,null);
+  var un=vis(tasksInGroup(b,null));
   var hasGroups=(GROUPS[b]||[]).length>0;
-  if(un.length||!hasGroups)html+=renderGroupSection(b,null);
+  if(un.length||(!hasGroups&&!isFiltering()))html+=renderGroupSection(b,null);
   return html;
 }
 // ── Soon: rolling weekend list ──
@@ -562,8 +658,9 @@ function renderGrouped(b){
 function renderDated(b){
   var html='';
   if(editingId==='new:'+b)html+='<div class="pcards" style="margin-bottom:1.2rem;">'+editorCard(null,b)+'</div>';
+  var filtering=isFiltering();
   // Overdue
-  var od=overdueTasks(b);
+  var od=vis(overdueTasks(b));
   if(od.length){
     html+='<div class="wk wk-overdue"><div class="wk-head">'+
       '<span class="wk-when">Overdue</span>'+
@@ -574,31 +671,40 @@ function renderDated(b){
     html+='</div></div>';
   }
   // Unscheduled — the pile you drag from. Hidden when empty (see CSS), but kept
-  // in the DOM so it can reappear as a drop target mid-drag.
-  var un=tasksInWeek(b,null);
-  html+='<div class="wk wk-unsched'+(un.length?'':' empty')+'">'+
-    '<div class="wk-head" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
-      'ondrop="wkDrop(event,\''+esc(b)+'\',null)">'+
-      '<span class="wk-when">Unscheduled</span>'+
-      '<span class="wk-meta">'+un.length+(un.length===1?' item':' items')+'</span>'+
-      '<span class="wk-sub">'+fmtMoney(weekTotal(b,null))+'</span>'+
-    '</div>';
-  if(un.length){
-    html+='<div class="pcards">';
-    un.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+  // in the DOM so it can reappear as a drop target mid-drag. While filtering it
+  // only appears if it actually holds a match.
+  var un=vis(tasksInWeek(b,null));
+  if(un.length||!filtering){
+    html+='<div class="wk wk-unsched'+(un.length?'':' empty')+'">'+
+      '<div class="wk-head" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+        'ondrop="wkDrop(event,\''+esc(b)+'\',null)">'+
+        '<span class="wk-when">Unscheduled</span>'+
+        '<span class="wk-meta">'+un.length+(un.length===1?' item':' items')+'</span>'+
+        '<span class="wk-sub">'+fmtMoney(filtering?visTotal(tasksInWeek(b,null)):weekTotal(b,null))+'</span>'+
+      '</div>';
+    if(un.length){
+      html+='<div class="pcards">';
+      un.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+      html+='</div>';
+    }else{
+      html+='<div class="grp-empty" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+        'ondrop="wkDrop(event,\''+esc(b)+'\',null)">Nothing waiting \u2014 drag here to unschedule</div>';
+    }
     html+='</div>';
-  }else{
-    html+='<div class="grp-empty" ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
-      'ondrop="wkDrop(event,\''+esc(b)+'\',null)">Nothing waiting \u2014 drag here to unschedule</div>';
   }
-  html+='</div>';
   // Weekends
   soonWeekKeys(b).forEach(function(k){html+=renderWeek(b,k);});
-  html+='<button class="wk-more" onclick="showMoreWeeks()">Show more weekends</button>';
+  // free weekends and "show more" are about planning, not finding — while
+  // filtering they'd just be empty rows, so they're suppressed
+  if(!filtering)html+='<button class="wk-more" onclick="showMoreWeeks()">Show more weekends</button>';
   return html;
 }
 function renderWeek(b,weekKey){
-  var tasks=tasksInWeek(b,weekKey);
+  var allTasks=tasksInWeek(b,weekKey);
+  var tasks=vis(allTasks);
+  // While filtering, a weekend with no match is dropped — free rows are for
+  // planning, and an empty one tells you nothing about your search.
+  if(isFiltering()&&!tasks.length)return '';
   var heading=weekHeading(weekKey);
   var dateLbl=fmtWeekLabel(weekKey);
   var isNow=(weekKey===currentWeekKey());
@@ -617,8 +723,10 @@ function renderWeek(b,weekKey){
   var html='<div class="wk"><div class="wk-head" '+dnd+'>'+
     whenHtml+
     '<span class="wk-date">'+esc(dateLbl)+'</span>'+
-    '<span class="wk-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>'+
-    '<span class="wk-sub">'+fmtMoney(weekTotal(b,weekKey))+'</span>'+
+    '<span class="wk-meta">'+(isFiltering()
+      ? (tasks.length+' of '+allTasks.length+' items')
+      : (tasks.length+(tasks.length===1?' item':' items')))+'</span>'+
+    '<span class="wk-sub">'+fmtMoney(isFiltering()?visTotal(allTasks):weekTotal(b,weekKey))+'</span>'+
     '</div><div class="pcards">';
   tasks.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
   html+='</div></div>';
@@ -626,8 +734,11 @@ function renderWeek(b,weekKey){
 }
 function renderGroupSection(b,g){
   var gid=g?g.id:null;
-  var tasks=tasksInGroup(b,gid);
-  var sub=groupTotal(b,gid);
+  var allTasks=tasksInGroup(b,gid);
+  var tasks=vis(allTasks);
+  // While filtering, a group with no matches is noise — drop it entirely.
+  if(isFiltering()&&!tasks.length)return '';
+  var sub=isFiltering()?visTotal(allTasks):groupTotal(b,gid);
   var hasGroups=(GROUPS[b]||[]).length>0;
   var html='<div class="grp'+(g?'':' grp-ungrouped')+'" data-gid="'+(gid==null?'':gid)+'">';
   // header — only shown for real groups, or for Ungrouped when groups exist
@@ -639,15 +750,20 @@ function renderGroupSection(b,g){
       'ondragleave="grpDragLeave(event)" '+
       'ondrop="grpDrop(event,\''+esc(b)+'\','+(gid==null?'null':gid)+')">';
     if(g){
-      html+='<span class="grp-grip" title="Drag to reorder group" draggable="true" '+
+      // no dragging while filtered — reordering against a partial list would
+      // scramble the cards currently hidden
+      if(!isFiltering())html+='<span class="grp-grip" title="Drag to reorder group" draggable="true" '+
         'ondragstart="grpDragStart(event,'+gid+',\''+esc(b)+'\')" ondragend="grpDragEnd(event)">\u283f</span>';
       html+='<span class="grp-name" title="Click to rename" onclick="renameGroup(\''+esc(b)+'\','+gid+',this)">'+esc(nm)+'</span>';
     }else{
       html+='<span class="grp-name">'+esc(nm)+'</span>';
     }
-    html+='<span class="grp-meta">'+tasks.length+(tasks.length===1?' item':' items')+'</span>';
+    // "3 of 12 items" while filtering, so a partial subtotal can't be misread
+    html+='<span class="grp-meta">'+(isFiltering()
+      ? (tasks.length+' of '+allTasks.length+' items')
+      : (tasks.length+(tasks.length===1?' item':' items')))+'</span>';
     html+='<span class="grp-sub">'+fmtMoney(sub)+'</span>';
-    if(g){
+    if(g&&!isFiltering()){
       html+='<button class="grp-swatch" title="Group colour" onclick="togglePalette('+gid+')">'+
         '<span class="sw" style="background:'+groupHex(g)+'"></span></button>';
       html+='<button class="grp-del" title="Delete group (its projects move to Ungrouped)" onclick="delGroup(\''+esc(b)+'\','+gid+')">\u00d7</button>';
@@ -708,12 +824,16 @@ function taskCard(t,rank){
   var stageSel='<select class="stage-sel" title="Move to another stage" onchange="changeStage('+t.id+',this.value)">'+
     BUCKETS.map(function(b){return '<option value="'+esc(b)+'"'+(b===t.bucket?' selected':'')+'>'+esc(b)+'</option>';}).join('')+
     '</select>';
-  return '<div class="pcard draggable-card" data-id="'+t.id+'" draggable="true" '+
+  // Drag is OFF while filtering: reordering computes positions from the visible
+  // list, so dragging a filtered view would silently reshuffle hidden cards.
+  var canDrag=!isFiltering();
+  var dnd=canDrag?(' draggable="true" '+
       'ondragstart="taskDragStart(event,'+t.id+',\''+esc(t.bucket)+'\')" '+
       'ondragover="taskDragOver(event,'+t.id+')" '+
       'ondragleave="taskDragLeave(event,'+t.id+')" '+
-      'ondrop="taskDrop(event,'+t.id+')" ondragend="taskDragEnd(event)">'+
-    '<span class="drag-grip" title="Drag to reorder">\u283f</span>'+
+      'ondrop="taskDrop(event,'+t.id+')" ondragend="taskDragEnd(event)"'):'';
+  return '<div class="pcard'+(canDrag?' draggable-card':'')+'" data-id="'+t.id+'"'+dnd+'>'+
+    (canDrag?'<span class="drag-grip" title="Drag to reorder">\u283f</span>':'')+
     rankHtml+
     '<div class="pcard-main">'+
       '<div class="pcard-name">'+esc(t.name)+'</div>'+
@@ -1260,7 +1380,9 @@ async function doSignIn(){
 }
 async function doSignOut(){if(sbClient)await sbClient.auth.signOut();showLoginScreen();}
 async function initAppAfterAuth(){
-  showAppScreen();activeBucket='Soon';renderTabs();renderPanels();
+  showAppScreen();activeBucket='Soon';
+  initFilterBar();
+  renderTabs();renderPanels();
   await loadFromCloud();syncOfflineBuffer();
 }
 async function initAuth(){
