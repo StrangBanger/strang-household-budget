@@ -185,7 +185,7 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
 .dep-readout .row.naive .v { color: var(--text-muted); font-weight: 500; }
 .dep-gap { font-size: 10px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
 
-.hh-savings-col { background: rgba(204,119,34,0.055); }
+
 .subtotal-row td {
   background: var(--linen); border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
@@ -647,6 +647,18 @@ table.monthly-table tbody tr.cliff-row td.corp-balance-col {
   background: rgba(204, 119, 34, 0.22);
 }
 
+/* Household savings — Walnut Ink, the third brand colour. Distinct from
+   corp (ochre) and tax (maroon) so the three pools read apart at a glance. */
+table.monthly-table th.hh-savings-col {
+  background: #5C4A2E;
+  color: var(--linen);
+}
+table.monthly-table td.hh-savings-col {
+  background: rgba(92, 74, 46, 0.07);
+  color: var(--walnut);
+  border-left: 1px solid rgba(92, 74, 46, 0.3);
+}
+
 /* Tax columns — muted maroon tint distinct from corp (teal) and HH (ochre) columns */
 table.monthly-table th.tax-col {
   background: #7A2E2E;
@@ -880,6 +892,18 @@ const DEFAULTS = {
   // corp seed and a household buffer are two different things and the model
   // needs both.
   hhSavingsStart: 0,
+
+  // Hard reserve. Savings fund the household down to this line and no further —
+  // past it, payroll escalates to protect it. The "don't take the family down
+  // with the business" line, made structural rather than advisory.
+  savingsFloor: 0,
+
+  // Survival-mode salary. Deliberately low: a dollar routed through payroll to
+  // buy groceries costs the corp ~$1.34, while a dollar of savings costs $1 —
+  // it's already been taxed. At ~$20k the basic personal amount shields it and
+  // the effective cost of extraction is ~1.00, so it's near-free to take while
+  // still generating RRSP room and CPP credits.
+  baseSalary: 0,
 
   // ---- Salary policy ----
   // Salary is a CONTROL problem, not a threshold problem. Re-deciding it every
@@ -1140,14 +1164,17 @@ const Engine = (function () {
   // maxSustainableGross: the highest candidate salary whose full corporate cost,
   // plus opex, is covered `coverage`x over by the annualised run rate.
   // Deliberately a FLOW test — seed capital cannot buy you a raise.
+  // Returns NULL when the run rate can't even carry the floor — the caller reads
+  // that as "survival mode". The previous version returned floorGross in that
+  // case, which quietly asserted you could afford a salary you couldn't.
   function maxSustainableGross(runRateAnnual, annualOpex, floorGross, ceilingGross, step, coverage) {
     const cov = coverage > 0 ? coverage : 1;
     const budget = (runRateAnnual / cov) - annualOpex; // what salary+erCPP may cost
-    if (budget <= 0) return floorGross;
+    if (budget <= 0) return null;
     const cands = salaryCandidates(floorGross, ceilingGross, step);
-    let best = floorGross;
+    let best = null;
     for (const g of cands) {
-      if (salaryChain(g).totalCorpCost <= budget) best = Math.max(best, g);
+      if (salaryChain(g).totalCorpCost <= budget) best = (best === null) ? g : Math.max(best, g);
     }
     return best;
   }
@@ -1156,7 +1183,8 @@ const Engine = (function () {
     const {
       deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
-      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart
+      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart,
+      savingsFloor, baseSalary
     } = params;
 
     const reviewEvery = Math.max(1, Number(salaryReviewMonths) || 12);
@@ -1178,8 +1206,12 @@ const Engine = (function () {
     const revHistory = [];       // trailing gross commission, for the run rate
     let hhSavings = Number(hhSavingsStart) || 0; // personal account; absorbs every surplus/deficit
     let hhRuinMonth = null;      // first month the household account goes negative
+    let hhBreachMonth = null;    // first month it drops through its own floor
     let hhSavingsLow = hhSavings;
-    let heldTarget = floorGross; // month 1 opens at floor — no trailing revenue yet
+    const savFloor = Number(savingsFloor) || 0;
+    const baseSal  = Math.max(0, Number(baseSalary) || 0);
+    let growthMode = false;      // month 1: no trailing revenue, so survival by definition
+    let heldTarget = baseSal;
     let corpBalance = corpFunding;
     let lossCarryforward = 0;
     let fiscalYearTaxableIncome = 0; // accumulates across the 12 months of the current fiscal year
@@ -1199,46 +1231,70 @@ const Engine = (function () {
       const availAfterOpex = corpBalance + grossCommission - opex;
 
       // ---- SALARY REVIEW ----
-      // Salary is re-set only on review months, then HELD. This is what kills the
-      // chatter: a single month of noise can no longer flip the salary.
+      // Mode is chosen at the review and HELD for the interval. Growth mode only
+      // when the business genuinely carries the real salary AND there's a cushion.
       const isReviewMonth = ((monthNum - 1) % reviewEvery) === 0;
       let reviewed = false;
       if (isReviewMonth && i > 0) {
         reviewed = true;
-        // Trailing run rate: sum the window, annualise it. A FLOW — unlike the old
+        // Trailing run rate: sum the window, annualise it. A FLOW — unlike a
         // balance test, seed capital cannot masquerade as earning power.
         const win = Math.min(rrWindow, revHistory.length);
         const trailing = revHistory.slice(-win).reduce((a, b) => a + b, 0);
         const runRateAnnual = win > 0 ? trailing * (12 / win) : 0;
         const annualOpexNow = annualOpexTotal(expenseState, Math.min(Math.floor(i / 12), 4));
-
-        heldTarget = maxSustainableGross(
+        const sustainable = maxSustainableGross(
           runRateAnnual, annualOpexNow, floorGross, ceilingGross, step, coverage);
 
-        // Second gate: earning it isn't enough, you also want a cushion behind you.
-        // This is what keeps surplusTriggerMonths meaningful.
-        if (corpBalance < surplusThreshold) heldTarget = floorGross;
+        // Two gates to earn growth mode: the revenue carries it, AND there's a
+        // cushion behind you. Either missing -> survival.
+        if (sustainable !== null && corpBalance >= surplusThreshold) {
+          growthMode = true;
+          heldTarget = sustainable;
+        } else {
+          growthMode = false;
+          heldTarget = baseSal;
+        }
       }
 
       let targetGross;
       let regime;
       if (availAfterOpex <= minBuffer) {
-        // EMERGENCY CUT — immediate, any month, and it STICKS until the next
-        // review. Without the stickiness the balance recovers next month and the
-        // chatter comes straight back.
-        heldTarget = floorGross;
-        targetGross = Math.min(floorGross, hhNeededGross);
+        // EMERGENCY — corp under buffer. Drop to survival; sticks to next review.
+        growthMode = false;
+        heldTarget = baseSal;
+        targetGross = Math.min(baseSal, hhNeededGross);
         regime = 1;
-      } else if (heldTarget <= floorGross && hhNeededGross < floorGross && corpBalance < surplusThreshold) {
-        // Household needs less than the floor and we're not flush — don't overpay
-        // salary just because we can; leave the cash in the corp.
-        targetGross = hhNeededGross;
-        regime = 2;
       } else {
-        targetGross = heldTarget;
-        regime = (targetGross >= ceilingGross) ? 5
-               : (targetGross > floorGross)    ? 4
-               : 3;
+        // Savings is the FIRST line, payroll the backstop — deliberately inverted
+        // from a salary-first model: $1 of savings buys $1 of groceries, whereas
+        // $1 of groceries via payroll costs the corp ~$1.34. Don't route money
+        // through a taxed pipe you don't have to.
+        //
+        // The floor defence applies in BOTH modes. Growth mode is not immunity:
+        // at an $85k salary you net ~$5,577/mo against a ~$6,473/mo need, so the
+        // household still bleeds and savings still needs defending.
+        const planned    = growthMode ? heldTarget : baseSal;
+        const drawAvail  = Math.max(0, hhSavings - savFloor);
+        const neededNetMo = Math.max(0, hhBurnMonthly - adam - ashleyMonthly);
+        const plannedNetMo = netAnnual(planned) / 12;
+        const gap = neededNetMo - plannedNetMo;
+
+        if (gap > drawAvail) {
+          // Savings would breach its floor — escalate payroll to defend it, capped
+          // at the salary that exactly covers the household. Paying beyond that
+          // would just be pushing cash through a taxed pipe for no reason.
+          // If the corp can't fund the escalation, drawFraction throttles it and
+          // the floor breaches anyway — which is the honest outcome, not a bug:
+          // a reserve can only be defended if there is money somewhere.
+          const requiredNetMo = neededNetMo - drawAvail;
+          const requiredGross = grossForNet(requiredNetMo * 12);
+          targetGross = Math.min(Math.max(planned, requiredGross), Math.max(hhNeededGross, planned));
+          regime = growthMode ? ((targetGross >= ceilingGross) ? 5 : 4) : 3;
+        } else {
+          targetGross = planned;
+          regime = growthMode ? ((targetGross >= ceilingGross) ? 5 : 4) : 2;
+        }
       }
 
       const neededGrossMo = targetGross / 12;
@@ -1297,6 +1353,10 @@ const Engine = (function () {
       hhSavings += hhSurplus;
       if (hhSavings < hhSavingsLow) hhSavingsLow = hhSavings;
       if (hhSavings < 0 && hhRuinMonth === null) hhRuinMonth = monthNum;
+      // Deliberately NOT clamped. If both pools are gone the hole is the finding —
+      // you want to see how deep it goes and whether it ever turns around.
+      const savingsBreached = hhSavings < savFloor - 0.005;
+      if (savingsBreached && hhBreachMonth === null) hhBreachMonth = monthNum;
 
       // Record AFTER the decision: the run rate must be strictly trailing, or a
       // review would be reading revenue it hasn't banked yet.
@@ -1308,13 +1368,13 @@ const Engine = (function () {
         netCashFlow, taxableIncome: taxableIncomeThisMonth, lossCarryforward, corpTaxOwed,
         corpBalance, regime,
         annualizedGross, yourNetMonthly, adam, ashleyMonthly,
-        totalHHNet, hhBurnMonthly, hhSurplus, hhSavings,
+        totalHHNet, hhBurnMonthly, hhSurplus, hhSavings, savingsBreached, growthMode,
       });
     }
 
     return {
       months, comm, surplusThreshold, floorChain, ceilingChain: salaryChain(ceilingGross),
-      hhRuinMonth, hhSavingsLow, hhSavingsEnd: hhSavings,
+      hhRuinMonth, hhBreachMonth, hhSavingsLow, hhSavingsEnd: hhSavings,
     };
   }
 
@@ -1333,6 +1393,8 @@ const State = {
   // Runway tab sliders
   deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
   hhSavingsStart: DEFAULTS.hhSavingsStart,
+  savingsFloor: DEFAULTS.savingsFloor,
+  baseSalary: DEFAULTS.baseSalary,
   salaryReviewMonths: DEFAULTS.salaryReviewMonths,
   runRateWindowMonths: DEFAULTS.runRateWindowMonths,
   salaryStep: DEFAULTS.salaryStep,
@@ -1402,7 +1464,7 @@ function runSimulation(scenarioKey) {
   const key = JSON.stringify({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
-    hhSavingsStart: State.hhSavingsStart,
+    hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     corpTaxRate: State.corpTaxRate,
     expense: State.expense, sales: State.sales, scenarioKey,
@@ -1413,7 +1475,7 @@ function runSimulation(scenarioKey) {
   const result = Engine.simulate({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
-    hhSavingsStart: State.hhSavingsStart,
+    hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
     adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
@@ -1448,9 +1510,9 @@ function fmtNum1(n) { return n.toFixed(1); }
 function regimeLabel(r) {
   const labels = {
     1: '1 — Constrained',
-    2: '2 — Below Floor',
-    3: '3 — At Floor',
-    4: '4 — Between Floor & Ceiling',
+    2: '2 — Base salary (savings funding)',
+    3: '3 — Escalated (savings at floor)',
+    4: '4 — Earned salary',
     5: '5 — At Ceiling',
   };
   return labels[r] || String(r);
@@ -1503,7 +1565,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 5;
+var PAYLOAD_VERSION  = 6;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1536,6 +1598,8 @@ function buildSavePayload() {
       adamMonthly: State.adamMonthly,
       adamMonthsActive: State.adamMonthsActive,
       hhSavingsStart: State.hhSavingsStart,
+      savingsFloor: State.savingsFloor,
+      baseSalary: State.baseSalary,
       salaryReviewMonths: State.salaryReviewMonths,
       runRateWindowMonths: State.runRateWindowMonths,
       salaryStep: State.salaryStep,
@@ -1624,6 +1688,20 @@ function migrateData(data) {
     }
     data.version = 5;
   }
+
+  // v5 -> v6: baseSalary + savingsFloor, and salary policy inverts — savings is
+  // now the first line and payroll the backstop. THIS ONE MOVES YOUR NUMBERS,
+  // like the v4 controller change did, and for the same reason: routing household
+  // spending through payroll costs ~1.34x what drawing savings costs. Both new
+  // params default to 0, which reproduces sensible behaviour until you set them.
+  if (data.version < 6) {
+    if (data.assumptions) {
+      ['savingsFloor','baseSalary'].forEach(function (k) {
+        if (data.assumptions[k] === undefined) data.assumptions[k] = DEFAULTS[k];
+      });
+    }
+    data.version = 6;
+  }
   return data;
 }
 
@@ -1646,7 +1724,7 @@ function applyLoadedData(data, sourceLbl) {
    'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
    'adamMonthly','adamMonthsActive',
    'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
-   'hhSavingsStart'].forEach(function (k) {
+   'hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) {
     if (a[k] !== undefined) State[k] = a[k];
   });
 
@@ -1792,7 +1870,7 @@ function resetToDefaults() {
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
    'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
-   'coverageRatio','hhSavingsStart'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+   'coverageRatio','hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) { State[k] = DEFAULTS[k]; });
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
   State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
@@ -1932,11 +2010,14 @@ function renderRunwayTab() {
 
         <div class="input-section">
           <div class="input-section-title">Salary policy</div>
+          ${numFieldHTML('baseSalary', 'Base salary (survival mode)', State.baseSalary, '$', '', 1000)}
           ${numFieldHTML('salaryReviewMonths', 'Review salary every', State.salaryReviewMonths, '', ' months', 1)}
           ${numFieldHTML('runRateWindowMonths', 'Run-rate window', State.runRateWindowMonths, '', ' months', 1)}
           ${numFieldHTML('salaryStep', 'Round salary down to', State.salaryStep, '$', '', 1000)}
           ${numFieldHTML('coverageRatio', 'Coverage required to raise', State.coverageRatio, '', '\u00d7', 0.05)}
           <div class="adam-gross-note" style="margin-top:.5rem">
+            Savings fund the household first — a dollar of savings costs $1, a dollar via payroll costs
+            the corp ~$1.34. Payroll escalates only to defend the savings floor.
             Salary is set at review months and held. Raising needs trailing revenue to cover
             <strong>${State.coverageRatio}&times;</strong> the cost of the raise <em>and</em> a balance above the
             surplus threshold. A drop below the minimum buffer cuts to floor immediately, until the next review.
@@ -1956,6 +2037,7 @@ function renderRunwayTab() {
           ${numFieldHTML('hhBurnMonthly', 'Monthly household burn', State.hhBurnMonthly, '$', '/mo', 250)}
           ${numFieldHTML('ashleyMonthly', "Ashley's net income", State.ashleyMonthly, '$', '/mo', 100)}
           ${numFieldHTML('hhSavingsStart', 'Personal savings (outside corp)', State.hhSavingsStart, '$', '', 5000)}
+          ${numFieldHTML('savingsFloor', 'Savings floor (hard reserve)', State.savingsFloor, '$', '', 2500)}
         </div>
 
         <div class="input-section">
@@ -1980,9 +2062,9 @@ function renderRunwayTab() {
           <div class="eyebrow">Corporate bank balance &amp; net cash flow — 60 months</div>
           <div class="chart-legend">
             <span><span class="legend-dot" style="background:#b3392e"></span>1 — Constrained</span>
-            <span><span class="legend-dot" style="background:#8a9eb5"></span>2 — Below Floor</span>
-            <span><span class="legend-dot" style="background:#CC7722"></span>3 — At Floor</span>
-            <span><span class="legend-dot" style="background:#1A3D3A"></span>4 — Between</span>
+            <span><span class="legend-dot" style="background:#8a9eb5"></span>2 — Base salary</span>
+            <span><span class="legend-dot" style="background:#CC7722"></span>3 — Escalated</span>
+            <span><span class="legend-dot" style="background:#1A3D3A"></span>4 — Earned</span>
             <span><span class="legend-dot" style="background:#1e7a52"></span>5 — At Ceiling</span>
             <span><span class="legend-dot" style="background:#CC7722;border-radius:0;height:3px;width:14px;display:inline-block;vertical-align:middle"></span>Corp bank balance (right axis)</span>
           </div>
@@ -2093,7 +2175,7 @@ function attachNumFieldHandlers(rerenderFn) {
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
                  'ashleyMonthly','hhBurnMonthly',
                  'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
-                 'hhSavingsStart'];
+                 'hhSavingsStart','savingsFloor','baseSalary'];
   keys.forEach(key => {
     const el = document.getElementById('input-' + key);
     if (!el) return;
@@ -2248,9 +2330,9 @@ function renderRunwayChart(result) {
 
   const REGIME_COLOURS = {
     1: '#b3392e',  // Constrained — red
-    2: '#8a9eb5',  // Below Floor — muted blue-grey (conserving, calm)
-    3: '#CC7722',  // At Floor — ochre (recovering, working)
-    4: '#1A3D3A',  // Between Floor & Ceiling — deep teal (earning a raise)
+    2: '#8a9eb5',  // Base salary — muted blue-grey (conserving, calm)
+    3: '#CC7722',  // Escalated — ochre (savings at its floor, payroll defending it)
+    4: '#1A3D3A',  // Earned salary — deep teal
     5: '#1e7a52',  // At Ceiling — green (thriving)
   };
 
