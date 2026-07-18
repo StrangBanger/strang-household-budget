@@ -194,6 +194,30 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
 .subtotal-row td.lbl { text-align: left; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; color: var(--ochre); }
 .subtotal-row td.na { color: var(--border-strong); font-weight: 400; }
 
+/* ============ FIELD HELP ============ */
+.num-field-label-wrap { display: flex; align-items: center; gap: 5px; }
+.help-btn {
+  flex: none; width: 13px; height: 13px; line-height: 11px;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-muted); border-radius: 50%;
+  font-size: 9px; font-weight: 700; font-family: var(--font-sans);
+  cursor: pointer; padding: 0; text-align: center;
+}
+.help-btn:hover { border-color: var(--ochre); color: var(--ochre); }
+.help-btn.open { background: var(--ochre); border-color: var(--ochre); color: var(--linen); }
+.field-help {
+  border-left: 2px solid var(--ochre);
+  background: rgba(204,119,34,0.06);
+  padding: 7px 9px; margin: 2px 0 9px;
+  font-size: 11px; line-height: 1.5; color: var(--walnut);
+}
+.field-help .affects {
+  display: block; margin-top: 5px; padding-top: 5px;
+  border-top: 1px solid rgba(92,74,46,0.18);
+  font-size: 10px; color: var(--text-muted);
+}
+.field-help .affects strong { color: var(--teal); font-weight: 600; }
+
 /* ============ HEADER ============ */
 .page-header {
   background: var(--teal);
@@ -402,7 +426,7 @@ p.section-sub {
 /* ============ RUNWAY TWO-COLUMN LAYOUT ============ */
 .runway-two-col {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 340px 1fr;
   gap: 2rem;
   align-items: start;
 }
@@ -2002,7 +2026,11 @@ function renderRunwayTab() {
         <div class="eyebrow">Model assumptions</div>
 
         <div class="input-section">
-          <div class="input-section-title">Business</div>
+          <div class="input-section-title" style="display:flex;align-items:center;gap:6px">
+            <span>Business</span>
+            <button class="help-btn ${openHelpKey === 'deposits' ? 'open' : ''}" data-help="deposits" title="What is this?">?</button>
+          </div>
+          ${helpHTML('deposits')}
           ${depositBlockHTML()}
           ${numFieldHTML('floorGross', 'Annual salary floor', State.floorGross, '$', '', 1000)}
           ${numFieldHTML('ceilingGross', 'Annual salary ceiling', State.ceilingGross, '$', '', 1000)}
@@ -2077,6 +2105,7 @@ function renderRunwayTab() {
 
   attachNumFieldHandlers(renderRunwayTab);
   attachDepositHandlers(renderRunwayTab);
+  attachHelpHandlers();
   renderDepositReadout();
   attachScenarioButtonHandlers('runway-scenario-bar', renderRunwayTab);
 
@@ -2086,11 +2115,123 @@ function renderRunwayTab() {
   renderRunwayChart(result);
 }
 
+
+// ============================================================
+// FIELD_META — what each input is, and where its effect surfaces.
+// Doubles as the model's documentation: there is nowhere else that records
+// which output a given assumption actually drives.
+// ============================================================
+const FIELD_META = {
+  deposits: {
+    what: 'Deposit size as a 3-point distribution rather than one average. Commission is graded (2.5/2.0/1.5%), so it is concave in deposit size — averaging first overstates it slightly. The bigger point: stating low/mid/high forces the implied mean into the open.',
+    affects: 'Monthly Detail → <strong>Gross Commission</strong> · "Commission per sale" stat',
+  },
+  floorGross: {
+    what: 'The salary you are aiming at once the business can carry it. Not a guaranteed minimum — until trailing revenue sustains it, you are paid the base salary instead. Worth checking against what the household actually needs.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 4 · "Months above floor" stat',
+  },
+  ceilingGross: {
+    what: 'The most the corp will ever pay you, however well things go. The controller stops here.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 5',
+  },
+  baseSalary: {
+    what: 'Survival-mode salary, paid until the business can sustain the floor. Deliberately low: $1 of household spending via payroll costs the corp ~$1.34, while $1 from savings costs $1. Around $20k the basic personal amount shields it, so it is near-free to extract while still generating RRSP room and CPP credits.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 2',
+  },
+  salaryReviewMonths: {
+    what: 'How often salary is re-set. Between reviews it is HELD — you do not re-run payroll every month, and pretending otherwise made the salary oscillate. At 12 the reviews land on months 1, 13, 25, 37, 49.',
+    affects: 'Monthly Detail → <strong>⟳</strong> marker, <strong>Target Gross</strong>',
+  },
+  runRateWindowMonths: {
+    what: 'How many trailing months of commission are used to judge what salary is sustainable, annualised to a yearly rate. A flow test — unlike a balance test, seed capital cannot masquerade as earning power.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong> at review months',
+  },
+  salaryStep: {
+    what: 'Rounds the sustainable salary DOWN to a round figure, because a real T4 is a round number. Mildly conservative as a side effect (about half a step on average) — but that is an accounting artifact, not risk management. Use coverage for that.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>',
+  },
+  coverageRatio: {
+    what: 'Trailing revenue must cover this multiple of what a raise costs before you take it. At 1.0 you raise to exactly break-even and the corp never grows. Higher keeps more in the corp. This is the real conservatism dial.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> · chart bar colours',
+  },
+  hhBurnMonthly: {
+    what: 'Everything the household spends in a month. The number every other household figure is measured against.',
+    affects: 'Monthly Detail → <strong>HH Burn</strong>, <strong>HH Surplus/Deficit</strong>, <strong>Savings Balance</strong>',
+  },
+  ashleyMonthly: {
+    what: "Ashley's take-home. Reduces what your salary and savings have to cover.",
+    affects: 'Monthly Detail → <strong>Ashley</strong>, <strong>HH Net Total</strong>',
+  },
+  hhSavingsStart: {
+    what: 'Your personal account opening balance — OUTSIDE the corp. Money in the CCPC is not spendable money: the only pipe out is payroll, and payroll is throttled exactly when the corp is low. This pool and the corp seed are different things.',
+    affects: 'Monthly Detail → <strong>Savings Balance</strong> · "Personal savings run out" and "Savings low point" stats',
+  },
+  savingsFloor: {
+    what: 'Hard reserve. Savings fund the household down to this line; past it payroll escalates to defend it. It can still break if the corp has no money either — a reserve is only defensible if there is money somewhere.',
+    affects: 'Monthly Detail → <strong>Savings Balance</strong>, <strong>Regime</strong> 3',
+  },
+  adamMonthly: {
+    what: "Adam's monthly contribution. Flows as personal household income, never through the corp's taxable income.",
+    affects: 'Monthly Detail → <strong>Adam</strong>, <strong>HH Net Total</strong>',
+  },
+  adamMonthsActive: {
+    what: 'How long the contribution runs. Watch what happens the month after it stops — the support tends to end before the business can carry you.',
+    affects: 'Monthly Detail → <strong>Adam</strong> · the ⚠ row at month 13',
+  },
+  corpFunding: {
+    what: 'Cash the corp opens with. Splitting a fixed pot between here and personal savings barely changes your combined wealth — the money is fungible — but it swings the risk of running dry enormously. This is a risk decision, not a return one.',
+    affects: 'Monthly Detail → <strong>Corp Balance</strong> · "Lowest corp balance" stat',
+  },
+  minBuffer: {
+    what: 'Corp balance floor. Drop below it and salary is cut to base immediately, any month, and stays cut until the next review. That stickiness is what stops the salary oscillating.',
+    affects: 'Monthly Detail → <strong>Regime</strong> 1 rows · "Lowest corp balance" stat',
+  },
+  surplusTriggerMonths: {
+    what: 'Months of runway the corp must hold before a raise is allowed — the second gate alongside coverage. Earning it is not enough; you also want a cushion behind you.',
+    affects: '"Surplus threshold" stat · Monthly Detail → <strong>Regime</strong> 4/5',
+  },
+  corpTaxRate: {
+    what: 'Small business deduction rate, applied to corporate profit at year-end. Losses carry forward and shelter later profit.',
+    affects: 'Monthly Detail → <strong>Corp Tax Owed</strong>, <strong>Loss Carryforward</strong> · 🧾 year-end rows',
+  },
+};
+
+// Which field's help is open. UI-only — deliberately not persisted; it's a
+// display preference, not an assumption, and not worth a payload migration.
+let openHelpKey = null;
+
+function helpHTML(key) {
+  const meta = FIELD_META[key];
+  if (!meta) return '';
+  return `<div class="field-help" data-help="${key}" ${openHelpKey === key ? '' : 'style="display:none"'}>
+    ${meta.what}
+    <span class="affects">Shows up in: ${meta.affects}</span>
+  </div>`;
+}
+
+function attachHelpHandlers() {
+  document.querySelectorAll('.help-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.help;
+      openHelpKey = (openHelpKey === key) ? null : key;   // one at a time
+      document.querySelectorAll('.field-help').forEach(el => {
+        el.style.display = (el.dataset.help === openHelpKey) ? '' : 'none';
+      });
+      document.querySelectorAll('.help-btn').forEach(b => {
+        b.classList.toggle('open', b.dataset.help === openHelpKey);
+      });
+    });
+  });
+}
+
 function numFieldHTML(key, label, value, prefix, suffix, step) {
   const displayVal = key === 'corpTaxRate' ? value.toFixed(1) : value;
   return `
     <div class="num-field-row">
-      <label class="num-field-label" for="input-${key}">${label}</label>
+      <div class="num-field-label-wrap">
+        <label class="num-field-label" for="input-${key}">${label}</label>
+        ${FIELD_META[key] ? `<button class="help-btn ${openHelpKey === key ? 'open' : ''}" data-help="${key}" title="What is this?">?</button>` : ''}
+      </div>
       <div class="num-field-input-wrap">
         ${prefix ? `<span class="num-field-affix">${prefix}</span>` : ''}
         <input class="num-field-input" type="number" id="input-${key}"
@@ -2098,6 +2239,7 @@ function numFieldHTML(key, label, value, prefix, suffix, step) {
         ${suffix ? `<span class="num-field-affix">${suffix}</span>` : ''}
       </div>
     </div>
+    ${helpHTML(key)}
   `;
 }
 
