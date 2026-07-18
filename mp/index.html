@@ -2224,6 +2224,57 @@ function attachHelpHandlers() {
   });
 }
 
+
+// ============================================================
+// NUMERIC INPUT ERGONOMICS
+// Three separate problems, all felt as "the boxes are fiddly":
+//  1. Clicking a field put the caret mid-number, so typing APPENDED to the old
+//     value ("85000" + "100000" -> "85100000000") instead of replacing it.
+//  2. Enter didn't visibly commit.
+//  3. Panels that re-render on change (the Runway tab rebuilds its whole
+//     innerHTML) destroyed the focused element, so focus vanished mid-edit —
+//     which made arrow-key nudging unusable.
+// ============================================================
+
+function enhanceNumericInput(el) {
+  // Select the whole value on focus so typing replaces it.
+  el.addEventListener('focus', () => el.select());
+  // A click would otherwise collapse that selection to a caret. Suppressing
+  // mouseup's default keeps the select() from focus intact — but only when the
+  // click IS the thing giving it focus, or drag-to-select inside the field breaks.
+  el.addEventListener('mousedown', () => { el._hadFocus = (document.activeElement === el); });
+  el.addEventListener('mouseup', e => { if (!el._hadFocus) e.preventDefault(); });
+  // Enter commits. Blur fires `change`, which is where the value is read.
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+  });
+}
+
+// Identify a field well enough to find it again after its DOM node is replaced.
+function focusSignature(el) {
+  if (!el || el.tagName !== 'INPUT') return null;
+  if (el.id) return '#' + el.id.replace(/([^\w-])/g, '\\$1');
+  if (el.classList.contains('dep-in')) {
+    return `.dep-in[data-dep="${el.dataset.dep}"][data-f="${el.dataset.f}"]`;
+  }
+  return null;
+}
+
+// Run a re-render without stealing focus from whatever the person is editing.
+function withFocusRestored(fn) {
+  const sig = focusSignature(document.activeElement);
+  const start = document.activeElement && document.activeElement.selectionStart;
+  fn();
+  if (!sig) return;
+  const next = document.querySelector(sig);
+  if (!next) return;
+  next.focus();
+  // Arrow-key nudging fires `change` while still focused; re-select so the next
+  // keystroke still replaces rather than appends.
+  if (start === null || start === undefined) next.select();
+  else next.select();
+}
+
 function numFieldHTML(key, label, value, prefix, suffix, step) {
   const displayVal = key === 'corpTaxRate' ? value.toFixed(1) : value;
   return `
@@ -2301,13 +2352,14 @@ function renderDepositReadout() {
 
 function attachDepositHandlers(rerenderFn) {
   document.querySelectorAll('.dep-in').forEach(inp => {
+    enhanceNumericInput(inp);
     inp.addEventListener('change', () => {
       const val = Math.max(0, Number(inp.value) || 0);
       inp.value = val;
       State.deposits[inp.dataset.dep][inp.dataset.f] = val;
       invalidateCache();
       scheduleCloudSave();
-      rerenderFn();
+      withFocusRestored(rerenderFn);
     });
   });
 }
@@ -2321,13 +2373,14 @@ function attachNumFieldHandlers(rerenderFn) {
   keys.forEach(key => {
     const el = document.getElementById('input-' + key);
     if (!el) return;
+    enhanceNumericInput(el);
     el.addEventListener('change', () => {
       let val = Number(el.value);
       if (key === 'corpTaxRate') val = val / 100; // stored as decimal, displayed as %
       State[key] = val;
       invalidateCache();
       scheduleCloudSave();
-      rerenderFn();
+      withFocusRestored(rerenderFn);
     });
   });
 }
@@ -2693,6 +2746,7 @@ function expenseChanged(structural) {
 function attachExpenseInputHandlers() {
   // ---- numeric value edits ----
   document.querySelectorAll('.expense-input').forEach(input => {
+    enhanceNumericInput(input);
     input.addEventListener('change', () => {
       const kind = input.dataset.kind;
       const item = findItem(kind, input.dataset.id);
@@ -2713,6 +2767,8 @@ function attachExpenseInputHandlers() {
 
   // ---- label / note edits ----
   document.querySelectorAll('.txt-input').forEach(input => {
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
     input.addEventListener('change', () => {
       const item = findItem(input.dataset.kind, input.dataset.id);
       if (!item) return;
@@ -3306,6 +3362,7 @@ function renderSalesYearGrid() {
   `;
 
   document.querySelectorAll('.sales-month-input').forEach(input => {
+    enhanceNumericInput(input);
     input.addEventListener('change', () => {
       const idx = Number(input.dataset.monthIdx);
       const val = Math.max(0, Number(input.value) || 0);
