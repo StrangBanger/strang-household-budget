@@ -1,0 +1,3578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Advice Only — Financial Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --teal: #1A3D3A;
+  --teal-light: #2a5450;
+  --ochre: #CC7722;
+  --ochre-light: #e08c3a;
+  --walnut: #5C4A2E;
+  --linen: #F7F3ED;
+  --linen-card: #FFFFFF;
+  --border: #ddd2bd;
+  --border-strong: #c7b89c;
+  --success: #1e7a52;
+  --success-bg: #e3efe8;
+  --danger: #b3392e;
+  --danger-bg: #f5e6e2;
+  --warning: #a8650f;
+  --warning-bg: #faf0de;
+  --text-muted: #8a7d68;
+  --font-serif: 'Lora', Georgia, serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 10px;
+  --radius-lg: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--linen);
+  color: var(--teal);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============ LOGIN SCREEN ============ */
+#login-screen {
+  position: fixed; inset: 0;
+  background: var(--teal);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1.5rem;
+}
+#login-screen.hidden { display: none; }
+.login-card {
+  background: var(--linen-card);
+  border: 1px solid var(--border-strong);
+  padding: 2.25rem 2rem;
+  width: 340px; max-width: 100%;
+}
+.login-wordmark {
+  font-family: var(--font-serif);
+  font-size: 22px; font-weight: 500; color: var(--teal);
+  margin-bottom: 0.25rem;
+}
+.login-sub {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 1.75rem;
+}
+.login-card .field { margin-bottom: 0.9rem; }
+.login-card label {
+  font-size: 10px; font-weight: 600; color: var(--ochre);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  display: block; margin-bottom: 5px;
+}
+.login-card input {
+  width: 100%; padding: 8px 10px; font-size: 13px;
+  font-family: var(--font-sans);
+  border: 1.5px solid var(--border-strong);
+  background: var(--linen); color: var(--teal);
+}
+.login-card input:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.login-card button {
+  width: 100%; padding: 10px; font-size: 13px; font-weight: 500;
+  font-family: var(--font-sans);
+  background: var(--teal); color: var(--linen);
+  border: none; cursor: pointer; margin-top: 0.6rem;
+}
+.login-card button:hover { background: var(--teal-light); }
+.login-card button:disabled { opacity: 0.5; cursor: default; }
+.login-err { font-size: 12px; color: var(--danger); margin-top: 0.7rem; min-height: 15px; line-height: 1.4; }
+
+#app-shell.hidden { display: none; }
+
+/* ============ HEADER ACTIONS ============ */
+.header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hdr-btn {
+  font-family: var(--font-sans); font-size: 11.5px; font-weight: 500;
+  background: transparent; color: var(--linen);
+  border: 1px solid rgba(247,243,237,0.35);
+  padding: 5px 10px; cursor: pointer;
+}
+.hdr-btn:hover { background: rgba(247,243,237,0.1); border-color: var(--linen); }
+.hdr-btn.danger:hover { background: rgba(179,57,46,0.25); border-color: var(--danger); }
+.saved-badge {
+  font-size: 11px; font-weight: 500; color: var(--ochre-light);
+  min-width: 78px; text-align: right;
+}
+.saved-badge.err { color: #e5a09a; }
+.last-saved-lbl {
+  font-size: 11px; color: rgba(247,243,237,0.6);
+  padding: 0 2.5rem 0.9rem;
+  max-width: 1280px; margin: 0 auto;
+}
+
+/* ============ EDITABLE EXPENSE ROWS ============ */
+.drag-handle {
+  cursor: grab; color: var(--border-strong);
+  padding: 0 6px 0 2px; display: inline-flex; align-items: center;
+  vertical-align: middle; flex: none;
+}
+.drag-handle:active { cursor: grabbing; }
+tr.dragging { opacity: 0.4; }
+tr.drop-above td { box-shadow: inset 0 2px 0 var(--ochre); }
+tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
+
+.name-cell { display: flex; align-items: center; gap: 2px; }
+.txt-input {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--teal);
+  background: transparent; border: 1px solid transparent;
+  padding: 3px 5px; width: 100%; min-width: 0;
+}
+.txt-input:hover { border-color: var(--border); background: var(--linen); }
+.txt-input:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.txt-input.note { font-size: 11px; color: var(--text-muted); }
+
+.basis-btn {
+  font-family: var(--font-mono, var(--font-sans)); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--linen); color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  padding: 2px 5px; cursor: pointer; flex: none; min-width: 34px;
+}
+.basis-btn.monthly { background: var(--ochre); color: var(--linen); border-color: var(--ochre); }
+.basis-btn:hover { border-color: var(--ochre); }
+
+.row-del {
+  background: transparent; border: none; color: var(--border-strong);
+  font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 5px;
+}
+.row-del:hover { color: var(--danger); }
+
+.add-row td { padding: 4px 6px 10px 30px !important; border-bottom: 1px solid var(--border); }
+.add-btn {
+  font-family: var(--font-sans); font-size: 11.5px; color: var(--ochre);
+  background: transparent; border: none; cursor: pointer; padding: 3px 0;
+}
+.add-btn:hover { text-decoration: underline; }
+
+.annual-hint {
+  display: block; font-size: 9.5px; color: var(--text-muted);
+  text-align: right; padding-right: 3px; margin-top: 1px;
+  font-variant-numeric: tabular-nums; min-height: 12px;
+}
+
+/* ============ DEPOSIT DISTRIBUTION ============ */
+.dep-grid { display: grid; grid-template-columns: 42px 1fr 62px; gap: 5px 6px; align-items: center; margin-bottom: 0.6rem; }
+.dep-grid .hdr { font-size: 9px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.dep-grid .hdr.r { text-align: right; }
+.dep-lbl { font-size: 11.5px; color: var(--text-muted); }
+.dep-in {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--teal);
+  background: var(--linen); border: 1px solid var(--border-strong);
+  padding: 5px 7px; width: 100%; text-align: right; font-variant-numeric: tabular-nums;
+}
+.dep-in:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.dep-wsum { font-size: 10.5px; text-align: right; margin: -0.3rem 0 0.7rem; color: var(--text-muted); }
+.dep-wsum.off { color: var(--ochre); }
+.dep-readout {
+  border-top: 1px solid var(--border); padding-top: 0.6rem; font-size: 11.5px;
+}
+.dep-readout .row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.dep-readout .k { color: var(--text-muted); }
+.dep-readout .v { font-variant-numeric: tabular-nums; color: var(--teal); font-weight: 600; }
+.dep-readout .row.naive .v { color: var(--text-muted); font-weight: 500; }
+.dep-gap { font-size: 10px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
+
+
+.subtotal-row td {
+  background: var(--linen); border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600; font-size: 11.5px; color: var(--teal);
+}
+.subtotal-row td.lbl { text-align: left; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; color: var(--ochre); }
+.subtotal-row td.na { color: var(--border-strong); font-weight: 400; }
+
+/* ============ FIELD HELP ============ */
+.num-field-label-wrap { display: flex; align-items: center; gap: 5px; }
+.help-btn {
+  flex: none; width: 13px; height: 13px; line-height: 11px;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-muted); border-radius: 50%;
+  font-size: 9px; font-weight: 700; font-family: var(--font-sans);
+  cursor: pointer; padding: 0; text-align: center;
+}
+.help-btn:hover { border-color: var(--ochre); color: var(--ochre); }
+.help-btn.open { background: var(--ochre); border-color: var(--ochre); color: var(--linen); }
+.field-help {
+  border-left: 2px solid var(--ochre);
+  background: rgba(204,119,34,0.06);
+  padding: 7px 9px; margin: 2px 0 9px;
+  font-size: 11px; line-height: 1.5; color: var(--walnut);
+}
+.field-help .affects {
+  display: block; margin-top: 5px; padding-top: 5px;
+  border-top: 1px solid rgba(92,74,46,0.18);
+  font-size: 10px; color: var(--text-muted);
+}
+.field-help .affects strong { color: var(--teal); font-weight: 600; }
+
+/* ============ HEADER ============ */
+.page-header {
+  background: var(--teal);
+  color: var(--linen);
+  padding: 2rem 2.5rem 1.75rem;
+}
+.header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.wordmark {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--linen);
+}
+.launch-date {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ochre-light);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ============ TAB NAV ============ */
+.tab-nav {
+  background: var(--linen-card);
+  border-bottom: 1px solid var(--border-strong);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.tab-nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 0 2.5rem;
+  overflow-x: auto;
+}
+.tab-btn {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--walnut);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 14px 16px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.tab-btn:hover { color: var(--teal); }
+.tab-btn.active {
+  color: var(--teal);
+  font-weight: 600;
+  border-bottom-color: var(--ochre);
+}
+
+/* ============ MAIN CONTENT ============ */
+.main-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 4rem;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ============ TYPOGRAPHY ============ */
+h2.section-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--teal);
+  margin-bottom: 0.35rem;
+}
+p.section-sub {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin-bottom: 1.75rem;
+  max-width: 70ch;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ochre);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.4rem;
+}
+
+/* ============ STAT CARDS / DASHBOARD ============ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 1.75rem;
+}
+.stat-card {
+  background: var(--linen-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--border-strong);
+}
+.stat-card.good::before { background: var(--success); }
+.stat-card.warn::before { background: var(--ochre); }
+.stat-card.bad::before { background: var(--danger); }
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  line-height: 1.3;
+  font-weight: 500;
+}
+.stat-value {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--teal);
+}
+.stat-value.good { color: var(--success); }
+.stat-value.warn { color: var(--ochre); }
+.stat-value.bad { color: var(--danger); }
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* ============ DASHBOARD HERO (Scenario Summary) ============ */
+.dash-hero {
+  background: var(--teal);
+  border-radius: var(--radius-lg);
+  padding: 2rem 2.25rem;
+  margin-bottom: 1.75rem;
+  color: var(--linen);
+  position: relative;
+  overflow: hidden;
+}
+.dash-hero::after {
+  content: '';
+  position: absolute;
+  right: -60px; top: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(204,119,34,0.18), transparent 70%);
+}
+.dash-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+.dash-stat-label {
+  font-size: 11px;
+  color: rgba(247,243,237,0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.dash-stat-value {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--linen);
+}
+.dash-stat-value.ochre { color: var(--ochre-light); }
+
+/* ============ CARDS / PANELS ============ */
+.panel {
+  background: var(--linen-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.panel-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+@media (max-width: 760px) {
+  .panel-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ============ RUNWAY TWO-COLUMN LAYOUT ============ */
+.runway-two-col {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .runway-two-col { grid-template-columns: 1fr; }
+}
+.assumptions-panel {
+  background: var(--linen-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.25rem 1rem;
+  position: sticky;
+  top: 60px; /* clears the sticky tab nav */
+}
+.runway-right { min-width: 0; }
+
+/* ============ INPUT SECTIONS ============ */
+.input-section {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.input-section:last-of-type { border-bottom: none; margin-bottom: 0.25rem; }
+.input-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ochre);
+  margin-bottom: 0.75rem;
+}
+
+/* ============ NUMBER FIELD INPUTS ============ */
+.num-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 0.7rem;
+}
+.num-field-label {
+  font-size: 11.5px;
+  color: var(--walnut);
+  font-weight: 500;
+}
+.num-field-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.num-field-affix {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.num-field-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal);
+  background: var(--linen);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+}
+.num-field-input::-webkit-outer-spin-button,
+.num-field-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.num-field-input:focus {
+  outline: none;
+  border-color: var(--ochre);
+  background: var(--linen-card);
+}
+
+/* Adam gross note */
+.adam-gross-note {
+  font-size: 12px;
+  color: var(--teal);
+  margin-top: 0.5rem;
+  padding: 6px 8px;
+  background: var(--linen);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+.adam-gross-sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* Keep slider CSS for other potential uses but visually hidden */
+.slider-grid { display: none; }
+
+/* ============ SCENARIO TOGGLE ============ */
+.scenario-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+}
+.scenario-btn {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--linen-card);
+  color: var(--walnut);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.scenario-btn:hover:not(.active) { background: var(--linen); }
+.scenario-btn.active {
+  background: var(--teal);
+  color: var(--linen);
+  border-color: var(--teal);
+}
+
+/* ============ NARRATIVE BOX ============ */
+.narrative-box {
+  border-radius: var(--radius);
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--border-strong);
+  background: var(--linen-card);
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.narrative-box.good { border-left-color: var(--success); }
+.narrative-box.warn { border-left-color: var(--ochre); }
+.narrative-box.bad { border-left-color: var(--danger); }
+.narrative-box h3 {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--teal);
+  margin-bottom: 0.4rem;
+}
+.narrative-box p {
+  font-size: 13.5px;
+  color: var(--walnut);
+  line-height: 1.65;
+}
+.narrative-box p strong { color: var(--teal); font-weight: 600; }
+
+/* ============ CHART CONTAINERS ============ */
+.chart-box {
+  background: var(--linen-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.25rem 0.75rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  color: var(--walnut);
+}
+.legend-dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+/* ============ TABLES ============ */
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: var(--linen-card);
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--teal);
+  color: var(--linen);
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 9px;
+  text-align: right;
+  white-space: nowrap;
+  z-index: 5;
+}
+thead th:first-child { text-align: left; }
+tbody td {
+  padding: 7px 9px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  color: var(--walnut);
+  white-space: nowrap;
+}
+tbody td:first-child { text-align: left; color: var(--teal); font-weight: 500; }
+tbody tr:nth-child(even) { background: var(--linen); }
+tbody tr.cliff-row { background: var(--warning-bg); }
+tbody tr.cliff-row td:first-child { font-weight: 700; }
+.scroll-tbody { display: block; max-height: 560px; overflow-y: auto; }
+.scroll-tbody table { display: table; width: 100%; }
+.fixed-table-wrap thead, .fixed-table-wrap tbody { display: block; }
+.fixed-table-wrap tbody tr, .fixed-table-wrap thead tr { display: table; width: 100%; table-layout: fixed; }
+
+/* ============ MONTHLY DETAIL — TIGHTER SPACING ============ */
+table.monthly-table { font-size: 11.5px; }
+table.monthly-table thead th {
+  padding: 7px 6px;
+  font-size: 9.5px;
+}
+table.monthly-table tbody td {
+  padding: 4px 6px;
+}
+
+/* Corp Balance column — distinct ochre tint to stand out as the key running metric */
+table.monthly-table th.corp-balance-col {
+  background: var(--ochre);
+  color: var(--linen);
+}
+table.monthly-table td.corp-balance-col {
+  background: rgba(204, 119, 34, 0.10);
+  color: var(--teal);
+  font-weight: 700;
+  border-left: 1px solid rgba(204, 119, 34, 0.35);
+  border-right: 1px solid rgba(204, 119, 34, 0.35);
+}
+table.monthly-table tbody tr.cliff-row td.corp-balance-col {
+  background: rgba(204, 119, 34, 0.22);
+}
+
+/* Household savings — Walnut Ink, the third brand colour. Distinct from
+   corp (ochre) and tax (maroon) so the three pools read apart at a glance. */
+table.monthly-table th.hh-savings-col {
+  background: #5C4A2E;
+  color: var(--linen);
+}
+table.monthly-table td.hh-savings-col {
+  background: rgba(92, 74, 46, 0.07);
+  color: var(--walnut);
+  border-left: 1px solid rgba(92, 74, 46, 0.3);
+}
+
+/* Tax columns — muted maroon tint distinct from corp (teal) and HH (ochre) columns */
+table.monthly-table th.tax-col {
+  background: #7A2E2E;
+  color: var(--linen);
+}
+table.monthly-table td.tax-col {
+  background: rgba(122, 46, 46, 0.06);
+  color: var(--walnut);
+}
+
+/* Year-end rows (12, 24, 36, 48, 60) — where the lump-sum tax bill actually lands */
+tbody tr.yearend-row {
+  background: rgba(122, 46, 46, 0.10);
+}
+tbody tr.yearend-row td.tax-col {
+  background: rgba(122, 46, 46, 0.16);
+  font-weight: 700;
+  color: #7A2E2E;
+}
+tbody tr.yearend-row td:first-child { font-weight: 700; }
+
+/* ============ PILLS ============ */
+.pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.pill.good { background: var(--success-bg); color: var(--success); }
+.pill.bad { background: var(--danger-bg); color: var(--danger); }
+.pill.warn { background: var(--warning-bg); color: var(--warning); }
+.pill.neutral { background: var(--border); color: var(--walnut); }
+
+/* ============ FILTER ROW ============ */
+.filter-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.filter-select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--linen-card);
+  color: var(--teal);
+  cursor: pointer;
+}
+
+/* ============ EXPENSE MODEL TABLE ============ */
+.expense-table-wrap { margin-bottom: 1.5rem; }
+.expense-cat-row td {
+  background: var(--linen) !important;
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--walnut);
+  border-bottom: 1px solid var(--border-strong);
+}
+.expense-input {
+  width: 88px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: right;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: #fffef9;
+  color: var(--teal);
+  font-variant-numeric: tabular-nums;
+}
+.expense-input:focus { outline: 2px solid var(--ochre); outline-offset: 1px; }
+.sales-month-input {
+  width: 64px;
+  text-align: center;
+}
+#sales-year-grid td:not(:first-child) { text-align: center; }
+#sales-year-grid th:not(:first-child) { text-align: center; }
+.expense-total-row td {
+  font-weight: 700;
+  color: var(--teal);
+  border-top: 2px solid var(--ochre);
+  background: var(--linen) !important;
+}
+
+/* ============ TWO-COL LAYOUT FOR EXPENSE PAGE ============ */
+.startup-grand-total {
+  background: var(--teal);
+  color: var(--linen);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+.startup-grand-total .label { font-size: 13px; opacity: 0.85; }
+.startup-grand-total .value { font-family: var(--font-serif); font-size: 26px; font-weight: 500; color: var(--ochre-light); }
+
+footer.model-footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2rem 0 1rem;
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <div class="login-wordmark">Advice Only</div>
+    <div class="login-sub">Financial Model</div>
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" autocomplete="username"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+    </div>
+    <div class="field">
+      <label for="login-pw">Password</label>
+      <input type="password" id="login-pw" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doSignIn()">
+    </div>
+    <button id="login-btn" onclick="doSignIn()">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<div id="app-shell" class="hidden">
+
+<header class="page-header">
+  <div class="header-inner">
+    <div class="wordmark">Advice Only</div>
+    <div class="header-actions">
+      <span class="saved-badge" id="saved-badge"></span>
+      <button class="hdr-btn" onclick="importData()">Import</button>
+      <button class="hdr-btn" onclick="exportData()">Export</button>
+      <button class="hdr-btn danger" onclick="resetToDefaults()">Reset</button>
+      <button class="hdr-btn" onclick="doSignOut()">Sign out</button>
+    </div>
+  </div>
+  <div class="last-saved-lbl" id="last-saved-lbl"></div>
+</header>
+<input type="file" id="import-file" accept="application/json" style="display:none">
+
+<nav class="tab-nav">
+  <div class="tab-nav-inner">
+    <button class="tab-btn active" data-tab="runway">Runway &amp; Cash Flow</button>
+    <button class="tab-btn" data-tab="expenses">Expense Model</button>
+    <button class="tab-btn" data-tab="sales">Sales Scenarios</button>
+    <button class="tab-btn" data-tab="summary">Scenario Summary</button>
+    <button class="tab-btn" data-tab="monthly">Monthly Detail</button>
+  </div>
+</nav>
+
+<div class="main-wrap" id="app-root">
+  <!-- Tab panels are injected by JS for maintainability -->
+</div>
+
+<footer class="model-footer">Advice Only — internal financial model. All figures are estimates for planning purposes.</footer>
+
+</div><!-- /#app-shell -->
+
+<script>
+// ============================================================
+// MODERN PENSION — MODEL DATA
+// All constants mirror the Excel workbook exactly (Assumptions, Expense_Model, Scenario_Sales)
+// ============================================================
+
+const TAX_BRACKETS = {
+  federal: [
+    { threshold: 16129, rate: 0.15 },
+    { threshold: 57375, rate: 0.205 },
+    { threshold: 111733, rate: 0.26 },
+    { threshold: 155625, rate: 0.29 },
+    { threshold: 246752, rate: 0.33 },
+  ],
+  federalCredit: 2161,
+  ontario: [
+    { threshold: 11865, rate: 0.0505 },
+    { threshold: 51446, rate: 0.0915 },
+    { threshold: 102135, rate: 0.1116 },
+    { threshold: 150000, rate: 0.1316 },
+    { threshold: 220000, rate: 0.1316 },
+  ],
+  ontarioCredit: 549,
+};
+
+const CPP = {
+  rateEmployer: 0.0595,
+  rateEmployee: 0.0595,
+  exemption: 3500,
+  ympe: 68500,
+  wagepointAnnual: 600,
+};
+
+const COMMISSION = {
+  tier1Rate: 0.025, tier1Cap: 100000,
+  tier2Rate: 0.020, tier2Cap: 200000,
+  tier3Rate: 0.015,
+};
+
+const CORP_TAX = {
+  smallBusinessRate: 0.122, // Combined Federal + Ontario Small Business Deduction rate, active income up to $500K/yr
+};
+
+// Default adjustable assumptions (sliders control these at runtime)
+const DEFAULTS = {
+  // Deposit size is modelled as a 3-point distribution, not a single average.
+  // Commission is graded (2.5/2.0/1.5), so it is concave in deposit size —
+  // meaning E[f(X)] <= f(E[X]). The gap is small (0-4%, and exactly 0 when the
+  // whole spread sits above the $200k kink, where the curve is linear), but the
+  // real value is that stating low/mid/high forces the implied mean into the
+  // open instead of hiding it behind one unfalsifiable "average".
+  // Weights are relative — they are normalised by their own sum, so they need
+  // not total exactly 100.
+  deposits: {
+    low:  { amt: 0, w: 25 },
+    mid:  { amt: 0, w: 50 },
+    high: { amt: 0, w: 25 },
+  },
+
+  // Personal bank account OUTSIDE the corp. This is the pool the household
+  // actually draws on: money in the CCPC is not spendable money — the only pipe
+  // out is payroll, and payroll is throttled exactly when the corp is low. So a
+  // corp seed and a household buffer are two different things and the model
+  // needs both.
+  hhSavingsStart: 0,
+
+  // Hard reserve. Savings fund the household down to this line and no further —
+  // past it, payroll escalates to protect it. The "don't take the family down
+  // with the business" line, made structural rather than advisory.
+  savingsFloor: 0,
+
+  // Survival-mode salary. Deliberately low: a dollar routed through payroll to
+  // buy groceries costs the corp ~$1.34, while a dollar of savings costs $1 —
+  // it's already been taxed. At ~$20k the basic personal amount shields it and
+  // the effective cost of extraction is ~1.00, so it's near-free to take while
+  // still generating RRSP room and CPP credits.
+  baseSalary: 0,
+
+  // ---- Salary policy ----
+  // Salary is a CONTROL problem, not a threshold problem. Re-deciding it every
+  // month against a balance made it chatter: pay the ceiling -> balance drops
+  // under the trigger -> revert to floor -> rebuild -> repeat. Three changes fix it:
+  //   1. Review interval  — salary is set and HELD; you don't re-run payroll monthly.
+  //   2. Run-rate test    — raise on trailing REVENUE (a flow), not balance (a stock,
+  //                         which conflates earned money with seed capital).
+  //   3. Asymmetry        — raising needs sustained revenue AND a cushion; cutting is
+  //                         immediate but sticks to the next review. That IS the
+  //                         hysteresis band.
+  salaryReviewMonths: 12,   // set salary at months 1, 13, 25, 37, 49
+  runRateWindowMonths: 6,   // trailing window for the revenue run rate
+  salaryStep: 10000,        // round sustainable salary DOWN to this (round T4 figures)
+  coverageRatio: 1.25,      // raise only when revenue covers 1.25x the cost of doing so
+  floorGross: 0,
+  ceilingGross: 0,
+  corpFunding: 0,
+  minBuffer: 0,
+  surplusTriggerMonths: 0,
+  ashleyMonthly: 0,
+  hhBurnMonthly: 0,
+  adamMonthly: 0,
+  adamMonthsActive: 0,
+};
+
+// Ongoing operating expenses — [Year1, Year2, Year3, Year4, Year5], grouped by category
+const OPEX_ITEMS = [
+  { cat: 'Licensing and compliance', items: [
+    { id: 'o1', label: 'E&O insurance (ON+BC+AB)', basis: 'annual', vals: [0,0,0,0,0], note: '3-province specialist' },
+    { id: 'o2', label: 'Provincial licence renewals', basis: 'annual', vals: [0,0,0,0,0], note: 'All provinces incl. corporate' },
+    { id: 'o3', label: 'Compliance and CE credits', basis: 'annual', vals: [0,0,0,0,0], note: 'Continuing education' },
+  ]},
+  { cat: 'Legal and accounting', items: [
+    { id: 'o4', label: 'Year-end corporate tax filing', basis: 'annual', vals: [0,0,0,0,0], note: 'Accountant for T2 only' },
+    { id: 'o5', label: 'HST + payroll remittances admin', basis: 'annual', vals: [0,0,0,0,0], note: 'Quarterly review' },
+    { id: 'o6', label: 'Legal (ad hoc)', basis: 'annual', vals: [0,0,0,0,0], note: 'MGA, referral agreements' },
+  ]},
+  { cat: 'Software subscriptions', items: [
+    { id: 'o7', label: 'Pipedrive CRM', basis: 'annual', vals: [0,0,0,0,0], note: '$55/mo' },
+    { id: 'o8', label: 'QuickBooks Online', basis: 'annual', vals: [0,0,0,0,0], note: '$35/mo' },
+    { id: 'o9', label: 'DocuSign', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
+    { id: 'o10', label: 'Google Workspace', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o11', label: 'Zoom Pro', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o12', label: 'Adobe Acrobat', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
+    { id: 'o13', label: 'LinkedIn Sales Navigator', basis: 'annual', vals: [0,0,0,0,0], note: '$100/mo' },
+    { id: 'o14', label: 'Password manager', basis: 'annual', vals: [0,0,0,0,0], note: '$5/mo' },
+    { id: 'o15', label: 'Calendly', basis: 'annual', vals: [0,0,0,0,0], note: '$10/mo' },
+    { id: 'o16', label: 'AI tools', basis: 'annual', vals: [0,0,0,0,0], note: '$20/mo' },
+    { id: 'o17', label: 'VoIP phone', basis: 'annual', vals: [0,0,0,0,0], note: '$25/mo' },
+  ]},
+  { cat: 'Website and digital', items: [
+    { id: 'o18', label: 'Website hosting', basis: 'annual', vals: [0,0,0,0,0], note: '$50/mo managed' },
+    { id: 'o19', label: 'Domain renewals', basis: 'annual', vals: [0,0,0,0,0], note: 'Annual' },
+  ]},
+  { cat: 'Marketing and client experience', items: [
+    { id: 'o20', label: 'Marketing (ads, content, SEO)', basis: 'annual', vals: [0,0,0,0,0], note: 'Light — referral-first' },
+    { id: 'o21', label: 'Client gifts and experience', basis: 'annual', vals: [0,0,0,0,0], note: '~$150/client, scales with volume' },
+    { id: 'o22', label: 'Postage and courier', basis: 'annual', vals: [0,0,0,0,0], note: 'Policy docs, gifts' },
+    { id: 'o23', label: 'Office supplies and printing', basis: 'annual', vals: [0,0,0,0,0], note: 'Home office' },
+  ]},
+  { cat: 'Travel', items: [
+    { id: 'o24', label: 'Travel — advisor and client meetings', basis: 'annual', vals: [0,0,0,0,0], note: 'ON + BC/AB trips' },
+  ]},
+  { cat: 'Home office (deductible portion)', items: [
+    { id: 'o25', label: 'Internet', basis: 'annual', vals: [0,0,0,0,0], note: 'Business-use portion' },
+    { id: 'o26', label: 'Cell phones', basis: 'annual', vals: [0,0,0,0,0], note: 'Business-use portion' },
+  ]},
+  { cat: 'Insurance', items: [
+    { id: 'o27', label: 'Business liability insurance', basis: 'annual', vals: [0,0,0,0,0], note: 'Home-based' },
+  ]},
+];
+
+// One-time startup costs (Month 1 only)
+const STARTUP_ITEMS = [
+  { cat: 'Legal', items: [
+    { id: 's1', label: 'Ontario corp incorporation', val: 0, note: 'Ontario Business Registry' },
+    { id: 's2', label: 'Lawyer — shareholder agreement', val: 0, note: 'If shareholder agreement required' },
+    { id: 's3', label: 'Trademark — Modern Pension', val: 0, note: 'CIPO filing + agent fee' },
+    { id: 's4', label: 'Virtual mailbox / registered address', val: 0, note: '~$25/mo, first year' },
+  ]},
+  { cat: 'Licensing', items: [
+    { id: 's5', label: 'LLQP exam + study materials', val: 0, note: 'Complete before launch' },
+    { id: 's6', label: 'Ontario FSRA — individual + corporate', val: 0, note: 'Both registrations' },
+  ]},
+  { cat: 'Brand and website', items: [
+    { id: 's7', label: 'Website design and development', val: 0, note: 'Custom build' },
+    { id: 's8', label: 'Domain registrations', val: 0, note: 'Multiple domains, first year' },
+    { id: 's9', label: 'Logo and brand design', val: 0, note: 'Freelance designer' },
+    { id: 's10', label: 'Launch marketing materials', val: 0, note: 'Cards, one-pager, advisor kit' },
+  ]},
+];
+
+// Scenario sales ramps — sales per month, 60 months (5 years)
+const SCENARIO_SALES = {
+  pessimistic: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  base: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  optimistic: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+};
+
+const SCENARIO_META = {
+  pessimistic: { label: 'Pessimistic', color: '#b3392e', desc: '' },
+  base: { label: 'Base case', color: '#CC7722', desc: '' },
+  optimistic: { label: 'Optimistic', color: '#1e7a52', desc: '' },
+};
+
+
+// ============================================================
+// MODERN PENSION — CALCULATION ENGINE
+// Mirrors the Excel workbook formulas exactly (Tax_Table, Assumptions, Monthly_Model)
+// ============================================================
+
+const Engine = (function () {
+
+  // ---- Tax calculation (exact bracket math, same logic as Tax_Table) ----
+  function federalTax(gross) {
+    const b = TAX_BRACKETS.federal;
+    let tax = 0;
+    tax += Math.max(0, gross - b[4].threshold) * b[4].rate;
+    tax += Math.max(0, Math.min(gross, b[4].threshold) - b[3].threshold) * b[3].rate;
+    tax += Math.max(0, Math.min(gross, b[3].threshold) - b[2].threshold) * b[2].rate;
+    tax += Math.max(0, Math.min(gross, b[2].threshold) - b[1].threshold) * b[1].rate;
+    tax += Math.max(0, Math.min(gross, b[1].threshold) - b[0].threshold) * b[0].rate;
+    tax -= TAX_BRACKETS.federalCredit;
+    return tax;
+  }
+
+  function ontarioTax(gross) {
+    const b = TAX_BRACKETS.ontario;
+    let tax = 0;
+    tax += Math.max(0, gross - b[4].threshold) * b[4].rate;
+    tax += Math.max(0, Math.min(gross, b[4].threshold) - b[3].threshold) * b[3].rate;
+    tax += Math.max(0, Math.min(gross, b[3].threshold) - b[2].threshold) * b[2].rate;
+    tax += Math.max(0, Math.min(gross, b[2].threshold) - b[1].threshold) * b[1].rate;
+    tax += Math.max(0, Math.min(gross, b[1].threshold) - b[0].threshold) * b[0].rate;
+    tax -= TAX_BRACKETS.ontarioCredit;
+    return tax;
+  }
+
+  function employeeCPP(gross) {
+    const insurable = Math.max(0, Math.min(gross, CPP.ympe) - CPP.exemption);
+    return insurable * CPP.rateEmployee;
+  }
+
+  function employerCPP(gross) {
+    const insurable = Math.max(0, Math.min(gross, CPP.ympe) - CPP.exemption);
+    return insurable * CPP.rateEmployer;
+  }
+
+  // Net annual pay for a given gross annual salary
+  function netAnnual(gross) {
+    if (gross <= 0) return 0;
+    const fed = Math.max(0, federalTax(gross));
+    const on = Math.max(0, ontarioTax(gross));
+    const eeCpp = employeeCPP(gross);
+    return gross - fed - on - eeCpp;
+  }
+
+  // Invert: given a target ANNUAL net, find the gross required.
+  // Uses bisection since tax is piecewise-linear and monotonic increasing.
+  function grossForNet(targetNet) {
+    if (targetNet <= 0) return 0;
+    let lo = 0, hi = 700000;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      const net = netAnnual(mid);
+      if (net < targetNet) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  // ---- Commission ----
+  function commissionPerSale(avgDeposit) {
+    const t1 = Math.min(avgDeposit, COMMISSION.tier1Cap) * COMMISSION.tier1Rate;
+    const t2 = Math.max(0, Math.min(avgDeposit, COMMISSION.tier2Cap) - COMMISSION.tier1Cap) * COMMISSION.tier2Rate;
+    const t3 = Math.max(0, avgDeposit - COMMISSION.tier2Cap) * COMMISSION.tier3Rate;
+    return t1 + t2 + t3;
+  }
+
+  // ---- Opex ----
+  // expenseState: { opex: [[y1..y5] per item across all categories flattened], startup: [items] }
+  // itemAnnual: an opex row stores EITHER a monthly rate or an annual amount,
+  // per its `basis`. Everything downstream wants annual, so normalise here.
+  function itemAnnual(item, yearIndex) {
+    const v = Number(item.vals[yearIndex]) || 0;
+    return item.basis === 'monthly' ? v * 12 : v;
+  }
+
+  function annualOpexTotal(expenseState, yearIndex) {
+    // yearIndex 0-4 for Year 1-5
+    let total = 0;
+    expenseState.opexFlat.forEach(item => { total += itemAnnual(item, yearIndex); });
+    return total;
+  }
+
+  function startupTotal(expenseState) {
+    let total = 0;
+    expenseState.startupFlat.forEach(item => { total += item.val; });
+    return total;
+  }
+
+  function monthlyOpex(expenseState, monthIdx /* 0-based */) {
+    const yearIndex = Math.floor(monthIdx / 12); // 0-4
+    const yearAnnual = annualOpexTotal(expenseState, Math.min(yearIndex, 4));
+    let opex = yearAnnual / 12;
+    if (monthIdx === 0) opex += startupTotal(expenseState);
+    return opex;
+  }
+
+  // ---- Floor / Ceiling chains (for display) ----
+  function salaryChain(gross) {
+    const eeCpp = employeeCPP(gross);
+    const erCpp = employerCPP(gross);
+    const totalCorpCost = gross + erCpp + CPP.wagepointAnnual;
+    const net = netAnnual(gross);
+    return {
+      gross, employeeCPP: eeCpp, employerCPP: erCpp,
+      totalCorpCost, netAnnual: net, netMonthly: net / 12,
+    };
+  }
+
+  // ---- Full 60-month simulation ----
+  // params: { deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+  //           ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey }
+  // expectedCommission: probability-weighted commission across the deposit
+  // distribution. Deterministic (no sampling) so it stays Excel-checkable.
+  // Weights are normalised by their sum; a zero-sum falls back to the mid point.
+  function expectedCommission(deposits) {
+    const pts = [deposits.low, deposits.mid, deposits.high];
+    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
+    if (sum <= 0) return commissionPerSale(Number(deposits.mid.amt) || 0);
+    return pts.reduce((t, p) =>
+      t + ((Number(p.w) || 0) / sum) * commissionPerSale(Number(p.amt) || 0), 0);
+  }
+
+  // meanDeposit: the average this distribution actually implies. Surfaced in the
+  // UI because it is the number most likely to differ from what you'd have typed.
+  function meanDeposit(deposits) {
+    const pts = [deposits.low, deposits.mid, deposits.high];
+    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
+    if (sum <= 0) return Number(deposits.mid.amt) || 0;
+    return pts.reduce((t, p) => t + ((Number(p.w) || 0) / sum) * (Number(p.amt) || 0), 0);
+  }
+
+  // salaryCandidates: the discrete salary levels we'd actually consider — the
+  // floor, then round `step` multiples above it, then the ceiling. Round numbers,
+  // because a real T4 is a round number.
+  function salaryCandidates(floorGross, ceilingGross, step) {
+    const out = [floorGross];
+    if (step > 0) {
+      let g = Math.ceil(floorGross / step) * step;
+      for (; g < ceilingGross; g += step) if (g > floorGross) out.push(g);
+    }
+    if (ceilingGross > floorGross) out.push(ceilingGross);
+    return out;
+  }
+
+  // maxSustainableGross: the highest candidate salary whose full corporate cost,
+  // plus opex, is covered `coverage`x over by the annualised run rate.
+  // Deliberately a FLOW test — seed capital cannot buy you a raise.
+  // Returns NULL when the run rate can't even carry the floor — the caller reads
+  // that as "survival mode". The previous version returned floorGross in that
+  // case, which quietly asserted you could afford a salary you couldn't.
+  function maxSustainableGross(runRateAnnual, annualOpex, floorGross, ceilingGross, step, coverage) {
+    const cov = coverage > 0 ? coverage : 1;
+    const budget = (runRateAnnual / cov) - annualOpex; // what salary+erCPP may cost
+    if (budget <= 0) return null;
+    const cands = salaryCandidates(floorGross, ceilingGross, step);
+    let best = null;
+    for (const g of cands) {
+      if (salaryChain(g).totalCorpCost <= budget) best = (best === null) ? g : Math.max(best, g);
+    }
+    return best;
+  }
+
+  function simulate(params) {
+    const {
+      deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+      ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
+      corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart,
+      savingsFloor, baseSalary
+    } = params;
+
+    const reviewEvery = Math.max(1, Number(salaryReviewMonths) || 12);
+    const rrWindow    = Math.max(1, Number(runRateWindowMonths) || 6);
+    const step        = Math.max(0, Number(salaryStep) || 0);
+    const coverage    = Math.max(0.01, Number(coverageRatio) || 1);
+
+    const taxRate = (corpTaxRate !== undefined) ? corpTaxRate : CORP_TAX.smallBusinessRate;
+
+    const comm = expectedCommission(deposits);
+    const sales = salesArr || SCENARIO_SALES[scenarioKey];
+
+    // Surplus Threshold = months x (Floor total monthly corp cost + Year 1 monthly opex)
+    const floorChain = salaryChain(floorGross);
+    const year1MonthlyOpex = annualOpexTotal(expenseState, 0) / 12;
+    const surplusThreshold = surplusTriggerMonths * (floorChain.totalCorpCost / 12 + year1MonthlyOpex);
+
+    const months = [];
+    const revHistory = [];       // trailing gross commission, for the run rate
+    let hhSavings = Number(hhSavingsStart) || 0; // personal account; absorbs every surplus/deficit
+    let hhRuinMonth = null;      // first month the household account goes negative
+    let hhBreachMonth = null;    // first month it drops through its own floor
+    let hhSavingsLow = hhSavings;
+    const savFloor = Number(savingsFloor) || 0;
+    const baseSal  = Math.max(0, Number(baseSalary) || 0);
+    let growthMode = false;      // month 1: no trailing revenue, so survival by definition
+    let heldTarget = baseSal;
+    let corpBalance = corpFunding;
+    let lossCarryforward = 0;
+    let fiscalYearTaxableIncome = 0; // accumulates across the 12 months of the current fiscal year
+    let carryforwardAtYearStart = 0; // loss carryforward as of the END of the prior fiscal year
+
+    for (let i = 0; i < 60; i++) {
+      const monthNum = i + 1;
+      const salesThisMonth = sales[i];
+      const grossCommission = salesThisMonth * comm;
+      const opex = monthlyOpex(expenseState, i);
+
+      const adam = monthNum <= adamMonthsActive ? adamMonthly : 0;
+      const neededNetMonthly = Math.max(0, hhBurnMonthly - adam - ashleyMonthly);
+      const neededNetAnnual = neededNetMonthly * 12;
+      const hhNeededGross = grossForNet(neededNetAnnual);
+
+      const availAfterOpex = corpBalance + grossCommission - opex;
+
+      // ---- SALARY REVIEW ----
+      // Mode is chosen at the review and HELD for the interval. Growth mode only
+      // when the business genuinely carries the real salary AND there's a cushion.
+      const isReviewMonth = ((monthNum - 1) % reviewEvery) === 0;
+      let reviewed = false;
+      if (isReviewMonth && i > 0) {
+        reviewed = true;
+        // Trailing run rate: sum the window, annualise it. A FLOW — unlike a
+        // balance test, seed capital cannot masquerade as earning power.
+        const win = Math.min(rrWindow, revHistory.length);
+        const trailing = revHistory.slice(-win).reduce((a, b) => a + b, 0);
+        const runRateAnnual = win > 0 ? trailing * (12 / win) : 0;
+        const annualOpexNow = annualOpexTotal(expenseState, Math.min(Math.floor(i / 12), 4));
+        const sustainable = maxSustainableGross(
+          runRateAnnual, annualOpexNow, floorGross, ceilingGross, step, coverage);
+
+        // Two gates to earn growth mode: the revenue carries it, AND there's a
+        // cushion behind you. Either missing -> survival.
+        if (sustainable !== null && corpBalance >= surplusThreshold) {
+          growthMode = true;
+          heldTarget = sustainable;
+        } else {
+          growthMode = false;
+          heldTarget = baseSal;
+        }
+      }
+
+      let targetGross;
+      let regime;
+      if (availAfterOpex <= minBuffer) {
+        // EMERGENCY — corp under buffer. Drop to survival; sticks to next review.
+        growthMode = false;
+        heldTarget = baseSal;
+        targetGross = Math.min(baseSal, hhNeededGross);
+        regime = 1;
+      } else {
+        // Savings is the FIRST line, payroll the backstop — deliberately inverted
+        // from a salary-first model: $1 of savings buys $1 of groceries, whereas
+        // $1 of groceries via payroll costs the corp ~$1.34. Don't route money
+        // through a taxed pipe you don't have to.
+        //
+        // The floor defence applies in BOTH modes. Growth mode is not immunity:
+        // at an $85k salary you net ~$5,577/mo against a ~$6,473/mo need, so the
+        // household still bleeds and savings still needs defending.
+        const planned    = growthMode ? heldTarget : baseSal;
+        const drawAvail  = Math.max(0, hhSavings - savFloor);
+        const neededNetMo = Math.max(0, hhBurnMonthly - adam - ashleyMonthly);
+        const plannedNetMo = netAnnual(planned) / 12;
+        const gap = neededNetMo - plannedNetMo;
+
+        if (gap > drawAvail) {
+          // Savings would breach its floor — escalate payroll to defend it, capped
+          // at the salary that exactly covers the household. Paying beyond that
+          // would just be pushing cash through a taxed pipe for no reason.
+          // If the corp can't fund the escalation, drawFraction throttles it and
+          // the floor breaches anyway — which is the honest outcome, not a bug:
+          // a reserve can only be defended if there is money somewhere.
+          const requiredNetMo = neededNetMo - drawAvail;
+          const requiredGross = grossForNet(requiredNetMo * 12);
+          targetGross = Math.min(Math.max(planned, requiredGross), Math.max(hhNeededGross, planned));
+          regime = growthMode ? ((targetGross >= ceilingGross) ? 5 : 4) : 3;
+        } else {
+          targetGross = planned;
+          regime = growthMode ? ((targetGross >= ceilingGross) ? 5 : 4) : 2;
+        }
+      }
+
+      const neededGrossMo = targetGross / 12;
+      const neededEcppMo = employerCPP(targetGross) / 12;
+      const neededTotalCostMo = neededGrossMo + neededEcppMo;
+
+      let drawFraction;
+      const availForSalary = availAfterOpex - minBuffer;
+      if (availForSalary >= neededTotalCostMo) drawFraction = 1;
+      else if (availForSalary > 0) drawFraction = availForSalary / neededTotalCostMo;
+      else drawFraction = 0;
+
+      const grossSalaryPaid = neededGrossMo * drawFraction;
+      const employerCppPaid = neededEcppMo * drawFraction;
+      const netCashFlow = grossCommission - opex - grossSalaryPaid - employerCppPaid;
+
+      // ---- Corporate tax mechanics ----
+      // Taxable income this month = pre-tax net cash flow (salary & employer CPP are deductible, already netted out above)
+      const taxableIncomeThisMonth = netCashFlow;
+
+      // If this is the first month of a new fiscal year, snapshot the carryforward available going into it
+      const monthInFiscalYear = ((monthNum - 1) % 12) + 1; // 1-12
+      if (monthInFiscalYear === 1) {
+        carryforwardAtYearStart = lossCarryforward;
+        fiscalYearTaxableIncome = 0;
+      }
+
+      // Update running loss carryforward: losses grow it, profits consume it first
+      if (taxableIncomeThisMonth < 0) {
+        lossCarryforward += -taxableIncomeThisMonth;
+      } else {
+        lossCarryforward = Math.max(0, lossCarryforward - taxableIncomeThisMonth);
+      }
+
+      fiscalYearTaxableIncome += taxableIncomeThisMonth;
+
+      let corpTaxOwed = 0;
+      const isYearEnd = (monthNum % 12 === 0);
+      if (isYearEnd) {
+        const taxableAfterCarryforward = Math.max(0, fiscalYearTaxableIncome - carryforwardAtYearStart);
+        corpTaxOwed = taxableAfterCarryforward * taxRate;
+      }
+
+      corpBalance = corpBalance + netCashFlow - corpTaxOwed;
+
+      const annualizedGross = grossSalaryPaid * 12;
+      const yourNetMonthly = netAnnual(annualizedGross) / 12;
+
+      const totalHHNet = yourNetMonthly + adam + ashleyMonthly;
+      const hhSurplus = totalHHNet - hhBurnMonthly;
+
+      // The household account absorbs the month: a deficit is a DRAW on savings,
+      // a surplus rebuilds it. Allowed to go negative on purpose — going negative
+      // is the finding, not an error to clamp away. hhRuinMonth is the answer to
+      // "how long can this go".
+      hhSavings += hhSurplus;
+      if (hhSavings < hhSavingsLow) hhSavingsLow = hhSavings;
+      if (hhSavings < 0 && hhRuinMonth === null) hhRuinMonth = monthNum;
+      // Deliberately NOT clamped. If both pools are gone the hole is the finding —
+      // you want to see how deep it goes and whether it ever turns around.
+      const savingsBreached = hhSavings < savFloor - 0.005;
+      if (savingsBreached && hhBreachMonth === null) hhBreachMonth = monthNum;
+
+      // Record AFTER the decision: the run rate must be strictly trailing, or a
+      // review would be reading revenue it hasn't banked yet.
+      revHistory.push(grossCommission);
+
+      months.push({
+        month: monthNum, sales: salesThisMonth, grossCommission, opex, reviewed,
+        targetGross, grossSalaryPaid, employerCppPaid,
+        netCashFlow, taxableIncome: taxableIncomeThisMonth, lossCarryforward, corpTaxOwed,
+        corpBalance, regime,
+        annualizedGross, yourNetMonthly, adam, ashleyMonthly,
+        totalHHNet, hhBurnMonthly, hhSurplus, hhSavings, savingsBreached, growthMode,
+      });
+    }
+
+    return {
+      months, comm, surplusThreshold, floorChain, ceilingChain: salaryChain(ceilingGross),
+      hhRuinMonth, hhBreachMonth, hhSavingsLow, hhSavingsEnd: hhSavings,
+    };
+  }
+
+  return {
+    federalTax, ontarioTax, employeeCPP, employerCPP, netAnnual, grossForNet,
+    commissionPerSale, expectedCommission, meanDeposit, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
+  };
+})();
+
+
+// ============================================================
+// MODERN PENSION — UI CONTROLLER
+// ============================================================
+
+const State = {
+  // Runway tab sliders
+  deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
+  hhSavingsStart: DEFAULTS.hhSavingsStart,
+  savingsFloor: DEFAULTS.savingsFloor,
+  baseSalary: DEFAULTS.baseSalary,
+  salaryReviewMonths: DEFAULTS.salaryReviewMonths,
+  runRateWindowMonths: DEFAULTS.runRateWindowMonths,
+  salaryStep: DEFAULTS.salaryStep,
+  coverageRatio: DEFAULTS.coverageRatio,
+  floorGross: DEFAULTS.floorGross,
+  ceilingGross: DEFAULTS.ceilingGross,
+  corpFunding: DEFAULTS.corpFunding,
+  minBuffer: DEFAULTS.minBuffer,
+  surplusTriggerMonths: DEFAULTS.surplusTriggerMonths,
+  corpTaxRate: CORP_TAX.smallBusinessRate,
+
+  // Fixed household params (not sliders per spec, but kept here for engine calls)
+  ashleyMonthly: DEFAULTS.ashleyMonthly,
+  hhBurnMonthly: DEFAULTS.hhBurnMonthly,
+  adamMonthly: DEFAULTS.adamMonthly,
+  adamMonthsActive: DEFAULTS.adamMonthsActive,
+
+  // Scenario selection (shared across Runway + Monthly Detail)
+  scenario: 'base',
+
+  // Scenario descriptions — commentary on the ramp assumptions. Lives in the
+  // saved payload, not in source, since it describes real referral strategy.
+  scenarioDesc: { pessimistic: '', base: '', optimistic: '' },
+  monthlyDetailYearFilter: 'all',
+
+  // Expense state — deep copy so edits don't mutate the original defaults
+  expense: {
+    opexFlat: null, // populated on init
+    startupFlat: null,
+  },
+
+  // Sales scenario state — deep copy of SCENARIO_SALES so edits don't mutate defaults
+  sales: {
+    pessimistic: null,
+    base: null,
+    optimistic: null,
+  },
+
+  // Cache of last simulation result per scenario (recomputed on any input change)
+  cache: {},
+};
+
+function initExpenseState() {
+  State.expense.opexFlat = OPEX_ITEMS.flatMap(cat => cat.items.map(item => ({
+    id: item.id, cat: cat.cat, label: item.label, note: item.note,
+    basis: item.basis || 'annual', vals: [...item.vals],
+  })));
+  State.expense.startupFlat = STARTUP_ITEMS.flatMap(cat => cat.items.map(item => ({
+    id: item.id, cat: cat.cat, label: item.label, note: item.note, val: item.val,
+  })));
+}
+
+function initSalesState() {
+  State.sales.pessimistic = [...SCENARIO_SALES.pessimistic];
+  State.sales.base = [...SCENARIO_SALES.base];
+  State.sales.optimistic = [...SCENARIO_SALES.optimistic];
+}
+
+function getExpenseStateForEngine() {
+  return {
+    opexFlat: State.expense.opexFlat,
+    startupFlat: State.expense.startupFlat,
+  };
+}
+
+function runSimulation(scenarioKey) {
+  const key = JSON.stringify({
+    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
+    hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
+    corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
+    corpTaxRate: State.corpTaxRate,
+    expense: State.expense, sales: State.sales, scenarioKey,
+  });
+  if (State.cache.key === key && State.cache.results[scenarioKey]) {
+    return State.cache.results[scenarioKey];
+  }
+  const result = Engine.simulate({
+    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
+    hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
+    corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
+    ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
+    adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
+    corpTaxRate: State.corpTaxRate,
+    expenseState: getExpenseStateForEngine(), scenarioKey, salesArr: State.sales[scenarioKey],
+  });
+  if (!State.cache.results || State.cache.key !== key) {
+    State.cache = { key, results: {} };
+  }
+  State.cache.results[scenarioKey] = result;
+  return result;
+}
+
+function invalidateCache() { State.cache = {}; }
+
+// ---- Formatters ----
+function fmtCurrency(n, decimals = 0) {
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(Math.round(n * Math.pow(10, decimals)) / Math.pow(10, decimals));
+  return sign + '$' + abs.toLocaleString('en-CA', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+function fmtCurrencySigned(n) {
+  return (n >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(n)).toLocaleString('en-CA');
+}
+function fmtCompact(n) {
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1000) return sign + '$' + (abs / 1000).toFixed(abs >= 10000 ? 0 : 1) + 'K';
+  return sign + '$' + Math.round(abs);
+}
+function fmtNum1(n) { return n.toFixed(1); }
+function regimeLabel(r) {
+  const labels = {
+    1: '1 — Constrained',
+    2: '2 — Base salary (savings funding)',
+    3: '3 — Escalated (savings at floor)',
+    4: '4 — Earned salary',
+    5: '5 — At Ceiling',
+  };
+  return labels[r] || String(r);
+}
+function regimePillClass(r) {
+  return r === 1 ? 'bad' : r === 2 ? 'neutral' : r === 3 ? 'warn' : r === 4 ? 'good' : 'good';
+}
+
+// ---- Tab switching ----
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById('panel-' + btn.dataset.tab);
+      if (panel) panel.classList.add('active');
+      // Re-render the activated tab to ensure charts size correctly
+      renderActiveTab(btn.dataset.tab);
+    });
+  });
+}
+
+function renderActiveTab(tab) {
+  if (tab === 'runway') renderRunwayTab();
+  else if (tab === 'expenses') renderExpensesTab();
+  else if (tab === 'sales') renderSalesTab();
+  else if (tab === 'summary') renderSummaryTab();
+  else if (tab === 'monthly') renderMonthlyTab();
+}
+
+// ---- App init ----
+// initAuth() shows the login screen, or goes straight to the app if a
+// session already exists. See the CLOUD SYNC section below.
+document.addEventListener('DOMContentLoaded', initAuth);
+
+
+// ============================================================
+// CLOUD SYNC (Supabase) — one row, autosaved.
+// Table: plan_model(owner uuid pk default auth.uid(), data jsonb, updated_at timestamptz)
+// RLS: owner = auth.uid() for select/insert/update. The client never sends
+// an owner value — Postgres stamps it from the JWT.
+// Auth: email/password, signups DISABLED in the dashboard. One user.
+//
+// NOTE: all model defaults ship as ZERO. Real figures live only in Supabase,
+// because this file sits in a public repo. First load = empty model; use
+// Import to seed it once from the JSON backup.
+// ============================================================
+var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
+var LOCAL_BUFFER_KEY = 'planModel_offlineBuffer';
+var APP_VERSION      = 'AdviceOnly-Model-v1';
+var PAYLOAD_VERSION  = 6;
+
+var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
+  ? null
+  : supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Set once at sign-in. The DB also defaults owner to auth.uid(), so this is
+// belt-and-braces — but naming the conflict target explicitly keeps the
+// upsert unambiguous.
+var CURRENT_UID = null;
+
+// buildSavePayload: single source of truth for what persists.
+// Used by BOTH the local JSON export and the cloud auto-save.
+function buildSavePayload() {
+  return {
+    version: PAYLOAD_VERSION,
+    savedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    // deposits is TOP-LEVEL, not under assumptions — migrateData and
+    // applyLoadedData both address it as data.deposits. Keep them in step.
+    deposits: State.deposits,
+    assumptions: {
+      floorGross: State.floorGross,
+      ceilingGross: State.ceilingGross,
+      corpFunding: State.corpFunding,
+      minBuffer: State.minBuffer,
+      surplusTriggerMonths: State.surplusTriggerMonths,
+      corpTaxRate: State.corpTaxRate,
+      ashleyMonthly: State.ashleyMonthly,
+      hhBurnMonthly: State.hhBurnMonthly,
+      adamMonthly: State.adamMonthly,
+      adamMonthsActive: State.adamMonthsActive,
+      hhSavingsStart: State.hhSavingsStart,
+      savingsFloor: State.savingsFloor,
+      baseSalary: State.baseSalary,
+      salaryReviewMonths: State.salaryReviewMonths,
+      runRateWindowMonths: State.runRateWindowMonths,
+      salaryStep: State.salaryStep,
+      coverageRatio: State.coverageRatio,
+    },
+    expense: {
+      opexFlat: State.expense.opexFlat,
+      startupFlat: State.expense.startupFlat,
+    },
+    sales: {
+      pessimistic: State.sales.pessimistic,
+      base: State.sales.base,
+      optimistic: State.sales.optimistic,
+    },
+    scenarioDesc: State.scenarioDesc,
+    ui: { scenario: State.scenario },
+    taxConstants: { year: 2026, note: 'Federal+Ontario brackets as coded. Update annually.' },
+  };
+}
+
+// migrateData: v1 -> v2 added per-item `id` (stable identity under reorder/
+// delete) and `basis` ('monthly' | 'annual'). The migration is non-destructive:
+// v1 rows were all annual amounts, so basis:'annual' reproduces them exactly.
+// No re-import needed for an existing saved model.
+function migrateData(data) {
+  if (!data.version) data.version = 1;
+
+  if (data.version < 2) {
+    var n = 0;
+    if (data.expense && data.expense.opexFlat) {
+      data.expense.opexFlat.forEach(function (it) {
+        if (!it.id) it.id = 'o' + (++n);
+        if (!it.basis) it.basis = 'annual';
+      });
+    }
+    var m = 0;
+    if (data.expense && data.expense.startupFlat) {
+      data.expense.startupFlat.forEach(function (it) {
+        if (!it.id) it.id = 's' + (++m);
+      });
+    }
+    data.version = 2;
+  }
+
+  // v2 -> v3: a single `avgDeposit` becomes a 3-point distribution. Seeding it
+  // as a DEGENERATE distribution (all three points equal, all weight on mid)
+  // makes E[f(X)] collapse to f(avgDeposit) exactly — so an existing model's
+  // numbers cannot move. You opt into a real spread by editing the points.
+  if (data.version < 3) {
+    if (data.assumptions && data.assumptions.avgDeposit !== undefined && !data.deposits) {
+      var avg = data.assumptions.avgDeposit;
+      data.deposits = {
+        low:  { amt: avg, w: 0 },
+        mid:  { amt: avg, w: 100 },
+        high: { amt: avg, w: 0 },
+      };
+      delete data.assumptions.avgDeposit;
+    }
+    if (!data.deposits) {
+      data.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
+    }
+    data.version = 3;
+  }
+
+  // v3 -> v4: salary policy params.
+  // NOTE — unlike every earlier migration, this one DOES change your numbers,
+  // and that is the point: v3 re-decided salary every month against the corp
+  // BALANCE, which made it oscillate (floor, floor, ceiling, floor...) and let
+  // seed capital buy raises. v4 reviews annually against trailing REVENUE.
+  // The old behaviour was the bug; there is nothing to preserve.
+  if (data.version < 4) {
+    if (data.assumptions) {
+      ['salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio'].forEach(function (k) {
+        if (data.assumptions[k] === undefined) data.assumptions[k] = DEFAULTS[k];
+      });
+    }
+    data.version = 4;
+  }
+
+  // v4 -> v5: household savings account. Defaults to 0, which is honest — the
+  // model shouldn't invent a buffer you may not have. Numbers don't move; this
+  // adds a reported quantity rather than changing any existing one.
+  if (data.version < 5) {
+    if (data.assumptions && data.assumptions.hhSavingsStart === undefined) {
+      data.assumptions.hhSavingsStart = DEFAULTS.hhSavingsStart;
+    }
+    data.version = 5;
+  }
+
+  // v5 -> v6: baseSalary + savingsFloor, and salary policy inverts — savings is
+  // now the first line and payroll the backstop. THIS ONE MOVES YOUR NUMBERS,
+  // like the v4 controller change did, and for the same reason: routing household
+  // spending through payroll costs ~1.34x what drawing savings costs. Both new
+  // params default to 0, which reproduces sensible behaviour until you set them.
+  if (data.version < 6) {
+    if (data.assumptions) {
+      ['savingsFloor','baseSalary'].forEach(function (k) {
+        if (data.assumptions[k] === undefined) data.assumptions[k] = DEFAULTS[k];
+      });
+    }
+    data.version = 6;
+  }
+  return data;
+}
+
+// newItemId: monotonic, collision-proof against whatever ids already exist.
+function newItemId(prefix, list) {
+  var max = 0;
+  list.forEach(function (it) {
+    var m = /^([a-z]+)(\d+)$/.exec(it.id || '');
+    if (m && m[1] === prefix) max = Math.max(max, Number(m[2]));
+  });
+  return prefix + (max + 1);
+}
+
+// applyLoadedData: exact mirror of buildSavePayload.
+function applyLoadedData(data, sourceLbl) {
+  data = migrateData(data);
+
+  var a = data.assumptions || {};
+  ['floorGross','ceilingGross','corpFunding','minBuffer',
+   'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
+   'adamMonthly','adamMonthsActive',
+   'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
+   'hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) {
+    if (a[k] !== undefined) State[k] = a[k];
+  });
+
+  if (data.deposits) State.deposits = data.deposits;
+
+  if (data.expense) {
+    if (data.expense.opexFlat)    State.expense.opexFlat    = data.expense.opexFlat;
+    if (data.expense.startupFlat) State.expense.startupFlat = data.expense.startupFlat;
+  }
+  if (data.sales) {
+    ['pessimistic','base','optimistic'].forEach(function (k) {
+      if (data.sales[k]) State.sales[k] = data.sales[k];
+    });
+  }
+  if (data.scenarioDesc) State.scenarioDesc = data.scenarioDesc;
+  if (data.ui && data.ui.scenario) State.scenario = data.ui.scenario;
+
+  invalidateCache();
+
+  var d = new Date(data.savedAt || Date.now());
+  setLastSavedLbl(sourceLbl + ' · Saved ' +
+    d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ', ' + d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }));
+
+  renderActiveTab(currentTab());
+}
+
+function currentTab() {
+  var btn = document.querySelector('.tab-btn.active');
+  return btn ? btn.dataset.tab : 'runway';
+}
+function setLastSavedLbl(txt) {
+  var el = document.getElementById('last-saved-lbl');
+  if (el) el.textContent = txt;
+}
+function showSavedBadge(msg, isErr) {
+  var el = document.getElementById('saved-badge');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'saved-badge' + (isErr ? ' err' : '');
+  if (!isErr) setTimeout(function () { if (el.textContent === msg) el.textContent = ''; }, 2500);
+}
+
+// ---- Auto-save ----
+var _cloudSaveTimer = null;
+function scheduleCloudSave() {
+  if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = setTimeout(saveToCloud, 600);
+}
+
+async function saveToCloud() {
+  var payload = buildSavePayload();
+  if (!sbClient) { showSavedBadge('Not configured', true); return; }
+  try {
+    if (!navigator.onLine) throw new Error('offline');
+    var res = await sbClient.from('plan_model').upsert(
+      { owner: CURRENT_UID, data: payload, updated_at: new Date().toISOString() },
+      { onConflict: 'owner' }
+    );
+    if (res.error) throw res.error;
+    localStorage.removeItem(LOCAL_BUFFER_KEY);
+    showSavedBadge('Saved ✓');
+    setLastSavedLbl('Saved to cloud · ' + new Date().toLocaleTimeString('en-CA',
+      { hour: 'numeric', minute: '2-digit' }));
+  } catch (err) {
+    localStorage.setItem(LOCAL_BUFFER_KEY, JSON.stringify(payload));
+    showSavedBadge('Saved offline ⚠', true);
+  }
+}
+
+function syncOfflineBuffer() {
+  if (localStorage.getItem(LOCAL_BUFFER_KEY) && sbClient) saveToCloud();
+}
+window.addEventListener('online', syncOfflineBuffer);
+
+async function loadFromCloud() {
+  if (!sbClient) return;
+  try {
+    var res = await sbClient.from('plan_model').select('data,updated_at').maybeSingle();
+    if (res.error) throw res.error;
+    if (res.data && res.data.data) {
+      applyLoadedData(res.data.data, 'Loaded from cloud');
+    } else {
+      setLastSavedLbl('No saved model yet — use Import to load your seed JSON. All values are zero until you do.');
+    }
+  } catch (err) {
+    var buf = localStorage.getItem(LOCAL_BUFFER_KEY);
+    if (buf) {
+      applyLoadedData(JSON.parse(buf), 'Loaded from offline buffer (unsynced)');
+    } else {
+      setLastSavedLbl('Could not reach cloud — check your connection.');
+    }
+  }
+}
+
+// ---- Import / Export ----
+// Import is the real recovery path: defaults are zeros, so Reset does not
+// restore anything usable. Keep an exported backup.
+function exportData() {
+  var payload = buildSavePayload();
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var d = new Date();
+  var stamp = d.toISOString().slice(0, 10) + '_' +
+    String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Advice_Only_Model_' + stamp + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showSavedBadge('Downloaded ✓');
+}
+
+function importData() {
+  document.getElementById('import-file').click();
+}
+
+function handleImportFile(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var data = JSON.parse(ev.target.result);
+      applyLoadedData(data, 'Imported ' + file.name);
+      scheduleCloudSave(); // push the imported file up immediately
+      showSavedBadge('Imported ✓');
+    } catch (err) {
+      showSavedBadge('Bad JSON ⚠', true);
+      alert('Could not read that file as an Advice Only model JSON.\n\n' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // allow re-importing the same filename
+}
+
+function resetToDefaults() {
+  if (!confirm(
+    'Reset every value to zero?\n\n' +
+    'Defaults in this file are all zeros — this does NOT restore your real ' +
+    'numbers. It overwrites your saved model with an empty one.\n\n' +
+    'Export a backup first if you have not.'
+  )) return;
+  ['floorGross','ceilingGross','corpFunding','minBuffer',
+   'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
+   'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
+   'coverageRatio','hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+  State.corpTaxRate = CORP_TAX.smallBusinessRate;
+  State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
+  State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
+  State.scenario = 'base';
+  initExpenseState();
+  initSalesState();
+  invalidateCache();
+  scheduleCloudSave();
+  renderActiveTab(currentTab());
+}
+
+// ---- Auth ----
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app-shell').classList.add('hidden');
+}
+function showAppScreen() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+}
+async function doSignIn() {
+  var email = document.getElementById('login-email').value.trim();
+  var pw    = document.getElementById('login-pw').value;
+  var errEl = document.getElementById('login-err');
+  var btn   = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if (!email || !pw) { errEl.textContent = 'Enter your email and password.'; return; }
+  if (!sbClient)     { errEl.textContent = 'Cloud backend not configured yet.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  var res = await sbClient.auth.signInWithPassword({ email: email, password: pw });
+  btn.disabled = false; btn.textContent = 'Sign in';
+  if (res.error) { errEl.textContent = res.error.message; return; }
+  document.getElementById('login-pw').value = '';
+  await initAppAfterAuth();
+}
+async function doSignOut() {
+  if (sbClient) await sbClient.auth.signOut();
+  showLoginScreen();
+}
+var _appBuilt = false;
+async function initAppAfterAuth() {
+  showAppScreen();
+  var sess = await sbClient.auth.getSession();
+  CURRENT_UID = sess.data && sess.data.session ? sess.data.session.user.id : null;
+  if (!_appBuilt) {
+    buildSkeleton();
+    initTabs();
+    document.getElementById('import-file').addEventListener('change', handleImportFile);
+    _appBuilt = true;
+  }
+  renderRunwayTab();
+  await loadFromCloud();
+  syncOfflineBuffer();
+}
+async function initAuth() {
+  initExpenseState();
+  initSalesState();
+  if (!sbClient) {
+    showLoginScreen();
+    document.getElementById('login-err').textContent =
+      'Cloud backend not configured — set SUPABASE_URL / SUPABASE_ANON_KEY in the script.';
+    return;
+  }
+  var res = await sbClient.auth.getSession();
+  if (res.data && res.data.session) {
+    await initAppAfterAuth();
+  } else {
+    showLoginScreen();
+  }
+  sbClient.auth.onAuthStateChange(function (event) {
+    if (event === 'SIGNED_OUT') showLoginScreen();
+  });
+}
+
+// ============================================================
+// SKELETON — builds the static HTML shell for all four tab panels
+// ============================================================
+function buildSkeleton() {
+  const root = document.getElementById('app-root');
+  root.innerHTML = `
+    <section class="tab-panel active" id="panel-runway">
+      <h2 class="section-title">Runway &amp; Cash Flow</h2>
+      <p class="section-sub">How long the corporate account funds your household while the business ramps, and when it becomes self-sustaining.</p>
+      <div id="runway-content"></div>
+    </section>
+
+    <section class="tab-panel" id="panel-expenses">
+      <h2 class="section-title">Expense Model</h2>
+      <p class="section-sub">Every operating cost feeding the corporate account's monthly outflow, plus the one-time setup spend added in month 1. Type directly into any field to adjust.</p>
+      <div id="expenses-content"></div>
+    </section>
+
+    <section class="tab-panel" id="panel-sales">
+      <h2 class="section-title">Sales Scenarios</h2>
+      <p class="section-sub">Sales per month feeding every scenario's commission revenue. Type directly into any month to adjust the ramp.</p>
+      <div id="sales-content"></div>
+    </section>
+
+    <section class="tab-panel" id="panel-summary">
+      <h2 class="section-title">Scenario Summary</h2>
+      <p class="section-sub">The full picture across pessimistic, base, and optimistic ramps — at a glance.</p>
+      <div id="summary-content"></div>
+    </section>
+
+    <section class="tab-panel" id="panel-monthly">
+      <h2 class="section-title">Monthly Detail</h2>
+      <p class="section-sub">Every month, every column, exactly as modelled — corporate account on the left, household ledger on the right.</p>
+      <div id="monthly-content"></div>
+    </section>
+  `;
+}
+
+// ============================================================
+// RUNWAY & CASH FLOW TAB
+// ============================================================
+let runwayChartInstance = null;
+
+function renderRunwayTab() {
+  const container = document.getElementById('runway-content');
+  if (!container) return;
+
+  const adamGrossAnnual = Engine.grossForNet(State.adamMonthly * 12);
+
+  container.innerHTML = `
+    <div class="runway-two-col">
+
+      <!-- LEFT: Assumptions panel -->
+      <div class="assumptions-panel">
+        <div class="eyebrow">Model assumptions</div>
+
+        <div class="input-section">
+          <div class="input-section-title" style="display:flex;align-items:center;gap:6px">
+            <span>Business</span>
+            <button class="help-btn ${openHelpKey === 'deposits' ? 'open' : ''}" data-help="deposits" title="What is this?">?</button>
+          </div>
+          ${helpHTML('deposits')}
+          ${depositBlockHTML()}
+          ${numFieldHTML('floorGross', 'Annual salary floor', State.floorGross, '$', '', 1000)}
+          ${numFieldHTML('ceilingGross', 'Annual salary ceiling', State.ceilingGross, '$', '', 1000)}
+        </div>
+
+        <div class="input-section">
+          <div class="input-section-title">Salary policy</div>
+          ${numFieldHTML('baseSalary', 'Base salary (survival mode)', State.baseSalary, '$', '', 1000)}
+          ${numFieldHTML('salaryReviewMonths', 'Review salary every', State.salaryReviewMonths, '', ' months', 1)}
+          ${numFieldHTML('runRateWindowMonths', 'Run-rate window', State.runRateWindowMonths, '', ' months', 1)}
+          ${numFieldHTML('salaryStep', 'Round salary down to', State.salaryStep, '$', '', 1000)}
+          ${numFieldHTML('coverageRatio', 'Coverage required to raise', State.coverageRatio, '', '\u00d7', 0.05)}
+          <div class="adam-gross-note" style="margin-top:.5rem">
+            Savings fund the household first — a dollar of savings costs $1, a dollar via payroll costs
+            the corp ~$1.34. Payroll escalates only to defend the savings floor.
+            Salary is set at review months and held. Raising needs trailing revenue to cover
+            <strong>${State.coverageRatio}&times;</strong> the cost of the raise <em>and</em> a balance above the
+            surplus threshold. A drop below the minimum buffer cuts to floor immediately, until the next review.
+          </div>
+        </div>
+
+        <div class="input-section">
+          <div class="input-section-title">Corporate account</div>
+          ${numFieldHTML('corpFunding', 'Initial funding', State.corpFunding, '$', '', 5000)}
+          ${numFieldHTML('minBuffer', 'Minimum buffer', State.minBuffer, '$', '', 5000)}
+          ${numFieldHTML('surplusTriggerMonths', 'Surplus threshold', State.surplusTriggerMonths, '', ' months', 1)}
+          ${numFieldHTML('corpTaxRate', 'Corp tax rate (SBD)', State.corpTaxRate * 100, '', '%', 0.5)}
+        </div>
+
+        <div class="input-section">
+          <div class="input-section-title">Household</div>
+          ${numFieldHTML('hhBurnMonthly', 'Monthly household burn', State.hhBurnMonthly, '$', '/mo', 250)}
+          ${numFieldHTML('ashleyMonthly', "Ashley's net income", State.ashleyMonthly, '$', '/mo', 100)}
+          ${numFieldHTML('hhSavingsStart', 'Personal savings (outside corp)', State.hhSavingsStart, '$', '', 5000)}
+          ${numFieldHTML('savingsFloor', 'Savings floor (hard reserve)', State.savingsFloor, '$', '', 2500)}
+        </div>
+
+        <div class="input-section">
+          <div class="input-section-title">Adam's contribution</div>
+          ${numFieldHTML('adamMonthly', 'Monthly net amount', State.adamMonthly, '$', '/mo', 100)}
+          ${numFieldHTML('adamMonthsActive', 'Duration', State.adamMonthsActive, '', ' months', 1)}
+          <div class="adam-gross-note">
+            ≈ <strong>${fmtCurrency(adamGrossAnnual)}</strong> gross annual equivalent
+            <span class="adam-gross-sub">(personal income, not corp revenue — directional only, Ontario+Federal brackets)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Stats + chart -->
+      <div class="runway-right">
+        <div class="scenario-bar" id="runway-scenario-bar">
+          ${scenarioButtonsHTML()}
+        </div>
+        <div id="runway-narrative"></div>
+        <div class="stat-grid" id="runway-stats"></div>
+        <div class="chart-box">
+          <div class="eyebrow">Corporate bank balance &amp; net cash flow — 60 months</div>
+          <div class="chart-legend">
+            <span><span class="legend-dot" style="background:#b3392e"></span>1 — Constrained</span>
+            <span><span class="legend-dot" style="background:#8a9eb5"></span>2 — Base salary</span>
+            <span><span class="legend-dot" style="background:#CC7722"></span>3 — Escalated</span>
+            <span><span class="legend-dot" style="background:#1A3D3A"></span>4 — Earned</span>
+            <span><span class="legend-dot" style="background:#1e7a52"></span>5 — At Ceiling</span>
+            <span><span class="legend-dot" style="background:#CC7722;border-radius:0;height:3px;width:14px;display:inline-block;vertical-align:middle"></span>Corp bank balance (right axis)</span>
+          </div>
+          <canvas id="runway-chart" height="90"></canvas>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  attachNumFieldHandlers(renderRunwayTab);
+  attachDepositHandlers(renderRunwayTab);
+  attachHelpHandlers();
+  renderDepositReadout();
+  attachScenarioButtonHandlers('runway-scenario-bar', renderRunwayTab);
+
+  const result = runSimulation(State.scenario);
+  renderRunwayStats(result);
+  renderRunwayNarrative(result);
+  renderRunwayChart(result);
+}
+
+
+// ============================================================
+// FIELD_META — what each input is, and where its effect surfaces.
+// Doubles as the model's documentation: there is nowhere else that records
+// which output a given assumption actually drives.
+// ============================================================
+const FIELD_META = {
+  deposits: {
+    what: 'Deposit size as a 3-point distribution rather than one average. Commission is graded (2.5/2.0/1.5%), so it is concave in deposit size — averaging first overstates it slightly. The bigger point: stating low/mid/high forces the implied mean into the open.',
+    affects: 'Monthly Detail → <strong>Gross Commission</strong> · "Commission per sale" stat',
+  },
+  floorGross: {
+    what: 'The salary you are aiming at once the business can carry it. Not a guaranteed minimum — until trailing revenue sustains it, you are paid the base salary instead. Worth checking against what the household actually needs.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 4 · "Months above floor" stat',
+  },
+  ceilingGross: {
+    what: 'The most the corp will ever pay you, however well things go. The controller stops here.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 5',
+  },
+  baseSalary: {
+    what: 'Survival-mode salary, paid until the business can sustain the floor. Deliberately low: $1 of household spending via payroll costs the corp ~$1.34, while $1 from savings costs $1. Around $20k the basic personal amount shields it, so it is near-free to extract while still generating RRSP room and CPP credits.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> 2',
+  },
+  salaryReviewMonths: {
+    what: 'How often salary is re-set. Between reviews it is HELD — you do not re-run payroll every month, and pretending otherwise made the salary oscillate. At 12 the reviews land on months 1, 13, 25, 37, 49.',
+    affects: 'Monthly Detail → <strong>⟳</strong> marker, <strong>Target Gross</strong>',
+  },
+  runRateWindowMonths: {
+    what: 'How many trailing months of commission are used to judge what salary is sustainable, annualised to a yearly rate. A flow test — unlike a balance test, seed capital cannot masquerade as earning power.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong> at review months',
+  },
+  salaryStep: {
+    what: 'Rounds the sustainable salary DOWN to a round figure, because a real T4 is a round number. Mildly conservative as a side effect (about half a step on average) — but that is an accounting artifact, not risk management. Use coverage for that.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>',
+  },
+  coverageRatio: {
+    what: 'Trailing revenue must cover this multiple of what a raise costs before you take it. At 1.0 you raise to exactly break-even and the corp never grows. Higher keeps more in the corp. This is the real conservatism dial.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Regime</strong> · chart bar colours',
+  },
+  hhBurnMonthly: {
+    what: 'Everything the household spends in a month. The number every other household figure is measured against.',
+    affects: 'Monthly Detail → <strong>HH Burn</strong>, <strong>HH Surplus/Deficit</strong>, <strong>Savings Balance</strong>',
+  },
+  ashleyMonthly: {
+    what: "Ashley's take-home. Reduces what your salary and savings have to cover.",
+    affects: 'Monthly Detail → <strong>Ashley</strong>, <strong>HH Net Total</strong>',
+  },
+  hhSavingsStart: {
+    what: 'Your personal account opening balance — OUTSIDE the corp. Money in the CCPC is not spendable money: the only pipe out is payroll, and payroll is throttled exactly when the corp is low. This pool and the corp seed are different things.',
+    affects: 'Monthly Detail → <strong>Savings Balance</strong> · "Personal savings run out" and "Savings low point" stats',
+  },
+  savingsFloor: {
+    what: 'Hard reserve. Savings fund the household down to this line; past it payroll escalates to defend it. It can still break if the corp has no money either — a reserve is only defensible if there is money somewhere.',
+    affects: 'Monthly Detail → <strong>Savings Balance</strong>, <strong>Regime</strong> 3',
+  },
+  adamMonthly: {
+    what: "Adam's monthly contribution. Flows as personal household income, never through the corp's taxable income.",
+    affects: 'Monthly Detail → <strong>Adam</strong>, <strong>HH Net Total</strong>',
+  },
+  adamMonthsActive: {
+    what: 'How long the contribution runs. Watch what happens the month after it stops — the support tends to end before the business can carry you.',
+    affects: 'Monthly Detail → <strong>Adam</strong> · the ⚠ row at month 13',
+  },
+  corpFunding: {
+    what: 'Cash the corp opens with. Splitting a fixed pot between here and personal savings barely changes your combined wealth — the money is fungible — but it swings the risk of running dry enormously. This is a risk decision, not a return one.',
+    affects: 'Monthly Detail → <strong>Corp Balance</strong> · "Lowest corp balance" stat',
+  },
+  minBuffer: {
+    what: 'Corp balance floor. Drop below it and salary is cut to base immediately, any month, and stays cut until the next review. That stickiness is what stops the salary oscillating.',
+    affects: 'Monthly Detail → <strong>Regime</strong> 1 rows · "Lowest corp balance" stat',
+  },
+  surplusTriggerMonths: {
+    what: 'Months of runway the corp must hold before a raise is allowed — the second gate alongside coverage. Earning it is not enough; you also want a cushion behind you.',
+    affects: '"Surplus threshold" stat · Monthly Detail → <strong>Regime</strong> 4/5',
+  },
+  corpTaxRate: {
+    what: 'Small business deduction rate, applied to corporate profit at year-end. Losses carry forward and shelter later profit.',
+    affects: 'Monthly Detail → <strong>Corp Tax Owed</strong>, <strong>Loss Carryforward</strong> · 🧾 year-end rows',
+  },
+};
+
+// Which field's help is open. UI-only — deliberately not persisted; it's a
+// display preference, not an assumption, and not worth a payload migration.
+let openHelpKey = null;
+
+function helpHTML(key) {
+  const meta = FIELD_META[key];
+  if (!meta) return '';
+  return `<div class="field-help" data-help="${key}" ${openHelpKey === key ? '' : 'style="display:none"'}>
+    ${meta.what}
+    <span class="affects">Shows up in: ${meta.affects}</span>
+  </div>`;
+}
+
+function attachHelpHandlers() {
+  document.querySelectorAll('.help-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.help;
+      openHelpKey = (openHelpKey === key) ? null : key;   // one at a time
+      document.querySelectorAll('.field-help').forEach(el => {
+        el.style.display = (el.dataset.help === openHelpKey) ? '' : 'none';
+      });
+      document.querySelectorAll('.help-btn').forEach(b => {
+        b.classList.toggle('open', b.dataset.help === openHelpKey);
+      });
+    });
+  });
+}
+
+
+// ============================================================
+// NUMERIC INPUT ERGONOMICS
+// Three separate problems, all felt as "the boxes are fiddly":
+//  1. Clicking a field put the caret mid-number, so typing APPENDED to the old
+//     value ("85000" + "100000" -> "85100000000") instead of replacing it.
+//  2. Enter didn't visibly commit.
+//  3. Panels that re-render on change (the Runway tab rebuilds its whole
+//     innerHTML) destroyed the focused element, so focus vanished mid-edit —
+//     which made arrow-key nudging unusable.
+// ============================================================
+
+function enhanceNumericInput(el) {
+  // Select the whole value on focus so typing replaces it.
+  el.addEventListener('focus', () => el.select());
+  // A click would otherwise collapse that selection to a caret. Suppressing
+  // mouseup's default keeps the select() from focus intact — but only when the
+  // click IS the thing giving it focus, or drag-to-select inside the field breaks.
+  el.addEventListener('mousedown', () => { el._hadFocus = (document.activeElement === el); });
+  el.addEventListener('mouseup', e => { if (!el._hadFocus) e.preventDefault(); });
+  // Enter commits. Blur fires `change`, which is where the value is read.
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+  });
+}
+
+// Identify a field well enough to find it again after its DOM node is replaced.
+function focusSignature(el) {
+  if (!el || el.tagName !== 'INPUT') return null;
+  if (el.id) return '#' + el.id.replace(/([^\w-])/g, '\\$1');
+  if (el.classList.contains('dep-in')) {
+    return `.dep-in[data-dep="${el.dataset.dep}"][data-f="${el.dataset.f}"]`;
+  }
+  return null;
+}
+
+// Run a re-render without stealing focus from whatever the person is editing.
+function withFocusRestored(fn) {
+  const sig = focusSignature(document.activeElement);
+  const start = document.activeElement && document.activeElement.selectionStart;
+  fn();
+  if (!sig) return;
+  const next = document.querySelector(sig);
+  if (!next) return;
+  next.focus();
+  // Arrow-key nudging fires `change` while still focused; re-select so the next
+  // keystroke still replaces rather than appends.
+  if (start === null || start === undefined) next.select();
+  else next.select();
+}
+
+function numFieldHTML(key, label, value, prefix, suffix, step) {
+  const displayVal = key === 'corpTaxRate' ? value.toFixed(1) : value;
+  return `
+    <div class="num-field-row">
+      <div class="num-field-label-wrap">
+        <label class="num-field-label" for="input-${key}">${label}</label>
+        ${FIELD_META[key] ? `<button class="help-btn ${openHelpKey === key ? 'open' : ''}" data-help="${key}" title="What is this?">?</button>` : ''}
+      </div>
+      <div class="num-field-input-wrap">
+        ${prefix ? `<span class="num-field-affix">${prefix}</span>` : ''}
+        <input class="num-field-input" type="number" id="input-${key}"
+          value="${displayVal}" step="${step}" data-key="${key}" data-prefix="${prefix}" data-suffix="${suffix}">
+        ${suffix ? `<span class="num-field-affix">${suffix}</span>` : ''}
+      </div>
+    </div>
+    ${helpHTML(key)}
+  `;
+}
+
+function scenarioDesc(key) {
+  return (State.scenarioDesc && State.scenarioDesc[key]) || SCENARIO_META[key].desc || '';
+}
+
+
+// ============================================================
+// DEPOSIT DISTRIBUTION (3-point)
+// ============================================================
+function depositBlockHTML() {
+  const d = State.deposits;
+  const row = (k, lbl) => `
+    <div class="dep-lbl">${lbl}</div>
+    <input class="dep-in" type="number" min="0" step="25000" data-dep="${k}" data-f="amt" value="${d[k].amt}">
+    <input class="dep-in" type="number" min="0" step="5" data-dep="${k}" data-f="w" value="${d[k].w}">`;
+  return `
+    <div class="dep-grid">
+      <div class="hdr"></div><div class="hdr r">Deposit</div><div class="hdr r">Weight</div>
+      ${row('low', 'Low')}
+      ${row('mid', 'Mid')}
+      ${row('high', 'High')}
+    </div>
+    <div class="dep-wsum" id="dep-wsum"></div>
+    <div class="dep-readout" id="dep-readout"></div>`;
+}
+
+// The readout exists to make the assumption visible: the implied mean is the
+// number most likely to differ from whatever single "average" you'd have typed.
+// The naive line shows f(mean) — what a single-average model would have paid —
+// so the concavity gap is on screen rather than buried in the engine.
+function renderDepositReadout() {
+  const d = State.deposits;
+  const wsum = ['low', 'mid', 'high'].reduce((t, k) => t + (Number(d[k].w) || 0), 0);
+  const el = document.getElementById('dep-wsum');
+  if (el) {
+    el.textContent = wsum === 100 ? 'Weights sum to 100%'
+      : wsum <= 0 ? 'No weights set — using Mid only'
+      : `Weights sum to ${(Math.round(wsum * 10) / 10)}% — normalised`;
+    el.className = 'dep-wsum' + (wsum === 100 ? '' : ' off');
+  }
+  const out = document.getElementById('dep-readout');
+  if (!out) return;
+  const mean = Engine.meanDeposit(d);
+  const exp = Engine.expectedCommission(d);
+  const naive = Engine.commissionPerSale(mean);
+  const gap = naive - exp;
+  out.innerHTML = `
+    <div class="row"><span class="k">Implied mean deposit</span><span class="v">${fmtCurrency(mean)}</span></div>
+    <div class="row"><span class="k">Expected commission / sale</span><span class="v">${fmtCurrency(exp)}</span></div>
+    <div class="row naive"><span class="k">Naive — single average</span><span class="v">${fmtCurrency(naive)}</span></div>
+    <div class="dep-gap">${gap > 0.5
+      ? `Averaging the deposit first would overstate commission by <strong>${fmtCurrency(gap)}</strong>/sale
+         (${(gap / naive * 100).toFixed(1)}%) — the grade is concave, so E[f(X)] &lt; f(E[X]).`
+      : `No gap — the spread sits in the flat 1.5% band above ${fmtCurrency(COMMISSION.tier2Cap)},
+         where the grade is linear and averaging first is exact.`}</div>`;
+}
+
+function attachDepositHandlers(rerenderFn) {
+  document.querySelectorAll('.dep-in').forEach(inp => {
+    enhanceNumericInput(inp);
+    inp.addEventListener('change', () => {
+      const val = Math.max(0, Number(inp.value) || 0);
+      inp.value = val;
+      State.deposits[inp.dataset.dep][inp.dataset.f] = val;
+      invalidateCache();
+      scheduleCloudSave();
+      withFocusRestored(rerenderFn);
+    });
+  });
+}
+
+function attachNumFieldHandlers(rerenderFn) {
+  const keys = ['floorGross','ceilingGross','corpFunding','minBuffer',
+                 'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
+                 'ashleyMonthly','hhBurnMonthly',
+                 'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
+                 'hhSavingsStart','savingsFloor','baseSalary'];
+  keys.forEach(key => {
+    const el = document.getElementById('input-' + key);
+    if (!el) return;
+    enhanceNumericInput(el);
+    el.addEventListener('change', () => {
+      let val = Number(el.value);
+      if (key === 'corpTaxRate') val = val / 100; // stored as decimal, displayed as %
+      State[key] = val;
+      invalidateCache();
+      scheduleCloudSave();
+      withFocusRestored(rerenderFn);
+    });
+  });
+}
+
+function sliderHTML(key, label, value, min, max, step, formatter) {
+  return `
+    <div class="slider-unit">
+      <div class="slider-label-row">
+        <span class="slider-label">${label}</span>
+        <span class="slider-value" id="val-${key}">${formatter(value)}</span>
+      </div>
+      <input type="range" id="slider-${key}" min="${min}" max="${max}" step="${step}" value="${value}" data-key="${key}">
+    </div>
+  `;
+}
+
+function attachSliderHandlers(rerenderFn) {
+  ['floorGross', 'ceilingGross', 'corpFunding', 'minBuffer', 'surplusTriggerMonths', 'corpTaxRate'].forEach(key => {
+    const el = document.getElementById('slider-' + key);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      State[key] = Number(el.value);
+      invalidateCache();
+      const formatter = key === 'surplusTriggerMonths' ? (n => n + ' months')
+        : key === 'corpTaxRate' ? (n => (n * 100).toFixed(1) + '%')
+        : fmtCurrency;
+      const valEl = document.getElementById('val-' + key);
+      if (valEl) valEl.textContent = formatter(State[key]);
+      // Debounce-free immediate re-render (simulation is fast enough)
+      rerenderFn();
+    });
+  });
+}
+
+function scenarioButtonsHTML() {
+  return ['pessimistic', 'base', 'optimistic'].map(k => `
+    <button class="scenario-btn ${State.scenario === k ? 'active' : ''}" data-scenario="${k}">${SCENARIO_META[k].label}</button>
+  `).join('');
+}
+
+function attachScenarioButtonHandlers(containerId, rerenderFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.querySelectorAll('.scenario-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      State.scenario = btn.dataset.scenario;
+      scheduleCloudSave();
+      rerenderFn();
+    });
+  });
+}
+
+function renderRunwayStats(result) {
+  const months = result.months;
+  const endingBalance = months[59].corpBalance;
+  const lowestBalance = Math.min(...months.map(m => m.corpBalance));
+  const worstHH = Math.min(...months.map(m => m.hhSurplus));
+  const deficitMonths = months.filter(m => m.hhSurplus < 0).length;
+  const r4r5 = months.filter(m => m.regime === 4 || m.regime === 5).length;
+
+  const lowestCls = lowestBalance >= State.minBuffer ? 'good' : lowestBalance >= 0 ? 'warn' : 'bad';
+  const worstHHCls = worstHH >= 0 ? 'good' : worstHH >= -1000 ? 'warn' : 'bad';
+
+  // The leap question, answered directly: does the personal account survive?
+  const ruin = result.hhRuinMonth;
+  const savLow = result.hhSavingsLow;
+  const savCls = ruin ? 'bad' : savLow < State.hhSavingsStart * 0.25 ? 'warn' : 'good';
+
+  document.getElementById('runway-stats').innerHTML = `
+    <div class="stat-card ${savCls}">
+      <div class="stat-label">${ruin ? 'Personal savings run out' : 'Personal savings hold'}</div>
+      <div class="stat-value ${savCls}">${ruin ? 'Month ' + ruin : 'All 60 months'}</div>
+    </div>
+    <div class="stat-card ${savCls}">
+      <div class="stat-label">Savings low point</div>
+      <div class="stat-value ${savCls}">${fmtCurrency(savLow)}</div>
+    </div>
+    <div class="stat-card good">
+      <div class="stat-label">Ending corp balance (month 60)</div>
+      <div class="stat-value good">${fmtCurrency(endingBalance)}</div>
+    </div>
+    <div class="stat-card ${lowestCls}">
+      <div class="stat-label">Lowest corp balance (any month)</div>
+      <div class="stat-value ${lowestCls}">${fmtCurrency(lowestBalance)}</div>
+    </div>
+    <div class="stat-card ${worstHHCls}">
+      <div class="stat-label">Worst household month</div>
+      <div class="stat-value ${worstHHCls}">${fmtCurrencySigned(worstHH)}</div>
+    </div>
+    <div class="stat-card ${deficitMonths > 24 ? 'bad' : deficitMonths > 10 ? 'warn' : 'good'}">
+      <div class="stat-label">Months with household deficit</div>
+      <div class="stat-value">${deficitMonths} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
+    </div>
+    <div class="stat-card good">
+      <div class="stat-label">Months above floor (Regimes 4+5)</div>
+      <div class="stat-value good">${r4r5} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Commission per sale</div>
+      <div class="stat-value">${fmtCurrency(result.comm)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Surplus threshold</div>
+      <div class="stat-value">${fmtCurrency(result.surplusThreshold)}</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">Total corp tax paid (5 years)</div>
+      <div class="stat-value warn">${fmtCurrency(months.reduce((s, m) => s + m.corpTaxOwed, 0))}</div>
+    </div>
+  `;
+}
+
+function renderRunwayNarrative(result) {
+  const meta = SCENARIO_META[State.scenario];
+  const months = result.months;
+  const endingBalance = months[59].corpBalance;
+  const lowestBalance = Math.min(...months.map(m => m.corpBalance));
+  const cls = lowestBalance >= State.minBuffer ? 'good' : lowestBalance >= 0 ? 'warn' : 'bad';
+
+  let verdict;
+  if (lowestBalance < 0) {
+    verdict = `Under this scenario, the corporate account runs out of cash entirely at some point — the business cannot cover its own costs even at the throttled-down salary. The plan needs more starting capital, lower opex, or a faster sales ramp to survive.`;
+  } else if (lowestBalance < State.minBuffer) {
+    verdict = `The corp balance dips below your minimum buffer of ${fmtCurrency(State.minBuffer)} at its lowest point, meaning salary gets throttled during that stretch. The business recovers, but this scenario tests the edge of what the buffer is meant to protect against.`;
+  } else {
+    verdict = `The corp balance never falls below your minimum buffer — the buffer is doing its job. By month 60 the account has grown to ${fmtCurrency(endingBalance)}, well past the original ${fmtCurrency(State.corpFunding)} funding.`;
+  }
+
+  document.getElementById('runway-narrative').innerHTML = `
+    <div class="narrative-box ${cls}">
+      <h3>${meta.label} scenario</h3>
+      <p>${meta.desc}</p>
+      <p style="margin-top:0.6rem">${verdict}</p>
+    </div>
+  `;
+}
+
+function renderRunwayChart(result) {
+  const ctx = document.getElementById('runway-chart');
+  if (!ctx) return;
+  if (runwayChartInstance) runwayChartInstance.destroy();
+
+  const REGIME_COLOURS = {
+    1: '#b3392e',  // Constrained — red
+    2: '#8a9eb5',  // Base salary — muted blue-grey (conserving, calm)
+    3: '#CC7722',  // Escalated — ochre (savings at its floor, payroll defending it)
+    4: '#1A3D3A',  // Earned salary — deep teal
+    5: '#1e7a52',  // At Ceiling — green (thriving)
+  };
+
+  const labels = result.months.map(m => 'M' + m.month);
+  const netCash = result.months.map(m => Math.round(m.netCashFlow));
+  const balance = result.months.map(m => Math.round(m.corpBalance));
+  const barColours = result.months.map(m => REGIME_COLOURS[m.regime] || '#8a7d68');
+
+  runwayChartInstance = new Chart(ctx.getContext('2d'), {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Corp net cash flow',
+          data: netCash,
+          backgroundColor: barColours,
+          borderRadius: 2,
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'Corp bank balance',
+          data: balance,
+          borderColor: '#CC7722',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.25,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}`,
+            afterBody: (items) => {
+              const idx = items[0]?.dataIndex;
+              if (idx === undefined) return '';
+              const m = result.months[idx];
+              return `Regime: ${regimeLabel(m.regime)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#8a7d68', font: { size: 10 }, maxTicksLimit: 15, autoSkip: true }, grid: { display: false } },
+        y: { position: 'left', ticks: { color: '#8a7d68', font: { size: 10 }, callback: v => fmtCompact(v) }, grid: { color: '#e8e0d0' } },
+        y1: { position: 'right', ticks: { color: '#CC7722', font: { size: 10 }, callback: v => fmtCompact(v) }, grid: { display: false } },
+      },
+    },
+  });
+  ctx.parentElement.style.height = '320px';
+}
+
+// ============================================================
+// EXPENSE MODEL TAB
+// ============================================================
+function renderExpensesTab() {
+  const container = document.getElementById('expenses-content');
+  if (!container) return;
+
+  const yearHeaders = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
+
+  // Category list = source order, unioned with anything the saved payload adds.
+  // Rendering a category even when empty keeps its "+ Add" button reachable,
+  // so deleting the last row in a group isn't a one-way door.
+  function catList(sourceItems, stateItems) {
+    const cats = sourceItems.map(c => c.cat);
+    stateItems.forEach(it => { if (cats.indexOf(it.cat) === -1) cats.push(it.cat); });
+    return cats;
+  }
+
+  const dragSvg = '<svg width="9" height="13" viewBox="0 0 10 14" fill="currentColor">'
+    + '<circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/>'
+    + '<circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/>'
+    + '<circle cx="2.5" cy="11.5" r="1.3"/><circle cx="7.5" cy="11.5" r="1.3"/></svg>';
+
+  // ---- Opex ----
+  let opexRows = '';
+  catList(OPEX_ITEMS, State.expense.opexFlat).forEach(cat => {
+    opexRows += `<tr class="expense-cat-row"><td colspan="8">${escHtml(cat)}</td></tr>`;
+    State.expense.opexFlat.forEach(item => {
+      if (item.cat !== cat) return;
+      const mo = item.basis === 'monthly';
+      opexRows += `<tr draggable="true" data-id="${item.id}" data-kind="opex">
+        <td>
+          <div class="name-cell">
+            <span class="drag-handle" title="Drag to reorder">${dragSvg}</span>
+            <input class="txt-input" data-field="label" data-id="${item.id}" data-kind="opex"
+              value="${escAttr(item.label)}" placeholder="Expense item">
+            <button class="basis-btn ${mo ? 'monthly' : ''}" data-id="${item.id}"
+              title="${mo ? 'Entering a MONTHLY rate — annualised ×12' : 'Entering an ANNUAL amount'}"
+              >${mo ? '/mo' : '/yr'}</button>
+          </div>
+        </td>
+        ${item.vals.map((v, yi) => `<td>
+          <input class="expense-input" type="number" min="0" step="${mo ? 5 : 50}"
+            data-kind="opex" data-id="${item.id}" data-year="${yi}" value="${v}">
+          <span class="annual-hint">${mo && v ? '= ' + fmtCurrency(v * 12) : ''}</span>
+        </td>`).join('')}
+        <td><input class="txt-input note" data-field="note" data-id="${item.id}" data-kind="opex"
+          value="${escAttr(item.note || '')}" placeholder="—"></td>
+        <td><button class="row-del" data-id="${item.id}" data-kind="opex" title="Remove">×</button></td>
+      </tr>`;
+    });
+    opexRows += `<tr class="add-row"><td colspan="8">
+      <button class="add-btn" data-kind="opex" data-cat="${escAttr(cat)}">+ Add ${escHtml(cat.toLowerCase())} item</button>
+    </td></tr>`;
+  });
+
+  // ---- Startup ----
+  let startupRows = '';
+  catList(STARTUP_ITEMS, State.expense.startupFlat).forEach(cat => {
+    startupRows += `<tr class="expense-cat-row"><td colspan="4">${escHtml(cat)}</td></tr>`;
+    State.expense.startupFlat.forEach(item => {
+      if (item.cat !== cat) return;
+      startupRows += `<tr draggable="true" data-id="${item.id}" data-kind="startup">
+        <td>
+          <div class="name-cell">
+            <span class="drag-handle" title="Drag to reorder">${dragSvg}</span>
+            <input class="txt-input" data-field="label" data-id="${item.id}" data-kind="startup"
+              value="${escAttr(item.label)}" placeholder="Item">
+          </div>
+        </td>
+        <td><input class="expense-input" type="number" min="0" step="50"
+          data-kind="startup" data-id="${item.id}" value="${item.val}"></td>
+        <td><input class="txt-input note" data-field="note" data-id="${item.id}" data-kind="startup"
+          value="${escAttr(item.note || '')}" placeholder="—"></td>
+        <td><button class="row-del" data-id="${item.id}" data-kind="startup" title="Remove">×</button></td>
+      </tr>`;
+    });
+    startupRows += `<tr class="add-row"><td colspan="4">
+      <button class="add-btn" data-kind="startup" data-cat="${escAttr(cat)}">+ Add ${escHtml(cat.toLowerCase())} item</button>
+    </td></tr>`;
+  });
+
+  const yearTotals = [0, 1, 2, 3, 4].map(yi => Engine.annualOpexTotal(getExpenseStateForEngine(), yi));
+  const startupTotal = Engine.startupTotal(getExpenseStateForEngine());
+
+  container.innerHTML = `
+    <div class="panel">
+      <div class="eyebrow">Ongoing operating expenses — feeds Monthly Detail column &ldquo;Opex/mo&rdquo;</div>
+      <p style="font-size:11.5px;color:var(--text-muted);margin:-0.4rem 0 0.9rem">
+        Toggle <strong>/yr</strong> to <strong>/mo</strong> to enter a monthly rate instead — it is annualised ×12
+        in the subtotal. Drag the handle to reorder within a category.
+      </p>
+      <div class="table-scroll expense-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Expense item</th>
+              ${yearHeaders.map(h => `<th>${h}</th>`).join('')}
+              <th style="text-align:left">Notes</th>
+              <th style="width:28px"></th>
+            </tr>
+          </thead>
+          <tbody id="opex-tbody">
+            ${opexRows}
+            <tr class="expense-total-row">
+              <td>Annual subtotal</td>
+              ${yearTotals.map(t => `<td>${fmtCurrency(t)}</td>`).join('')}
+              <td></td><td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="eyebrow">One-time startup cost — added to Month 1 opex only</div>
+      <div class="table-scroll expense-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Cost</th><th style="text-align:left">Notes</th><th style="width:28px"></th></tr>
+          </thead>
+          <tbody id="startup-tbody">${startupRows}</tbody>
+        </table>
+      </div>
+      <div class="startup-grand-total">
+        <span class="label">Total one-time startup cost</span>
+        <span class="value" id="startup-grand-total-value">${fmtCurrency(startupTotal)}</span>
+      </div>
+    </div>
+  `;
+
+  attachExpenseInputHandlers();
+}
+
+function escHtml(t) {
+  return String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+function escAttr(t) {
+  return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function expList(kind) {
+  return kind === 'opex' ? State.expense.opexFlat : State.expense.startupFlat;
+}
+function findItem(kind, id) {
+  return expList(kind).find(it => it.id === id);
+}
+// Structural edits (add/delete/reorder) re-render; value edits do not.
+function expenseChanged(structural) {
+  invalidateCache();
+  scheduleCloudSave();
+  if (structural) renderExpensesTab();
+  else updateExpenseTotals();
+}
+
+function attachExpenseInputHandlers() {
+  // ---- numeric value edits ----
+  document.querySelectorAll('.expense-input').forEach(input => {
+    enhanceNumericInput(input);
+    input.addEventListener('change', () => {
+      const kind = input.dataset.kind;
+      const item = findItem(kind, input.dataset.id);
+      if (!item) return;
+      const val = Math.max(0, Number(input.value) || 0);
+      input.value = val;
+      if (kind === 'opex') {
+        item.vals[Number(input.dataset.year)] = val;
+        // keep the "= $X" annualised hint in step with the field
+        const hint = input.parentElement.querySelector('.annual-hint');
+        if (hint) hint.textContent = (item.basis === 'monthly' && val) ? '= ' + fmtCurrency(val * 12) : '';
+      } else {
+        item.val = val;
+      }
+      expenseChanged(false);
+    });
+  });
+
+  // ---- label / note edits ----
+  document.querySelectorAll('.txt-input').forEach(input => {
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+    input.addEventListener('change', () => {
+      const item = findItem(input.dataset.kind, input.dataset.id);
+      if (!item) return;
+      const field = input.dataset.field;
+      const v = input.value.trim();
+      if (field === 'label' && !v) { input.value = item.label; return; } // labels can't be blank
+      item[field] = v;
+      expenseChanged(false);
+    });
+  });
+
+  // ---- basis toggle ----
+  // Flipping basis CONVERTS the stored figure so the annual total is unchanged.
+  // Toggling a unit should never move money.
+  document.querySelectorAll('.basis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = findItem('opex', btn.dataset.id);
+      if (!item) return;
+      if (item.basis === 'monthly') {
+        item.basis = 'annual';
+        item.vals = item.vals.map(v => Math.round((Number(v) || 0) * 12 * 100) / 100);
+      } else {
+        item.basis = 'monthly';
+        item.vals = item.vals.map(v => Math.round(((Number(v) || 0) / 12) * 100) / 100);
+      }
+      expenseChanged(true);
+    });
+  });
+
+  // ---- add ----
+  document.querySelectorAll('.add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.kind;
+      const cat = btn.dataset.cat;
+      const list = expList(kind);
+      const item = (kind === 'opex')
+        ? { id: newItemId('o', list), cat, label: 'New expense', note: '', basis: 'annual', vals: [0, 0, 0, 0, 0] }
+        : { id: newItemId('s', list), cat, label: 'New item', note: '', val: 0 };
+      // insert after the last row of this category so groups stay contiguous
+      let insertAt = list.length;
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i].cat === cat) { insertAt = i + 1; break; }
+      }
+      list.splice(insertAt, 0, item);
+      expenseChanged(true);
+      // focus the new label so it's immediately typeable
+      const el = document.querySelector(`.txt-input[data-field="label"][data-id="${item.id}"]`);
+      if (el) { el.focus(); el.select(); }
+    });
+  });
+
+  // ---- delete ----
+  document.querySelectorAll('.row-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.kind;
+      const list = expList(kind);
+      const idx = list.findIndex(it => it.id === btn.dataset.id);
+      if (idx === -1) return;
+      const item = list[idx];
+      const hasMoney = kind === 'opex' ? item.vals.some(v => v > 0) : item.val > 0;
+      if (hasMoney && !confirm(`Remove "${item.label}"? It still has figures against it.`)) return;
+      list.splice(idx, 1);
+      expenseChanged(true);
+    });
+  });
+
+  attachExpenseDragHandlers();
+}
+
+// ---- drag reorder ----
+// Constrained to within a category: the flat array is rendered by grouping on
+// `cat`, so allowing cross-category drops would split a group into two headers.
+let _dragId = null, _dragKind = null;
+
+function attachExpenseDragHandlers() {
+  document.querySelectorAll('tr[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      _dragId = row.dataset.id; _dragKind = row.dataset.kind;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _dragId); // Firefox needs a payload
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      clearDropMarkers();
+      _dragId = null; _dragKind = null;
+    });
+    row.addEventListener('dragover', e => {
+      if (!_dragId || row.dataset.kind !== _dragKind) return;
+      const src = findItem(_dragKind, _dragId);
+      const tgt = findItem(_dragKind, row.dataset.id);
+      if (!src || !tgt || src.cat !== tgt.cat || src.id === tgt.id) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      const below = (e.clientY - r.top) > r.height / 2;
+      clearDropMarkers();
+      row.classList.add(below ? 'drop-below' : 'drop-above');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-above', 'drop-below'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!_dragId || row.dataset.kind !== _dragKind) return;
+      if (row.dataset.id === _dragId) { clearDropMarkers(); return; } // self-drop = no-op
+      const list = expList(_dragKind);
+      const from = list.findIndex(it => it.id === _dragId);
+      const tgtIdx = list.findIndex(it => it.id === row.dataset.id);
+      if (from === -1 || tgtIdx === -1 || list[from].cat !== list[tgtIdx].cat) return;
+      const r = row.getBoundingClientRect();
+      const below = (e.clientY - r.top) > r.height / 2;
+      const moved = list.splice(from, 1)[0];
+      // recompute target AFTER the splice — removing an earlier element shifts it
+      let to = list.findIndex(it => it.id === row.dataset.id) + (below ? 1 : 0);
+      list.splice(to, 0, moved);
+      clearDropMarkers();
+      expenseChanged(true);
+    });
+  });
+}
+function clearDropMarkers() {
+  document.querySelectorAll('.drop-above, .drop-below').forEach(el =>
+    el.classList.remove('drop-above', 'drop-below'));
+}
+
+function updateExpenseTotals() {
+  const yearTotals = [0, 1, 2, 3, 4].map(yi => Engine.annualOpexTotal(getExpenseStateForEngine(), yi));
+  const totalCells = document.querySelectorAll('.expense-total-row td');
+  // totalCells[0] is label, next 5 are year totals
+  for (let i = 0; i < 5; i++) {
+    if (totalCells[i + 1]) totalCells[i + 1].textContent = fmtCurrency(yearTotals[i]);
+  }
+  const startupTotal = Engine.startupTotal(getExpenseStateForEngine());
+  const startupEl = document.getElementById('startup-grand-total-value');
+  if (startupEl) startupEl.textContent = fmtCurrency(startupTotal);
+}
+
+// ============================================================
+// SCENARIO SUMMARY TAB (Dashboard)
+// ============================================================
+let summaryRevenueChart = null;
+let summaryBalanceChart = null;
+let summaryRegimeChart = null;
+let summaryCompositionChart = null;
+let compositionScenario = 'base';
+
+function renderSummaryTab() {
+  const container = document.getElementById('summary-content');
+  if (!container) return;
+
+  const results = {
+    pessimistic: runSimulation('pessimistic'),
+    base: runSimulation('base'),
+    optimistic: runSimulation('optimistic'),
+  };
+
+  // Hero dashboard using BASE case as the headline scenario
+  const baseR = results.base;
+  const baseMonths = baseR.months;
+  const baseEnding = baseMonths[59].corpBalance;
+  const baseLowest = Math.min(...baseMonths.map(m => m.corpBalance));
+  const baseWorstHH = Math.min(...baseMonths.map(m => m.hhSurplus));
+  const baseDeficitMonths = baseMonths.filter(m => m.hhSurplus < 0).length;
+
+  container.innerHTML = `
+    <div class="dash-hero">
+      <div class="eyebrow" style="color:rgba(247,243,237,0.7)">Base case headline — month 60 outlook</div>
+      <div class="dash-hero-grid">
+        <div>
+          <div class="dash-stat-label">Ending corp balance</div>
+          <div class="dash-stat-value ochre">${fmtCurrency(baseEnding)}</div>
+        </div>
+        <div>
+          <div class="dash-stat-label">Lowest balance, any month</div>
+          <div class="dash-stat-value">${fmtCurrency(baseLowest)}</div>
+        </div>
+        <div>
+          <div class="dash-stat-label">Worst household month</div>
+          <div class="dash-stat-value">${fmtCurrencySigned(baseWorstHH)}</div>
+        </div>
+        <div>
+          <div class="dash-stat-label">Months with deficit</div>
+          <div class="dash-stat-value">${baseDeficitMonths} / 60</div>
+        </div>
+        <div>
+          <div class="dash-stat-label">Commission per sale</div>
+          <div class="dash-stat-value">${fmtCurrency(baseR.comm)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-grid-2">
+      <div class="chart-box" style="margin-bottom:0">
+        <div class="eyebrow">Annual gross commission by scenario</div>
+        <canvas id="summary-revenue-chart" height="100"></canvas>
+      </div>
+      <div class="chart-box" style="margin-bottom:0">
+        <div class="eyebrow">Corp bank balance over 60 months — all scenarios</div>
+        <canvas id="summary-balance-chart" height="100"></canvas>
+      </div>
+    </div>
+
+    <div style="height:1.5rem"></div>
+
+    <div class="chart-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem">
+        <div class="eyebrow" style="margin-bottom:0">Monthly cash flow composition — what goes into each bar</div>
+        <div style="display:flex;gap:6px" id="composition-scenario-bar">
+          ${['pessimistic','base','optimistic'].map(k => `
+            <button class="scenario-btn ${k === 'base' ? 'active' : ''}" data-scenario="${k}"
+              style="flex:none;padding:6px 12px;font-size:12px">${SCENARIO_META[k].label}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:#CC7722"></span>Gross commission (revenue line)</span>
+        <span><span class="legend-dot" style="background:#5C4A2E"></span>Opex</span>
+        <span><span class="legend-dot" style="background:#4a7c6f"></span>Gross salary paid</span>
+        <span><span class="legend-dot" style="background:#8fb5ae"></span>Employer CPP</span>
+        <span><span class="legend-dot" style="background:#b3392e"></span>Corp tax (year-end months)</span>
+      </div>
+      <canvas id="summary-composition-chart" height="80"></canvas>
+    </div>
+
+    <div style="height:1.5rem"></div>
+
+    <div class="panel-grid-2">
+      <div class="chart-box" style="margin-bottom:0">
+        <div class="eyebrow">Pay regime distribution by scenario (months out of 60)</div>
+        <canvas id="summary-regime-chart" height="120"></canvas>
+      </div>
+      <div class="panel" style="margin-bottom:0">
+        <div class="eyebrow">Scenario comparison table</div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th style="text-align:left">Metric</th><th>Pessimistic</th><th>Base</th><th>Optimistic</th></tr>
+            </thead>
+            <tbody>
+              ${comparisonRow('Ending corp balance (mo 60)', results, r => fmtCurrency(r.months[59].corpBalance))}
+              ${comparisonRow('Lowest corp balance', results, r => fmtCurrency(Math.min(...r.months.map(m => m.corpBalance))))}
+              ${comparisonRow('Worst HH month', results, r => fmtCurrencySigned(Math.min(...r.months.map(m => m.hhSurplus))))}
+              ${comparisonRow('Months in deficit', results, r => r.months.filter(m => m.hhSurplus < 0).length + ' / 60')}
+              ${comparisonRow('Total corp tax paid (5yr)', results, r => fmtCurrency(r.months.reduce((s, m) => s + m.corpTaxOwed, 0)))}
+              ${comparisonRow('Year 1 total commission', results, r => fmtCurrency(sumYear(r.months, 0)))}
+              ${comparisonRow('Year 3 total commission', results, r => fmtCurrency(sumYear(r.months, 2)))}
+              ${comparisonRow('Year 5 total commission', results, r => fmtCurrency(sumYear(r.months, 4)))}
+              ${comparisonRow('Year 1 sales volume', results, r => fmtNum1(sumYearSales(r.months, 0)))}
+              ${comparisonRow('Year 5 sales volume', results, r => fmtNum1(sumYearSales(r.months, 4)))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:1.5rem"></div>
+
+    <div class="panel">
+      <div class="eyebrow">Annual production &amp; tax summary — all scenarios</div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left">Year</th>
+              <th>Pess. Commission</th><th>Pess. Sales</th><th>Pess. Tax</th>
+              <th>Base Commission</th><th>Base Sales</th><th>Base Tax</th>
+              <th>Opt. Commission</th><th>Opt. Sales</th><th>Opt. Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[0,1,2,3,4].map(yi => `
+              <tr>
+                <td>Year ${yi+1}</td>
+                <td>${fmtCurrency(sumYear(results.pessimistic.months, yi))}</td>
+                <td>${fmtNum1(sumYearSales(results.pessimistic.months, yi))}</td>
+                <td>${fmtCurrency(sumYearTax(results.pessimistic.months, yi))}</td>
+                <td>${fmtCurrency(sumYear(results.base.months, yi))}</td>
+                <td>${fmtNum1(sumYearSales(results.base.months, yi))}</td>
+                <td>${fmtCurrency(sumYearTax(results.base.months, yi))}</td>
+                <td>${fmtCurrency(sumYear(results.optimistic.months, yi))}</td>
+                <td>${fmtNum1(sumYearSales(results.optimistic.months, yi))}</td>
+                <td>${fmtCurrency(sumYearTax(results.optimistic.months, yi))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  renderSummaryCharts(results);
+  renderCompositionChart(results);
+
+  // Attach composition scenario buttons
+  document.querySelectorAll('#composition-scenario-bar .scenario-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      compositionScenario = btn.dataset.scenario;
+      document.querySelectorAll('#composition-scenario-bar .scenario-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderCompositionChart(results);
+    });
+  });
+}
+
+function sumYear(months, yearIdx) {
+  return months.slice(yearIdx * 12, yearIdx * 12 + 12).reduce((s, m) => s + m.grossCommission, 0);
+}
+function sumYearSales(months, yearIdx) {
+  return months.slice(yearIdx * 12, yearIdx * 12 + 12).reduce((s, m) => s + m.sales, 0);
+}
+function sumYearTax(months, yearIdx) {
+  return months.slice(yearIdx * 12, yearIdx * 12 + 12).reduce((s, m) => s + m.corpTaxOwed, 0);
+}
+
+function comparisonRow(label, results, fn) {
+  return `<tr>
+    <td>${label}</td>
+    <td>${fn(results.pessimistic)}</td>
+    <td>${fn(results.base)}</td>
+    <td>${fn(results.optimistic)}</td>
+  </tr>`;
+}
+
+function renderSummaryCharts(results) {
+  // Revenue by year, grouped bar
+  const revCtx = document.getElementById('summary-revenue-chart');
+  if (summaryRevenueChart) summaryRevenueChart.destroy();
+  if (revCtx) {
+    summaryRevenueChart = new Chart(revCtx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+        datasets: ['pessimistic', 'base', 'optimistic'].map(k => ({
+          label: SCENARIO_META[k].label,
+          data: [0,1,2,3,4].map(yi => Math.round(sumYear(results[k].months, yi))),
+          backgroundColor: SCENARIO_META[k].color,
+          borderRadius: 4,
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#5C4A2E', font: { size: 11 }, boxWidth: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}` } },
+        },
+        scales: {
+          x: { ticks: { color: '#8a7d68', font: { size: 11 } }, grid: { display: false } },
+          y: { ticks: { color: '#8a7d68', font: { size: 10 }, callback: v => fmtCompact(v) }, grid: { color: '#e8e0d0' } },
+        },
+      },
+    });
+    revCtx.parentElement.style.height = '300px';
+  }
+
+  // Corp balance over time, all 3 scenarios
+  const balCtx = document.getElementById('summary-balance-chart');
+  if (summaryBalanceChart) summaryBalanceChart.destroy();
+  if (balCtx) {
+    summaryBalanceChart = new Chart(balCtx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: results.base.months.map(m => 'M' + m.month),
+        datasets: ['pessimistic', 'base', 'optimistic'].map(k => ({
+          label: SCENARIO_META[k].label,
+          data: results[k].months.map(m => Math.round(m.corpBalance)),
+          borderColor: SCENARIO_META[k].color,
+          backgroundColor: 'transparent',
+          borderWidth: 2.25,
+          pointRadius: 0,
+          tension: 0.2,
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#5C4A2E', font: { size: 11 }, boxWidth: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}` } },
+        },
+        scales: {
+          x: { ticks: { color: '#8a7d68', font: { size: 9 }, maxTicksLimit: 12, autoSkip: true }, grid: { display: false } },
+          y: { ticks: { color: '#8a7d68', font: { size: 10 }, callback: v => fmtCompact(v) }, grid: { color: '#e8e0d0' } },
+        },
+      },
+    });
+    balCtx.parentElement.style.height = '300px';
+  }
+
+  // Regime distribution, stacked horizontal bar
+  const regCtx = document.getElementById('summary-regime-chart');
+  if (summaryRegimeChart) summaryRegimeChart.destroy();
+  if (regCtx) {
+    const scenarios = ['pessimistic', 'base', 'optimistic'];
+    const r1 = scenarios.map(k => results[k].months.filter(m => m.regime === 1).length);
+    const r2 = scenarios.map(k => results[k].months.filter(m => m.regime === 2).length);
+    const r3 = scenarios.map(k => results[k].months.filter(m => m.regime === 3).length);
+    const r4 = scenarios.map(k => results[k].months.filter(m => m.regime === 4).length);
+    const r5 = scenarios.map(k => results[k].months.filter(m => m.regime === 5).length);
+    summaryRegimeChart = new Chart(regCtx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: scenarios.map(k => SCENARIO_META[k].label),
+        datasets: [
+          { label: '1 — Constrained',          data: r1, backgroundColor: '#b3392e', borderRadius: 2 },
+          { label: '2 — Below Floor',           data: r2, backgroundColor: '#8a9eb5', borderRadius: 2 },
+          { label: '3 — At Floor',              data: r3, backgroundColor: '#CC7722', borderRadius: 2 },
+          { label: '4 — At Ceiling',            data: r4, backgroundColor: '#1A3D3A', borderRadius: 2 },
+          { label: '5 — Full Ceiling + Growing',data: r5, backgroundColor: '#1e7a52', borderRadius: 2 },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#5C4A2E', font: { size: 11 }, boxWidth: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw} months` } },
+        },
+        scales: {
+          x: { stacked: true, max: 60, ticks: { color: '#8a7d68', font: { size: 10 } }, grid: { color: '#e8e0d0' } },
+          y: { stacked: true, ticks: { color: '#5C4A2E', font: { size: 12, weight: '500' } }, grid: { display: false } },
+        },
+      },
+    });
+    regCtx.parentElement.style.height = '300px';
+  }
+}
+
+function renderCompositionChart(results) {
+  const ctx = document.getElementById('summary-composition-chart');
+  if (!ctx) return;
+  if (summaryCompositionChart) summaryCompositionChart.destroy();
+
+  const months = results[compositionScenario].months;
+  const labels = months.map(m => 'M' + m.month);
+
+  // Cost components (stacked bars, all positive)
+  const opex      = months.map(m => Math.round(m.opex));
+  const salary    = months.map(m => Math.round(m.grossSalaryPaid));
+  const ecpp      = months.map(m => Math.round(m.employerCppPaid));
+  const tax       = months.map(m => Math.round(m.corpTaxOwed));
+  // Revenue line
+  const revenue   = months.map(m => Math.round(m.grossCommission));
+
+  summaryCompositionChart = new Chart(ctx.getContext('2d'), {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Opex',
+          data: opex,
+          backgroundColor: '#5C4A2E',
+          borderRadius: 0,
+          stack: 'costs',
+          yAxisID: 'y',
+        },
+        {
+          type: 'bar',
+          label: 'Gross salary paid',
+          data: salary,
+          backgroundColor: '#4a7c6f',
+          borderRadius: 0,
+          stack: 'costs',
+          yAxisID: 'y',
+        },
+        {
+          type: 'bar',
+          label: 'Employer CPP',
+          data: ecpp,
+          backgroundColor: '#8fb5ae',
+          borderRadius: 0,
+          stack: 'costs',
+          yAxisID: 'y',
+        },
+        {
+          type: 'bar',
+          label: 'Corp tax (year-end)',
+          data: tax,
+          backgroundColor: '#b3392e',
+          borderRadius: 0,
+          stack: 'costs',
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'Gross commission (revenue)',
+          data: revenue,
+          borderColor: '#CC7722',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.2,
+          yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${fmtCurrency(ctx.raw)}`,
+            afterBody: (items) => {
+              const idx = items[0]?.dataIndex;
+              if (idx === undefined) return '';
+              const m = months[idx];
+              const totalCosts = m.opex + m.grossSalaryPaid + m.employerCppPaid + m.corpTaxOwed;
+              const gap = m.grossCommission - totalCosts;
+              const labels = { 1: '1 — Constrained', 2: '2 — Recovering', 3: '3 — Surplus' };
+              return [`Net: ${fmtCurrencySigned(Math.round(gap))}`, `Regime: ${labels[m.regime]}`];
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#8a7d68', font: { size: 10 }, maxTicksLimit: 15, autoSkip: true },
+          grid: { display: false },
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#8a7d68', font: { size: 10 }, callback: v => fmtCompact(v) },
+          grid: { color: '#e8e0d0' },
+          title: { display: true, text: 'Monthly ($)', color: '#8a7d68', font: { size: 10 } },
+        },
+      },
+    },
+  });
+  ctx.parentElement.style.height = '340px';
+}
+function renderSalesTab() {
+  const container = document.getElementById('sales-content');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="scenario-bar" id="sales-scenario-bar">
+      ${scenarioButtonsHTML()}
+    </div>
+    <div id="sales-summary" class="stat-grid"></div>
+    <div class="panel">
+      <div class="eyebrow">Sales per month — ${SCENARIO_META[State.scenario].label}</div>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem">${scenarioDesc(State.scenario)} Edit any month below; commission revenue throughout the model recalculates immediately.</p>
+      <div id="sales-year-grid"></div>
+    </div>
+  `;
+
+  attachScenarioButtonHandlers('sales-scenario-bar', renderSalesTab);
+  renderSalesYearGrid();
+  renderSalesSummary();
+}
+
+function renderSalesYearGrid() {
+  const grid = document.getElementById('sales-year-grid');
+  const arr = State.sales[State.scenario];
+
+  const yearTotals = [0, 1, 2, 3, 4].map(yi =>
+    arr.slice(yi * 12, yi * 12 + 12).reduce((s, v) => s + v, 0)
+  );
+
+  let bodyRows = '';
+  for (let mi = 0; mi < 12; mi++) {
+    bodyRows += `<tr>
+      <td>Month ${mi + 1}</td>
+      ${[0,1,2,3,4].map(yi => {
+        const idx = yi * 12 + mi;
+        return `<td><input class="expense-input sales-month-input" type="number" min="0" step="0.1"
+          data-month-idx="${idx}" value="${arr[idx]}"></td>`;
+      }).join('')}
+    </tr>`;
+  }
+
+  grid.innerHTML = `
+    <div class="table-scroll expense-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">Month</th>
+            <th>Year 1</th><th>Year 2</th><th>Year 3</th><th>Year 4</th><th>Year 5</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr class="expense-total-row">
+            <td>Year total</td>
+            ${yearTotals.map((t, yi) => `<td id="year-total-${yi}">${fmtNum1(t)}</td>`).join('')}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  document.querySelectorAll('.sales-month-input').forEach(input => {
+    enhanceNumericInput(input);
+    input.addEventListener('change', () => {
+      const idx = Number(input.dataset.monthIdx);
+      const val = Math.max(0, Number(input.value) || 0);
+      input.value = val;
+      State.sales[State.scenario][idx] = val;
+      invalidateCache();
+      scheduleCloudSave();
+      updateSalesYearTotals();
+      renderSalesSummary();
+    });
+  });
+}
+
+function updateSalesYearTotals() {
+  const arr = State.sales[State.scenario];
+  for (let yi = 0; yi < 5; yi++) {
+    const total = arr.slice(yi * 12, yi * 12 + 12).reduce((s, v) => s + v, 0);
+    const el = document.getElementById('year-total-' + yi);
+    if (el) el.textContent = fmtNum1(total);
+  }
+}
+
+function renderSalesSummary() {
+  const result = runSimulation(State.scenario);
+  const totalSales = result.months.reduce((s, m) => s + m.sales, 0);
+  const totalCommission = result.months.reduce((s, m) => s + m.grossCommission, 0);
+  const yr1 = sumYearSales(result.months, 0);
+  const yr5 = sumYearSales(result.months, 4);
+
+  document.getElementById('sales-summary').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total sales, 60 months</div>
+      <div class="stat-value">${fmtNum1(totalSales)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total gross commission, 60 months</div>
+      <div class="stat-value">${fmtCurrency(totalCommission)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Year 1 sales volume</div>
+      <div class="stat-value">${fmtNum1(yr1)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Year 5 sales volume</div>
+      <div class="stat-value">${fmtNum1(yr5)}</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// MONTHLY DETAIL TAB
+// ============================================================
+function renderMonthlyTab() {
+  const container = document.getElementById('monthly-content');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="scenario-bar" id="monthly-scenario-bar">
+      ${scenarioButtonsHTML()}
+    </div>
+    <div class="filter-row">
+      <label class="slider-label" for="year-filter">Filter by year:</label>
+      <select class="filter-select" id="year-filter">
+        <option value="all">All 60 months</option>
+        <option value="0">Year 1 (months 1–12)</option>
+        <option value="1">Year 2 (months 13–24)</option>
+        <option value="2">Year 3 (months 25–36)</option>
+        <option value="3">Year 4 (months 37–48)</option>
+        <option value="4">Year 5 (months 49–60)</option>
+      </select>
+    </div>
+    <div class="table-scroll">
+      <div class="scroll-tbody">
+        <table class="monthly-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Month</th>
+              <th>Sales</th>
+              <th>Gross Commission</th>
+              <th>Opex/mo</th>
+              <th>Target Gross</th>
+              <th>Gross Salary Paid</th>
+              <th>Employer CPP</th>
+              <th>Corp Net Cash</th>
+              <th class="tax-col">Taxable Income</th>
+              <th class="tax-col">Loss Carryforward</th>
+              <th class="tax-col">Corp Tax Owed</th>
+              <th class="corp-balance-col">Corp Balance</th>
+              <th>Regime</th>
+              <th>Annualized Gross</th>
+              <th>Your Net Pay</th>
+              <th>Adam</th>
+              <th>Ashley</th>
+              <th>HH Net Total</th>
+              <th>HH Burn</th>
+              <th>HH Surplus/Deficit</th>
+              <th class="hh-savings-col">Savings Balance</th>
+            </tr>
+          </thead>
+          <tbody id="monthly-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  attachScenarioButtonHandlers('monthly-scenario-bar', renderMonthlyTab);
+
+  const yearFilterEl = document.getElementById('year-filter');
+  yearFilterEl.value = State.monthlyDetailYearFilter;
+  yearFilterEl.addEventListener('change', () => {
+    State.monthlyDetailYearFilter = yearFilterEl.value;
+    renderMonthlyTableBody();
+  });
+
+  renderMonthlyTableBody();
+}
+
+function renderMonthlyTableBody() {
+  const result = runSimulation(State.scenario);
+  let months = result.months;
+
+  if (State.monthlyDetailYearFilter !== 'all') {
+    const yi = Number(State.monthlyDetailYearFilter);
+    months = months.slice(yi * 12, yi * 12 + 12);
+  }
+
+  // Year subtotals. FLOWS sum (revenue, opex, salary, tax); STOCKS do not — a
+  // balance is a point in time, so we show its CLOSING value. Summing a bank
+  // balance across 12 months would be a meaningless number.
+  const FLOW = ['sales','grossCommission','opex','grossSalaryPaid','employerCppPaid',
+                'netCashFlow','taxableIncome','corpTaxOwed','yourNetMonthly','adam',
+                'ashleyMonthly','totalHHNet','hhBurnMonthly','hhSurplus'];
+
+  function subtotalRow(chunk, label) {
+    const t = {};
+    FLOW.forEach(k => { t[k] = chunk.reduce((a, m) => a + (m[k] || 0), 0); });
+    const last = chunk[chunk.length - 1];
+    return `<tr class="subtotal-row">
+      <td class="lbl">${label}</td>
+      <td>${fmtNum1(t.sales)}</td>
+      <td>${fmtCurrency(t.grossCommission)}</td>
+      <td>${fmtCurrency(t.opex)}</td>
+      <td class="na">—</td>
+      <td>${fmtCurrency(t.grossSalaryPaid)}</td>
+      <td>${fmtCurrency(t.employerCppPaid)}</td>
+      <td>${fmtCurrency(t.netCashFlow)}</td>
+      <td class="tax-col">${fmtCurrency(t.taxableIncome)}</td>
+      <td class="tax-col na">—</td>
+      <td class="tax-col">${t.corpTaxOwed > 0 ? fmtCurrency(t.corpTaxOwed) : '—'}</td>
+      <td class="corp-balance-col">${fmtCurrency(last.corpBalance)}</td>
+      <td class="na">—</td>
+      <td class="na">—</td>
+      <td>${fmtCurrency(t.yourNetMonthly)}</td>
+      <td>${fmtCurrency(t.adam)}</td>
+      <td>${fmtCurrency(t.ashleyMonthly)}</td>
+      <td>${fmtCurrency(t.totalHHNet)}</td>
+      <td>${fmtCurrency(t.hhBurnMonthly)}</td>
+      <td>${fmtCurrencySigned(t.hhSurplus)}</td>
+      <td class="hh-savings-col">${fmtCurrency(last.hhSavings)}</td>
+    </tr>`;
+  }
+
+  const monthRow = m => {
+    const isCliff = m.month === 13;
+    const isYearEnd = m.corpTaxOwed > 0;
+    const rowClass = isCliff ? 'cliff-row' : (isYearEnd ? 'yearend-row' : '');
+    return `<tr class="${rowClass}">
+      <td>Month ${m.month}${isCliff ? ' ⚠' : ''}${isYearEnd ? ' 🧾' : ''}${m.reviewed ? ' ⟳' : ''}</td>
+      <td>${fmtNum1(m.sales)}</td>
+      <td>${fmtCurrency(m.grossCommission)}</td>
+      <td>${fmtCurrency(m.opex)}</td>
+      <td>${fmtCurrency(m.targetGross)}</td>
+      <td>${fmtCurrency(m.grossSalaryPaid)}</td>
+      <td>${fmtCurrency(m.employerCppPaid)}</td>
+      <td>${fmtCurrency(m.netCashFlow)}</td>
+      <td class="tax-col">${fmtCurrency(m.taxableIncome)}</td>
+      <td class="tax-col">${fmtCurrency(m.lossCarryforward)}</td>
+      <td class="tax-col">${m.corpTaxOwed > 0 ? fmtCurrency(m.corpTaxOwed) : '—'}</td>
+      <td class="corp-balance-col">${fmtCurrency(m.corpBalance)}</td>
+      <td><span class="pill ${regimePillClass(m.regime)}">${regimeLabel(m.regime)}</span></td>
+      <td>${fmtCurrency(m.annualizedGross)}</td>
+      <td>${fmtCurrency(m.yourNetMonthly)}</td>
+      <td>${fmtCurrency(m.adam)}</td>
+      <td>${fmtCurrency(m.ashleyMonthly)}</td>
+      <td>${fmtCurrency(m.totalHHNet)}</td>
+      <td>${fmtCurrency(m.hhBurnMonthly)}</td>
+      <td><span class="pill ${m.hhSurplus >= 0 ? 'good' : m.hhSurplus > -1000 ? 'warn' : 'bad'}">${fmtCurrencySigned(m.hhSurplus)}</span></td>
+      <td class="hh-savings-col"><span class="pill ${m.hhSavings >= 0 ? 'good' : 'bad'}">${fmtCurrency(m.hhSavings)}</span></td>
+    </tr>`;
+  };
+
+  // Group by year so a subtotal can follow each block, whatever the filter.
+  let rows = '';
+  const byYear = {};
+  months.forEach(m => { const y = Math.floor((m.month - 1) / 12); (byYear[y] = byYear[y] || []).push(m); });
+  Object.keys(byYear).map(Number).sort((a, b) => a - b).forEach(y => {
+    const chunk = byYear[y];
+    rows += chunk.map(monthRow).join('');
+    rows += subtotalRow(chunk, `Year ${y + 1} total${chunk.length < 12 ? ' (partial)' : ''}`);
+  });
+
+  // Grand total only when every month is on screen.
+  if (State.monthlyDetailYearFilter === 'all' && months.length === 60) {
+    rows += subtotalRow(months, '60-month total');
+  }
+
+  document.getElementById('monthly-tbody').innerHTML = rows;
+}
+
+
+</script>
+</body>
+</html>
