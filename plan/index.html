@@ -218,60 +218,6 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--ochre); }
 }
 .field-help .affects strong { color: var(--teal); font-weight: 600; }
 
-/* ============ MOBILE (phones, <=640px) ============ */
-/* The tab stacks to one column at 900px, but the desktop chrome underneath —
-   2.5rem side paddings, a sticky assumptions panel, fixed-width deposit
-   columns — still assumed a wide viewport. This block fixes the first tab
-   (and the shared chrome) for a ~380px screen. */
-@media (max-width: 640px) {
-  /* reclaim the ~80px that side paddings were eating */
-  .page-header { padding: 1.25rem 1rem 1.1rem; }
-  .main-wrap   { padding: 1.25rem 1rem 3rem; }
-  .tab-nav-inner { padding: 0 1rem; }
-  .last-saved-lbl { padding: 0 1rem 0.9rem; }
-
-  .wordmark { font-size: 21px; }
-
-  /* header actions wrap under the wordmark instead of fighting it for the row */
-  .header-inner { gap: 0.6rem; }
-  .header-actions { width: 100%; gap: 7px; }
-  .hdr-btn { font-size: 11px; padding: 5px 9px; }
-  .saved-badge { min-width: 0; }
-
-  /* the sticky rail is pointless once stacked on top — it just steals height
-     and can cover the chart. Let it scroll away normally. */
-  .assumptions-panel { position: static; padding: 1rem 0.9rem 0.85rem; }
-  .runway-two-col { gap: 1.25rem; }
-
-  /* stats: two-up rather than one giant column of cards */
-  .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
-  .stat-card { padding: 12px 12px 12px 14px; }
-  .stat-value { font-size: 18px; }
-  .stat-label { font-size: 10px; }
-
-  /* deposit grid: the fixed 42/62px side columns crush on a phone. Give the
-     amount room and let the weight shrink. */
-  .dep-grid { grid-template-columns: 36px 1fr 54px; gap: 4px 5px; }
-  .dep-in { font-size: 12px; padding: 6px 6px; }
-  .dep-readout .row { gap: 6px; }
-
-  /* inputs at 16px stop iOS Safari from zooming the viewport on focus */
-  .num-field-input, .dep-in, .expense-input, .sales-month-input, .txt-input { font-size: 16px; }
-  .num-field-input { padding: 9px 10px; }
-
-  /* tables stay horizontally scrollable, just make that obvious and comfy */
-  .table-scroll { -webkit-overflow-scrolling: touch; }
-
-  /* the field-help callout can go edge to edge */
-  .field-help { font-size: 12px; }
-}
-
-/* Very narrow (<=380px): drop stats to a single column so values don't clip */
-@media (max-width: 380px) {
-  .stat-grid { grid-template-columns: 1fr; }
-  .dep-grid { grid-template-columns: 32px 1fr 48px; }
-}
-
 /* ============ HEADER ============ */
 .page-header {
   background: var(--teal);
@@ -847,6 +793,73 @@ footer.model-footer {
   color: var(--text-muted);
   padding: 2rem 0 1rem;
 }
+
+/* ============ MOBILE (phones, <=640px) ============ */
+/* The tab stacks to one column at 900px, but the desktop chrome underneath —
+   2.5rem side paddings, a sticky assumptions panel, fixed-width deposit
+   columns — still assumed a wide viewport. This block fixes the first tab
+   (and the shared chrome) for a ~380px screen. */
+@media (max-width: 640px) {
+  /* reclaim the ~80px that side paddings were eating */
+  .page-header { padding: 1.25rem 1rem 1.1rem; }
+  .main-wrap   { padding: 1.25rem 1rem 3rem; }
+  .tab-nav-inner { padding: 0 1rem; }
+  .last-saved-lbl { padding: 0 1rem 0.9rem; }
+
+  .wordmark { font-size: 21px; }
+
+  /* header actions wrap under the wordmark instead of fighting it for the row */
+  .header-inner { gap: 0.6rem; }
+  .header-actions { width: 100%; gap: 7px; }
+  .hdr-btn { font-size: 11px; padding: 5px 9px; }
+  .saved-badge { min-width: 0; }
+
+  /* THE OVERLAP FIX. On mobile the rail must not be sticky — a sticky element
+     stays pinned while later siblings scroll up UNDER it, which is exactly the
+     cards-over-inputs bug. Force static, and neutralise the z-index/stacking so
+     nothing floats above anything. !important because this must beat the base
+     rule regardless of source order. */
+  .assumptions-panel {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    padding: 1rem 0.9rem 0.85rem;
+  }
+  .runway-right { position: static !important; z-index: auto !important; }
+  .runway-two-col { position: relative; z-index: 0; }
+  .runway-two-col { gap: 1.25rem; }
+
+  /* stats: two-up rather than one giant column of cards */
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
+  .stat-card { padding: 12px 12px 12px 14px; }
+  .stat-value { font-size: 18px; }
+  .stat-label { font-size: 10px; }
+
+  /* deposit grid: the fixed 42/62px side columns crush on a phone. Give the
+     amount room and let the weight shrink. */
+  .dep-grid { grid-template-columns: 36px 1fr 54px; gap: 4px 5px; }
+  .dep-in { font-size: 12px; padding: 6px 6px; }
+  .dep-readout .row { gap: 6px; }
+
+  /* inputs at 16px stop iOS Safari from zooming the viewport on focus */
+  .num-field-input, .dep-in, .expense-input, .sales-month-input, .txt-input { font-size: 16px; }
+  .num-field-input { padding: 9px 10px; }
+
+  /* tables stay horizontally scrollable, just make that obvious and comfy */
+  .table-scroll { -webkit-overflow-scrolling: touch; }
+
+  /* the field-help callout can go edge to edge */
+  .field-help { font-size: 12px; }
+}
+
+/* Very narrow (<=380px): drop stats to a single column so values don't clip */
+@media (max-width: 380px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .dep-grid { grid-template-columns: 32px 1fr 48px; }
+}
+
+
+
 </style>
 </head>
 <body>
