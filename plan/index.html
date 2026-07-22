@@ -951,31 +951,17 @@ const CPP = {
   wagepointAnnual: 600,
 };
 
-const COMMISSION = {
-  tier1Rate: 0.025, tier1Cap: 100000,
-  tier2Rate: 0.020, tier2Cap: 200000,
-  tier3Rate: 0.015,
-};
-
 const CORP_TAX = {
   smallBusinessRate: 0.122, // Combined Federal + Ontario Small Business Deduction rate, active income up to $500K/yr
 };
 
 // Default adjustable assumptions (sliders control these at runtime)
 const DEFAULTS = {
-  // Deposit size is modelled as a 3-point distribution, not a single average.
-  // Commission is graded (2.5/2.0/1.5), so it is concave in deposit size —
-  // meaning E[f(X)] <= f(E[X]). The gap is small (0-4%, and exactly 0 when the
-  // whole spread sits above the $200k kink, where the curve is linear), but the
-  // real value is that stating low/mid/high forces the implied mean into the
-  // open instead of hiding it behind one unfalsifiable "average".
-  // Weights are relative — they are normalised by their own sum, so they need
-  // not total exactly 100.
-  deposits: {
-    low:  { amt: 0, w: 25 },
-    mid:  { amt: 0, w: 50 },
-    high: { amt: 0, w: 25 },
-  },
+  // Revenue is a flat fee per plan. Each unit of "sales" (see Sales Scenarios)
+  // is one plan, and revenue for the month is simply plans x planFee. This
+  // replaces the older graded-insurance-commission model, where per-sale
+  // revenue was derived from a deposit-size distribution and tiered rates.
+  planFee: 0,
 
   // Personal bank account OUTSIDE the corp. This is the pool the household
   // actually draws on: money in the CCPC is not spendable money — the only pipe
@@ -1166,14 +1152,6 @@ const Engine = (function () {
     return (lo + hi) / 2;
   }
 
-  // ---- Commission ----
-  function commissionPerSale(avgDeposit) {
-    const t1 = Math.min(avgDeposit, COMMISSION.tier1Cap) * COMMISSION.tier1Rate;
-    const t2 = Math.max(0, Math.min(avgDeposit, COMMISSION.tier2Cap) - COMMISSION.tier1Cap) * COMMISSION.tier2Rate;
-    const t3 = Math.max(0, avgDeposit - COMMISSION.tier2Cap) * COMMISSION.tier3Rate;
-    return t1 + t2 + t3;
-  }
-
   // ---- Opex ----
   // expenseState: { opex: [[y1..y5] per item across all categories flattened], startup: [items] }
   // itemAnnual: an opex row stores EITHER a monthly rate or an annual amount,
@@ -1217,27 +1195,10 @@ const Engine = (function () {
   }
 
   // ---- Full 60-month simulation ----
-  // params: { deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+  // params: { planFee, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
   //           ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey }
-  // expectedCommission: probability-weighted commission across the deposit
-  // distribution. Deterministic (no sampling) so it stays Excel-checkable.
-  // Weights are normalised by their sum; a zero-sum falls back to the mid point.
-  function expectedCommission(deposits) {
-    const pts = [deposits.low, deposits.mid, deposits.high];
-    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
-    if (sum <= 0) return commissionPerSale(Number(deposits.mid.amt) || 0);
-    return pts.reduce((t, p) =>
-      t + ((Number(p.w) || 0) / sum) * commissionPerSale(Number(p.amt) || 0), 0);
-  }
-
-  // meanDeposit: the average this distribution actually implies. Surfaced in the
-  // UI because it is the number most likely to differ from what you'd have typed.
-  function meanDeposit(deposits) {
-    const pts = [deposits.low, deposits.mid, deposits.high];
-    const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
-    if (sum <= 0) return Number(deposits.mid.amt) || 0;
-    return pts.reduce((t, p) => t + ((Number(p.w) || 0) / sum) * (Number(p.amt) || 0), 0);
-  }
+  // Revenue per plan is a single flat fee (planFee); revenue for a month is
+  // plans-sold x planFee. No deposit distribution, no tiered rates.
 
   // salaryCandidates: the discrete salary levels we'd actually consider — the
   // floor, then round `step` multiples above it, then the ceiling. Round numbers,
@@ -1272,7 +1233,7 @@ const Engine = (function () {
 
   function simulate(params) {
     const {
-      deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
+      planFee, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
       corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart,
       savingsFloor, baseSalary
@@ -1285,7 +1246,7 @@ const Engine = (function () {
 
     const taxRate = (corpTaxRate !== undefined) ? corpTaxRate : CORP_TAX.smallBusinessRate;
 
-    const comm = expectedCommission(deposits);
+    const comm = Math.max(0, Number(planFee) || 0); // flat revenue per plan
     const sales = salesArr || SCENARIO_SALES[scenarioKey];
 
     // Surplus Threshold = months x (Floor total monthly corp cost + Year 1 monthly opex)
@@ -1471,7 +1432,7 @@ const Engine = (function () {
 
   return {
     federalTax, ontarioTax, employeeCPP, employerCPP, netAnnual, grossForNet,
-    commissionPerSale, expectedCommission, meanDeposit, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
+    itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
   };
 })();
 
@@ -1482,7 +1443,7 @@ const Engine = (function () {
 
 const State = {
   // Runway tab sliders
-  deposits: JSON.parse(JSON.stringify(DEFAULTS.deposits)),
+  planFee: DEFAULTS.planFee,
   hhSavingsStart: DEFAULTS.hhSavingsStart,
   savingsFloor: DEFAULTS.savingsFloor,
   baseSalary: DEFAULTS.baseSalary,
@@ -1553,7 +1514,7 @@ function getExpenseStateForEngine() {
 
 function runSimulation(scenarioKey) {
   const key = JSON.stringify({
-    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    planFee: State.planFee, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
     hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
@@ -1564,7 +1525,7 @@ function runSimulation(scenarioKey) {
     return State.cache.results[scenarioKey];
   }
   const result = Engine.simulate({
-    deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
+    planFee: State.planFee, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
     salaryReviewMonths: State.salaryReviewMonths, runRateWindowMonths: State.runRateWindowMonths, salaryStep: State.salaryStep, coverageRatio: State.coverageRatio,
     hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
@@ -1656,7 +1617,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'planModel_offlineBuffer';
 var APP_VERSION      = 'AdviceOnly-Model-v1';
-var PAYLOAD_VERSION  = 6;
+var PAYLOAD_VERSION  = 7;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1674,9 +1635,9 @@ function buildSavePayload() {
     version: PAYLOAD_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: APP_VERSION,
-    // deposits is TOP-LEVEL, not under assumptions — migrateData and
-    // applyLoadedData both address it as data.deposits. Keep them in step.
-    deposits: State.deposits,
+    // planFee is TOP-LEVEL, not under assumptions — migrateData and
+    // applyLoadedData both address it as data.planFee. Keep them in step.
+    planFee: State.planFee,
     assumptions: {
       floorGross: State.floorGross,
       ceilingGross: State.ceilingGross,
@@ -1750,7 +1711,10 @@ function migrateData(data) {
       delete data.assumptions.avgDeposit;
     }
     if (!data.deposits) {
-      data.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
+      // Legacy shim: DEFAULTS.deposits no longer exists (revenue is now a flat
+      // per-plan fee), so seed a zero distribution here. The v6->v7 step below
+      // converts whatever lands here into data.planFee.
+      data.deposits = { low: { amt: 0, w: 25 }, mid: { amt: 0, w: 50 }, high: { amt: 0, w: 25 } };
     }
     data.version = 3;
   }
@@ -1793,6 +1757,35 @@ function migrateData(data) {
     }
     data.version = 6;
   }
+
+  // v6 -> v7: revenue model changes from a graded insurance commission (a 3-point
+  // deposit distribution run through tiered rates) to a single flat fee per plan.
+  // To keep a loaded legacy model from silently dropping to zero revenue, carry
+  // the old distribution over by computing the expected per-sale commission it
+  // implied and using that as the starting flat fee. Edit it to a real fee after.
+  if (data.version < 7) {
+    if (data.planFee === undefined) {
+      if (data.deposits) {
+        var LT = { r1: 0.025, c1: 100000, r2: 0.020, c2: 200000, r3: 0.015 };
+        var perSale = function (dep) {
+          var t1 = Math.min(dep, LT.c1) * LT.r1;
+          var t2 = Math.max(0, Math.min(dep, LT.c2) - LT.c1) * LT.r2;
+          var t3 = Math.max(0, dep - LT.c2) * LT.r3;
+          return t1 + t2 + t3;
+        };
+        var pts = ['low', 'mid', 'high'].map(function (k) { return data.deposits[k] || { amt: 0, w: 0 }; });
+        var wsum = pts.reduce(function (t, p) { return t + (Number(p.w) || 0); }, 0);
+        var fee = wsum > 0
+          ? pts.reduce(function (t, p) { return t + ((Number(p.w) || 0) / wsum) * perSale(Number(p.amt) || 0); }, 0)
+          : perSale(Number((data.deposits.mid || {}).amt) || 0);
+        data.planFee = Math.round(fee);
+      } else {
+        data.planFee = DEFAULTS.planFee;
+      }
+    }
+    delete data.deposits;
+    data.version = 7;
+  }
   return data;
 }
 
@@ -1819,7 +1812,7 @@ function applyLoadedData(data, sourceLbl) {
     if (a[k] !== undefined) State[k] = a[k];
   });
 
-  if (data.deposits) State.deposits = data.deposits;
+  if (data.planFee !== undefined) State.planFee = data.planFee;
 
   if (data.expense) {
     if (data.expense.opexFlat)    State.expense.opexFlat    = data.expense.opexFlat;
@@ -1963,7 +1956,7 @@ function resetToDefaults() {
    'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
    'coverageRatio','hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) { State[k] = DEFAULTS[k]; });
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
-  State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
+  State.planFee = DEFAULTS.planFee;
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
   State.scenario = 'base';
   initExpenseState();
@@ -2056,7 +2049,7 @@ function buildSkeleton() {
 
     <section class="tab-panel" id="panel-sales">
       <h2 class="section-title">Sales Scenarios</h2>
-      <p class="section-sub">Sales per month feeding every scenario's commission revenue. Type directly into any month to adjust the ramp.</p>
+      <p class="section-sub">Plans sold per month feeding every scenario's revenue. Type directly into any month to adjust the ramp.</p>
       <div id="sales-content"></div>
     </section>
 
@@ -2093,12 +2086,8 @@ function renderRunwayTab() {
         <div class="eyebrow">Model assumptions</div>
 
         <div class="input-section">
-          <div class="input-section-title" style="display:flex;align-items:center;gap:6px">
-            <span>Business</span>
-            <button class="help-btn ${openHelpKey === 'deposits' ? 'open' : ''}" data-help="deposits" title="What is this?">?</button>
-          </div>
-          ${helpHTML('deposits')}
-          ${depositBlockHTML()}
+          <div class="input-section-title">Business</div>
+          ${numFieldHTML('planFee', 'Fee per plan', State.planFee, '$', '', 100)}
           ${numFieldHTML('floorGross', 'Annual salary floor', State.floorGross, '$', '', 1000)}
           ${numFieldHTML('ceilingGross', 'Annual salary ceiling', State.ceilingGross, '$', '', 1000)}
         </div>
@@ -2171,9 +2160,7 @@ function renderRunwayTab() {
   `;
 
   attachNumFieldHandlers(renderRunwayTab);
-  attachDepositHandlers(renderRunwayTab);
   attachHelpHandlers();
-  renderDepositReadout();
   attachScenarioButtonHandlers('runway-scenario-bar', renderRunwayTab);
 
   const result = runSimulation(State.scenario);
@@ -2189,9 +2176,9 @@ function renderRunwayTab() {
 // which output a given assumption actually drives.
 // ============================================================
 const FIELD_META = {
-  deposits: {
-    what: 'Deposit size as a 3-point distribution rather than one average. Commission is graded (2.5/2.0/1.5%), so it is concave in deposit size — averaging first overstates it slightly. The bigger point: stating low/mid/high forces the implied mean into the open.',
-    affects: 'Monthly Detail → <strong>Gross Commission</strong> · "Commission per sale" stat',
+  planFee: {
+    what: 'The flat fee you charge per plan. Revenue for a month is simply plans sold x this fee — no deposit sizes, no tiered rates. Set it to whatever you actually bill per plan.',
+    affects: 'Monthly Detail → <strong>Gross Revenue</strong> · "Revenue per plan" stat',
   },
   floorGross: {
     what: 'The salary you are aiming at once the business can carry it. Not a guaranteed minimum — until trailing revenue sustains it, you are paid the base salary instead. Worth checking against what the household actually needs.',
@@ -2210,7 +2197,7 @@ const FIELD_META = {
     affects: 'Monthly Detail → <strong>⟳</strong> marker, <strong>Target Gross</strong>',
   },
   runRateWindowMonths: {
-    what: 'How many trailing months of commission are used to judge what salary is sustainable, annualised to a yearly rate. A flow test — unlike a balance test, seed capital cannot masquerade as earning power.',
+    what: 'How many trailing months of revenue are used to judge what salary is sustainable, annualised to a yearly rate. A flow test — unlike a balance test, seed capital cannot masquerade as earning power.',
     affects: 'Monthly Detail → <strong>Target Gross</strong> at review months',
   },
   salaryStep: {
@@ -2366,73 +2353,8 @@ function scenarioDesc(key) {
 }
 
 
-// ============================================================
-// DEPOSIT DISTRIBUTION (3-point)
-// ============================================================
-function depositBlockHTML() {
-  const d = State.deposits;
-  const row = (k, lbl) => `
-    <div class="dep-lbl">${lbl}</div>
-    <input class="dep-in" type="number" min="0" step="25000" data-dep="${k}" data-f="amt" value="${d[k].amt}">
-    <input class="dep-in" type="number" min="0" step="5" data-dep="${k}" data-f="w" value="${d[k].w}">`;
-  return `
-    <div class="dep-grid">
-      <div class="hdr"></div><div class="hdr r">Deposit</div><div class="hdr r">Weight</div>
-      ${row('low', 'Low')}
-      ${row('mid', 'Mid')}
-      ${row('high', 'High')}
-    </div>
-    <div class="dep-wsum" id="dep-wsum"></div>
-    <div class="dep-readout" id="dep-readout"></div>`;
-}
-
-// The readout exists to make the assumption visible: the implied mean is the
-// number most likely to differ from whatever single "average" you'd have typed.
-// The naive line shows f(mean) — what a single-average model would have paid —
-// so the concavity gap is on screen rather than buried in the engine.
-function renderDepositReadout() {
-  const d = State.deposits;
-  const wsum = ['low', 'mid', 'high'].reduce((t, k) => t + (Number(d[k].w) || 0), 0);
-  const el = document.getElementById('dep-wsum');
-  if (el) {
-    el.textContent = wsum === 100 ? 'Weights sum to 100%'
-      : wsum <= 0 ? 'No weights set — using Mid only'
-      : `Weights sum to ${(Math.round(wsum * 10) / 10)}% — normalised`;
-    el.className = 'dep-wsum' + (wsum === 100 ? '' : ' off');
-  }
-  const out = document.getElementById('dep-readout');
-  if (!out) return;
-  const mean = Engine.meanDeposit(d);
-  const exp = Engine.expectedCommission(d);
-  const naive = Engine.commissionPerSale(mean);
-  const gap = naive - exp;
-  out.innerHTML = `
-    <div class="row"><span class="k">Implied mean deposit</span><span class="v">${fmtCurrency(mean)}</span></div>
-    <div class="row"><span class="k">Expected commission / sale</span><span class="v">${fmtCurrency(exp)}</span></div>
-    <div class="row naive"><span class="k">Naive — single average</span><span class="v">${fmtCurrency(naive)}</span></div>
-    <div class="dep-gap">${gap > 0.5
-      ? `Averaging the deposit first would overstate commission by <strong>${fmtCurrency(gap)}</strong>/sale
-         (${(gap / naive * 100).toFixed(1)}%) — the grade is concave, so E[f(X)] &lt; f(E[X]).`
-      : `No gap — the spread sits in the flat 1.5% band above ${fmtCurrency(COMMISSION.tier2Cap)},
-         where the grade is linear and averaging first is exact.`}</div>`;
-}
-
-function attachDepositHandlers(rerenderFn) {
-  document.querySelectorAll('.dep-in').forEach(inp => {
-    enhanceNumericInput(inp);
-    inp.addEventListener('change', () => {
-      const val = Math.max(0, Number(inp.value) || 0);
-      inp.value = val;
-      State.deposits[inp.dataset.dep][inp.dataset.f] = val;
-      invalidateCache();
-      scheduleCloudSave();
-      withFocusRestored(rerenderFn);
-    });
-  });
-}
-
 function attachNumFieldHandlers(rerenderFn) {
-  const keys = ['floorGross','ceilingGross','corpFunding','minBuffer',
+  const keys = ['planFee','floorGross','ceilingGross','corpFunding','minBuffer',
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
                  'ashleyMonthly','hhBurnMonthly',
                  'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
@@ -2546,7 +2468,7 @@ function renderRunwayStats(result) {
       <div class="stat-value good">${r4r5} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Commission per sale</div>
+      <div class="stat-label">Revenue per plan</div>
       <div class="stat-value">${fmtCurrency(result.comm)}</div>
     </div>
     <div class="stat-card">
@@ -3019,7 +2941,7 @@ function renderSummaryTab() {
           <div class="dash-stat-value">${baseDeficitMonths} / 60</div>
         </div>
         <div>
-          <div class="dash-stat-label">Commission per sale</div>
+          <div class="dash-stat-label">Revenue per plan</div>
           <div class="dash-stat-value">${fmtCurrency(baseR.comm)}</div>
         </div>
       </div>
@@ -3027,7 +2949,7 @@ function renderSummaryTab() {
 
     <div class="panel-grid-2">
       <div class="chart-box" style="margin-bottom:0">
-        <div class="eyebrow">Annual gross commission by scenario</div>
+        <div class="eyebrow">Annual gross revenue by scenario</div>
         <canvas id="summary-revenue-chart" height="100"></canvas>
       </div>
       <div class="chart-box" style="margin-bottom:0">
@@ -3049,7 +2971,7 @@ function renderSummaryTab() {
         </div>
       </div>
       <div class="chart-legend">
-        <span><span class="legend-dot" style="background:#CC7722"></span>Gross commission (revenue line)</span>
+        <span><span class="legend-dot" style="background:#CC7722"></span>Gross revenue (revenue line)</span>
         <span><span class="legend-dot" style="background:#5C4A2E"></span>Opex</span>
         <span><span class="legend-dot" style="background:#4a7c6f"></span>Gross salary paid</span>
         <span><span class="legend-dot" style="background:#8fb5ae"></span>Employer CPP</span>
@@ -3078,9 +3000,9 @@ function renderSummaryTab() {
               ${comparisonRow('Worst HH month', results, r => fmtCurrencySigned(Math.min(...r.months.map(m => m.hhSurplus))))}
               ${comparisonRow('Months in deficit', results, r => r.months.filter(m => m.hhSurplus < 0).length + ' / 60')}
               ${comparisonRow('Total corp tax paid (5yr)', results, r => fmtCurrency(r.months.reduce((s, m) => s + m.corpTaxOwed, 0)))}
-              ${comparisonRow('Year 1 total commission', results, r => fmtCurrency(sumYear(r.months, 0)))}
-              ${comparisonRow('Year 3 total commission', results, r => fmtCurrency(sumYear(r.months, 2)))}
-              ${comparisonRow('Year 5 total commission', results, r => fmtCurrency(sumYear(r.months, 4)))}
+              ${comparisonRow('Year 1 total revenue', results, r => fmtCurrency(sumYear(r.months, 0)))}
+              ${comparisonRow('Year 3 total revenue', results, r => fmtCurrency(sumYear(r.months, 2)))}
+              ${comparisonRow('Year 5 total revenue', results, r => fmtCurrency(sumYear(r.months, 4)))}
               ${comparisonRow('Year 1 sales volume', results, r => fmtNum1(sumYearSales(r.months, 0)))}
               ${comparisonRow('Year 5 sales volume', results, r => fmtNum1(sumYearSales(r.months, 4)))}
             </tbody>
@@ -3098,9 +3020,9 @@ function renderSummaryTab() {
           <thead>
             <tr>
               <th style="text-align:left">Year</th>
-              <th>Pess. Commission</th><th>Pess. Sales</th><th>Pess. Tax</th>
-              <th>Base Commission</th><th>Base Sales</th><th>Base Tax</th>
-              <th>Opt. Commission</th><th>Opt. Sales</th><th>Opt. Tax</th>
+              <th>Pess. Revenue</th><th>Pess. Sales</th><th>Pess. Tax</th>
+              <th>Base Revenue</th><th>Base Sales</th><th>Base Tax</th>
+              <th>Opt. Revenue</th><th>Opt. Sales</th><th>Opt. Tax</th>
             </tr>
           </thead>
           <tbody>
@@ -3318,7 +3240,7 @@ function renderCompositionChart(results) {
         },
         {
           type: 'line',
-          label: 'Gross commission (revenue)',
+          label: 'Gross revenue',
           data: revenue,
           borderColor: '#CC7722',
           backgroundColor: 'transparent',
@@ -3378,7 +3300,7 @@ function renderSalesTab() {
     <div id="sales-summary" class="stat-grid"></div>
     <div class="panel">
       <div class="eyebrow">Sales per month — ${SCENARIO_META[State.scenario].label}</div>
-      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem">${scenarioDesc(State.scenario)} Edit any month below; commission revenue throughout the model recalculates immediately.</p>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem">${scenarioDesc(State.scenario)} Edit any month below; revenue throughout the model recalculates immediately.</p>
       <div id="sales-year-grid"></div>
     </div>
   `;
@@ -3465,7 +3387,7 @@ function renderSalesSummary() {
       <div class="stat-value">${fmtNum1(totalSales)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Total gross commission, 60 months</div>
+      <div class="stat-label">Total gross revenue, 60 months</div>
       <div class="stat-value">${fmtCurrency(totalCommission)}</div>
     </div>
     <div class="stat-card">
@@ -3508,7 +3430,7 @@ function renderMonthlyTab() {
             <tr>
               <th style="text-align:left">Month</th>
               <th>Sales</th>
-              <th>Gross Commission</th>
+              <th>Gross Revenue</th>
               <th>Opex/mo</th>
               <th>Target Gross</th>
               <th>Gross Salary Paid</th>
