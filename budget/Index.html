@@ -542,6 +542,17 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
       <button class="add-btn" onclick="addOTI()" style="align-self:end;">+ Add</button>
     </div>
     <div class="oti-list" id="oti-list"><div class="oti-hdr"><span>One-time income entries</span></div><div class="oti-row"><span class="oti-month">Apr 2026</span><span class="oti-desc">Tax Refund</span><span class="oti-amt">+$3,602.72</span><button class="del-tx" onclick="delOTI(1)" title="Remove">×</button></div><div class="oti-row"><span class="oti-month">Mar 2026</span><span class="oti-desc">Group Benefits</span><span class="oti-amt">+$178.00</span><button class="del-tx" onclick="delOTI(2)" title="Remove">×</button></div></div>
+
+  <!-- YEAR-END INCOME LOCK -->
+  <div class="chart-box" style="margin-top:1.5rem;">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">Year-end lock</div>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:.875rem;line-height:1.5;">Freeze a completed year's monthly income so future salary or tax changes don't rewrite history. Locked months show their frozen post-variance total; you can hand-edit any month afterward (e.g. bi-weekly extra-pay months).</p>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <select id="lock-year-sel" style="padding:7px 10px;font-size:13px;font-family:var(--font);border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);"></select>
+      <button class="hbtn" id="lock-year-btn" onclick="promptLockYear()" style="background:var(--accent);color:#fff;border:none;padding:7px 16px;">Lock year</button>
+    </div>
+    <div id="locked-years-list" style="margin-top:1rem;"></div>
+  </div>
   </div>
 </div>
 
@@ -830,6 +841,9 @@ function getIncValue(item,ym){
 
 // monthlyIncome: reads INC_LINES for the month, runs tax engine, adds OTI
 function monthlyIncome(ym){
+  // Year-end lock: a locked month returns its frozen post-variance total, immune to
+  // later salary/tax changes. Everything downstream inherits this via this one gate.
+  if(LOCKED_INCOME[ym]!==undefined)return LOCKED_INCOME[ym];
   var bGross=getIncValue(INC_LINES.bryanGross,ym);
   var bEmpR=getIncValue(INC_LINES.bryanEmpRRSP,ym);
   var bEeR =getIncValue(INC_LINES.bryanEeRRSP,ym);
@@ -875,6 +889,7 @@ function getMonthIncomeParts(ym){
 var OTI=[], _otiId=1;
 // Balance snapshots: { "YYYY-MM": amount } — real bank balance recorded each month
 var BAL_SNAPSHOTS={};
+var LOCKED_INCOME={};  // {"YYYY-MM": post-variance total} — frozen historical income by month
 
 // ── BUDGET LINES ─────────────────────────────────────────────
 var _id=1;
@@ -1104,6 +1119,7 @@ function buildSavePayload(){
     saveHistory:SAVE_HISTORY,
     seed:seed,
     balanceSnapshots:BAL_SNAPSHOTS,
+    lockedIncome:LOCKED_INCOME,
     incomeLines:INC_LINES,
     oneTimeIncome:OTI,
     otiNextId:_otiId,
@@ -1122,6 +1138,7 @@ function applyLoadedData(data,sourceLbl){
   LINES=data.budgetLines||data.lines||LINES;
   TXNS=data.transactions||data.txns||[];
   BAL_SNAPSHOTS=data.balanceSnapshots||{};
+  LOCKED_INCOME=data.lockedIncome||{};
   _txId=data.txNextId||1;
   INC_LINES=data.incomeLines;
   OTI=data.oneTimeIncome||[];
@@ -1370,12 +1387,109 @@ function renderTaxBreakdowns(){
   grid.innerHTML=card('Bryan',bRows,b.net+getIncValue(INC_LINES.bryanVariance,ym))+card('Ashley',aRows,a.net+getIncValue(INC_LINES.ashleyVariance,ym))+ccbCard;
 }
 
+// ══════════════════════════════════════════════════════════
+// YEAR-END INCOME LOCK
+// Freezes a completed year's monthly income (post-variance) so later
+// salary/tax edits never rewrite history. One gate in monthlyIncome()
+// makes every card/chart/table respect it automatically.
+// ══════════════════════════════════════════════════════════
+function lockableYears(){
+  // Offer years from the earliest data year through last completed year.
+  var todym=todayYM(),curYr=parseInt(todym.split('-')[0]);
+  var years=[];
+  for(var y=2026;y<curYr;y++)years.push(y);      // fully-past years
+  if(parseInt(todym.split('-')[1])===12)years.push(curYr); // current year if it's December
+  return years;
+}
+function computeYearIncome(yr){
+  // 12 monthly post-variance totals as currently modelled (ignoring any existing lock).
+  var vals={};
+  for(var m=1;m<=12;m++){
+    var ym=yr+'-'+(m<10?'0':'')+m;
+    // Temporarily bypass the lock to get the freshly-computed value
+    var had=LOCKED_INCOME[ym]; if(had!==undefined)delete LOCKED_INCOME[ym];
+    vals[ym]=monthlyIncome(ym);
+    if(had!==undefined)LOCKED_INCOME[ym]=had;
+  }
+  return vals;
+}
+function isYearLocked(yr){
+  for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;if(LOCKED_INCOME[ym]!==undefined)return true;}
+  return false;
+}
+function promptLockYear(){
+  var yr=parseInt(document.getElementById('lock-year-sel').value);
+  if(!yr)return;
+  var vals=computeYearIncome(yr);
+  var total=0,lines=[];
+  for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;total+=vals[ym];lines.push(ymlb(ym)+': '+fmtC(vals[ym]));}
+  var msg='Freeze '+yr+' income at these monthly values?\n\n'+lines.join('\n')+'\n\nYear total: '+fmtC(total)+
+    '\n\nAfter locking, these months are immune to future salary/tax changes. You can still hand-edit any month, and you can unlock later.';
+  if(confirm(msg)){
+    for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;LOCKED_INCOME[ym]=vals[ym];}
+    renderIncome();recalc();renderTrack();scheduleCloudSave();
+  }
+}
+function unlockYear(yr){
+  if(!confirm('Unlock '+yr+'? These months will go back to being computed live from your current income settings.'))return;
+  for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;delete LOCKED_INCOME[ym];}
+  renderIncome();recalc();renderTrack();scheduleCloudSave();
+}
+function editLockedMonth(ym){
+  var cur=LOCKED_INCOME[ym];
+  var raw=prompt('Locked income for '+ymlb(ym)+' (post-variance actual):',cur);
+  if(raw===null)return;
+  var v=parseFloat(String(raw).replace(/[^0-9.\-]/g,''));
+  if(isNaN(v))return;
+  LOCKED_INCOME[ym]=v;
+  renderIncome();recalc();renderTrack();scheduleCloudSave();
+}
+function renderLockControls(){
+  var sel=document.getElementById('lock-year-sel');
+  if(!sel)return;
+  var years=lockableYears();
+  if(!years.length){
+    sel.innerHTML='<option value="">No complete year yet</option>';
+    document.getElementById('lock-year-btn').disabled=true;
+  }else{
+    sel.innerHTML=years.map(function(y){return'<option value="'+y+'"'+(isYearLocked(y)?' disabled':'')+'>'+y+(isYearLocked(y)?' (locked)':'')+'</option>';}).join('');
+    // default to first unlocked year
+    var firstUnlocked=years.filter(function(y){return !isYearLocked(y);})[0];
+    if(firstUnlocked)sel.value=firstUnlocked;
+    document.getElementById('lock-year-btn').disabled=!firstUnlocked;
+  }
+  // Locked years list with unlock + per-month edit (months always shown)
+  var lockedYrs=[];
+  Object.keys(LOCKED_INCOME).forEach(function(ym){var y=parseInt(ym.split('-')[0]);if(lockedYrs.indexOf(y)<0)lockedYrs.push(y);});
+  lockedYrs.sort();
+  var listEl=document.getElementById('locked-years-list');
+  if(!lockedYrs.length){listEl.innerHTML='';return;}
+  var html='';
+  lockedYrs.forEach(function(yr){
+    var total=0,rows='';
+    for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;var v=LOCKED_INCOME[ym];if(v===undefined)continue;total+=v;
+      rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;">'+
+        '<span style="color:var(--text3);">'+ymlb(ym)+'</span>'+
+        '<span style="display:flex;align-items:center;gap:8px;"><span style="font-family:var(--mono);font-weight:600;color:var(--green);">'+fmtC(v)+'</span>'+
+        '<button class="del-tx" onclick="editLockedMonth(\''+ym+'\')" title="Edit actual" style="font-size:11px;">✎</button></span></div>';
+    }
+    html+='<div style="border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:.75rem;background:var(--green-bg);">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">'+
+        '<span style="font-size:13px;font-weight:700;">'+yr+' · locked</span>'+
+        '<span style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:var(--text3);font-family:var(--mono);">total '+fmtC(total)+'</span>'+
+        '<button class="hbtn" onclick="unlockYear('+yr+')" style="background:var(--surface);border:1px solid var(--border-strong);color:var(--text2);padding:4px 12px;font-size:12px;">Unlock</button></span></div>'+
+      '<div style="padding-top:.4rem;border-top:1px solid var(--border);">'+rows+'</div>'+
+    '</div>';
+  });
+  listEl.innerHTML=html;
+}
 function renderIncome(){
   renderIncSection('inc-tbl-bryan',['bryanGross','bryanEmpRRSP','bryanEeRRSP','bryanVariance']);
   renderIncSection('inc-tbl-ashley',['ashleyGross','ashleyUnion','ashleyOmers','ashleyBenefits','ashleyVariance']);
   renderIncSection('inc-tbl-ccb',['ccbAFNI','ccbUnder6','ccbOver6','ccbVariance']);
   renderTaxBreakdowns();
   renderOTIList();
+  renderLockControls();
 }
 
 // ── INCOME LINE UPDATES ──────────────────────────────────────
