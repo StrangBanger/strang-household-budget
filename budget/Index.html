@@ -403,6 +403,32 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   /* Login card — full width on small screens */
   .login-card{width:calc(100% - 2rem);padding:1.5rem 1.25rem;}
 }
+/* Income Projection (what-if scenarios) */
+.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.scen-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem 1.1rem;}
+.scen-col-cur{background:var(--surface2);}
+.scen-col-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border);}
+.scen-col-title{font-size:13px;font-weight:700;letter-spacing:-.01em;}
+.scen-reset{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;}
+.scen-reset:hover{color:var(--accent);}
+.scen-inputs{margin-bottom:.875rem;}
+.scen-inp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;}
+.scen-inp-lbl{font-size:11px;color:var(--text3);white-space:nowrap;}
+.scen-inp-val{font-size:13px;font-family:var(--mono);font-weight:600;color:var(--text2);}
+.scen-inp{width:92px;padding:4px 8px;font-size:12px;font-family:var(--mono);text-align:right;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg);color:var(--text);}
+.scen-inp:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+.scen-results{}
+.scen-res-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:8px;}
+.scen-res-lbl{font-size:11px;color:var(--text3);}
+.scen-res-v{font-size:14px;font-weight:600;font-family:var(--mono);text-align:right;}
+.scen-res-v.pos{color:var(--green);}
+.scen-res-v.neg{color:var(--red);}
+.scen-res-v.muted{color:var(--text3);font-weight:500;}
+.scen-delta{display:block;font-size:10px;font-weight:500;margin-top:1px;}
+.scen-delta.pos{color:var(--green);}
+.scen-delta.neg{color:var(--red);}
+.scen-res-divider{height:1px;background:var(--border);margin:8px 0;}
+@media(max-width:760px){.scenario-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -439,6 +465,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   <button class="tab" id="t-table" onclick="showTab('table')">Month detail</button>
   <button class="tab" id="t-proj" onclick="showTab('proj')">Monthly Summary</button>
   <button class="tab" id="t-dash" onclick="showTab('dash')">Dashboard</button>
+  <button class="tab" id="t-scenario" onclick="showTab('scenario')">Projection</button>
 </div>
 
 <!-- TRACK -->
@@ -651,6 +678,15 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 </div>
 </div>
 </div>
+</div>
+
+<!-- PROJECTION (income what-if) -->
+<div class="panel" id="tab-scenario">
+  <div style="margin-bottom:1rem;">
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:.25rem;">Income projection</h2>
+    <p style="font-size:12px;color:var(--text3);line-height:1.5;max-width:640px;">Test how different incomes affect your surplus, holding your budgeted expenses constant. Column 1 is your current reality; edit Scenarios A and B to compare. Gross salaries run through the full tax engine, and AFNI drives CCB.</p>
+  </div>
+  <div id="scenario-grid" class="scenario-grid"></div>
 </div>
 
 <!-- end shell / app-shell -->
@@ -866,6 +902,129 @@ function monthlyIncome(ym){
   return b.net+a.net+ccb+oti+bVar+aVar+cVar;
 }
 
+// ══════════════════════════════════════════════════════════
+// INCOME PROJECTION (what-if scenarios)
+// Mirrors monthlyIncome's tax-engine assembly but with override inputs.
+// Expenses held at budgeted spend; annual = accurate 12-month sum.
+// ══════════════════════════════════════════════════════════
+function currentScenarioInputs(){
+  // Snapshot of current settings as the editable baseline for a new scenario.
+  var ym=todayYM();
+  return {
+    bGross:getIncValue(INC_LINES.bryanGross,ym),
+    aGross:getIncValue(INC_LINES.ashleyGross,ym),
+    afni:getIncValue(INC_LINES.ccbAFNI,ym),
+    bEmpR:getIncValue(INC_LINES.bryanEmpRRSP,ym),
+    bEeR:getIncValue(INC_LINES.bryanEeRRSP,ym)
+  };
+}
+function scenarioMonthlyIncome(inp,ym){
+  // Compute take-home for a given scenario input set, for month ym.
+  // Ashley's union/OMERS/benefits and kids' ages carry from current settings.
+  var aUnion=getIncValue(INC_LINES.ashleyUnion,ym);
+  var aOmers=getIncValue(INC_LINES.ashleyOmers,ym);
+  var aBen  =getIncValue(INC_LINES.ashleyBenefits,ym);
+  var u6=getIncValue(INC_LINES.ccbUnder6,ym);
+  var o6=getIncValue(INC_LINES.ccbOver6,ym);
+  var b=calcPerson(inp.bGross,inp.bEmpR,inp.bEeR,0,0,0,0);
+  var a=calcPerson(inp.aGross,0,0,aUnion,aOmers,0,aBen);
+  var yr=parseInt(ym.split('-')[1])>=7?"2627":"2526";
+  var ccb=calcCCB(inp.afni,u6,o6,yr);
+  return b.net+a.net+ccb;
+}
+function budgetedMonthSpend(ym){
+  return LINES.reduce(function(s,l){return s+getMonthAmount(l,ym);},0);
+}
+function annualBudgetedSpend(yr){
+  // Accurate: sum all 12 months of budgeted spend for the year.
+  var t=0;for(var m=1;m<=12;m++){t+=budgetedMonthSpend(yr+'-'+(m<10?'0':'')+m);}return t;
+}
+function computeScenarioResult(inp){
+  // Returns {monthInc, monthSpend, monthSurplus, annualInc, annualSpend, annualSurplus}
+  var yr=parseInt(todayYM().split('-')[0]);
+  var monthInc=scenarioMonthlyIncome(inp,todayYM());
+  var monthSpend=budgetedMonthSpend(todayYM());
+  var annualInc=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;annualInc+=scenarioMonthlyIncome(inp,ym);}
+  var annualSpend=annualBudgetedSpend(yr);
+  return {
+    monthInc:monthInc, monthSpend:monthSpend, monthSurplus:monthInc-monthSpend,
+    annualInc:annualInc, annualSpend:annualSpend, annualSurplus:annualInc-annualSpend
+  };
+}
+function currentResult(){
+  // Baseline uses the real monthlyIncome (respects locks, variance, everything).
+  var yr=parseInt(todayYM().split('-')[0]);
+  var monthInc=monthlyIncome(todayYM());
+  var monthSpend=budgetedMonthSpend(todayYM());
+  var annualInc=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;annualInc+=monthlyIncome(ym);}
+  var annualSpend=annualBudgetedSpend(yr);
+  return {monthInc:monthInc,monthSpend:monthSpend,monthSurplus:monthInc-monthSpend,
+    annualInc:annualInc,annualSpend:annualSpend,annualSurplus:annualInc-annualSpend};
+}
+function updateScenarioInput(which,field,raw){
+  if(!SCENARIOS[which])SCENARIOS[which]=currentScenarioInputs();
+  var v=parseFloat(String(raw).replace(/[^0-9.\-]/g,''));
+  if(isNaN(v))v=0;
+  SCENARIOS[which][field]=v;
+  renderScenario();scheduleCloudSave();
+}
+function resetScenario(which){
+  SCENARIOS[which]=null;
+  renderScenario();scheduleCloudSave();
+}
+function fmtDelta(v){return (v>=0?'+':'−')+fmtR(Math.abs(v));}
+function renderScenario(){
+  var grid=document.getElementById('scenario-grid');
+  if(!grid)return;
+  var cur=currentResult();
+  var cols=[{key:'current',label:'Current',inputs:currentScenarioInputs(),res:cur,readonly:true}];
+  ['a','b'].forEach(function(k){
+    var inp=SCENARIOS[k]||currentScenarioInputs();
+    cols.push({key:k,label:'Scenario '+k.toUpperCase(),inputs:inp,res:computeScenarioResult(inp),readonly:false,active:!!SCENARIOS[k]});
+  });
+
+  function inputRow(col,field,label){
+    if(col.readonly){
+      return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span><span class="scen-inp-val">'+fmtR(col.inputs[field])+'</span></div>';
+    }
+    return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span>'+
+      '<input class="scen-inp" type="text" value="'+col.inputs[field]+'" onblur="updateScenarioInput(\''+col.key+'\',\''+field+'\',this.value)" onfocus="this.select()"></div>';
+  }
+  function resultRow(label,val,delta,cls){
+    var deltaHtml=delta!==null?'<span class="scen-delta '+(delta>=0?'pos':'neg')+'">'+fmtDelta(delta)+'</span>':'';
+    return '<div class="scen-res-row"><span class="scen-res-lbl">'+label+'</span><span class="scen-res-v '+(cls||'')+'">'+val+deltaHtml+'</span></div>';
+  }
+
+  var html='';
+  cols.forEach(function(col){
+    var r=col.res, isCur=col.key==='current';
+    var mSurCls=r.monthSurplus>=0?'pos':'neg', aSurCls=r.annualSurplus>=0?'pos':'neg';
+    html+='<div class="scen-col'+(isCur?' scen-col-cur':'')+'">'+
+      '<div class="scen-col-hd">'+
+        '<span class="scen-col-title">'+col.label+'</span>'+
+        (!isCur&&col.active?'<button class="scen-reset" onclick="resetScenario(\''+col.key+'\')" title="Reset to current">reset</button>':'')+
+      '</div>'+
+      '<div class="scen-inputs">'+
+        inputRow(col,'bGross','Bryan gross')+
+        inputRow(col,'aGross','Ashley gross')+
+        inputRow(col,'afni','AFNI (for CCB)')+
+        inputRow(col,'bEmpR','Bryan empl. RRSP')+
+        inputRow(col,'bEeR','Bryan empe. RRSP')+
+      '</div>'+
+      '<div class="scen-results">'+
+        resultRow('Monthly income',fmtR(r.monthInc),isCur?null:(r.monthInc-cur.monthInc),'')+
+        resultRow('Monthly spend',fmtR(r.monthSpend),null,'muted')+
+        resultRow('Monthly surplus',fmtDelta(r.monthSurplus),isCur?null:(r.monthSurplus-cur.monthSurplus),mSurCls)+
+        '<div class="scen-res-divider"></div>'+
+        resultRow('Annual income',fmtR(r.annualInc),isCur?null:(r.annualInc-cur.annualInc),'')+
+        resultRow('Annual spend',fmtR(r.annualSpend),null,'muted')+
+        resultRow('Annual surplus',fmtDelta(r.annualSurplus),isCur?null:(r.annualSurplus-cur.annualSurplus),aSurCls)+
+      '</div>'+
+    '</div>';
+  });
+  grid.innerHTML=html;
+}
+
 // getMonthIncomeParts: for a specific month, returns full breakdown (used by Income tab)
 function getMonthIncomeParts(ym){
   var bGross=getIncValue(INC_LINES.bryanGross,ym);
@@ -890,6 +1049,7 @@ var OTI=[], _otiId=1;
 // Balance snapshots: { "YYYY-MM": amount } — real bank balance recorded each month
 var BAL_SNAPSHOTS={};
 var LOCKED_INCOME={};  // {"YYYY-MM": post-variance total} — frozen historical income by month
+var SCENARIOS={a:null,b:null};  // income what-if scenarios (null until user edits; then {bGross,aGross,afni,bEmpR,bEeR})
 
 // ── BUDGET LINES ─────────────────────────────────────────────
 var _id=1;
@@ -1120,6 +1280,7 @@ function buildSavePayload(){
     seed:seed,
     balanceSnapshots:BAL_SNAPSHOTS,
     lockedIncome:LOCKED_INCOME,
+    scenarios:SCENARIOS,
     incomeLines:INC_LINES,
     oneTimeIncome:OTI,
     otiNextId:_otiId,
@@ -1139,6 +1300,7 @@ function applyLoadedData(data,sourceLbl){
   TXNS=data.transactions||data.txns||[];
   BAL_SNAPSHOTS=data.balanceSnapshots||{};
   LOCKED_INCOME=data.lockedIncome||{};
+  SCENARIOS=data.scenarios||{a:null,b:null};
   _txId=data.txNextId||1;
   INC_LINES=data.incomeLines;
   OTI=data.oneTimeIncome||[];
@@ -2847,6 +3009,7 @@ function showTab(n){
   if(n==='track')renderTrack();
   if(n==='income')renderIncome();
   if(n==='dash')renderDashboard();
+  if(n==='scenario')renderScenario();
 }
 window.addEventListener('load',function(){
   initAuth(); // shows login screen, or initAppAfterAuth() if already signed in
