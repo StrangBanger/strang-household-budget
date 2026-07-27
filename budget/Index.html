@@ -1896,6 +1896,7 @@ function renderTrack(){
         +'<div style="position:absolute;left:'+timePct.toFixed(1)+'%;top:-2px;height:11px;width:2px;background:var(--text2);border-radius:1px;" title="Today\'s pace"></div>'
       +'</div>'
       +'<div style="font-size:10px;color:var(--text3);margin-top:4px;">'+spentPct.toFixed(0)+'% spent · '+timePct.toFixed(0)+'% through month</div>'
+      +'<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+(dim-now.getDate())+' day'+((dim-now.getDate())===1?'':'s')+' left in the month</div>'
     +'</div>';
   }
   var projPos=projInc-projSpend; // "If on budget" — income minus projected spend
