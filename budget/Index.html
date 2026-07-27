@@ -429,6 +429,10 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-delta.neg{color:var(--red);}
 .scen-res-divider{height:1px;background:var(--border);margin:8px 0;}
 @media(max-width:760px){.scenario-grid{grid-template-columns:1fr;}}
+.scen-afni-auto{font-size:9px;font-weight:600;color:var(--accent);background:var(--accent-bg);padding:1px 5px;border-radius:8px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle;}
+.scen-afni-reset{font-size:9px;font-weight:600;color:var(--text3);background:var(--surface2);padding:1px 5px;border-radius:8px;text-transform:uppercase;letter-spacing:.03em;border:none;cursor:pointer;vertical-align:middle;}
+.scen-afni-reset:hover{color:var(--accent);background:var(--accent-bg);}
+.scen-inp-auto{color:var(--text3);font-style:italic;}
 </style>
 </head>
 <body>
@@ -907,16 +911,30 @@ function monthlyIncome(ym){
 // Mirrors monthlyIncome's tax-engine assembly but with override inputs.
 // Expenses held at budgeted spend; annual = accurate 12-month sum.
 // ══════════════════════════════════════════════════════════
+function autoAFNI(inp){
+  // AFNI ≈ combined gross minus pre-tax income-reducing deductions the tool knows about.
+  // (Ashley's union & OMERS carry from current settings; RRSP from the scenario itself.)
+  var ym=todayYM();
+  var aUnion=getIncValue(INC_LINES.ashleyUnion,ym);
+  var aOmers=getIncValue(INC_LINES.ashleyOmers,ym);
+  return Math.max(0, inp.bGross + inp.aGross - (inp.bEmpR*12) - (inp.bEeR*12) - (aUnion*12) - (aOmers*12));
+}
 function currentScenarioInputs(){
   // Snapshot of current settings as the editable baseline for a new scenario.
   var ym=todayYM();
-  return {
+  var inp={
     bGross:getIncValue(INC_LINES.bryanGross,ym),
     aGross:getIncValue(INC_LINES.ashleyGross,ym),
-    afni:getIncValue(INC_LINES.ccbAFNI,ym),
     bEmpR:getIncValue(INC_LINES.bryanEmpRRSP,ym),
-    bEeR:getIncValue(INC_LINES.bryanEeRRSP,ym)
+    bEeR:getIncValue(INC_LINES.bryanEeRRSP,ym),
+    afniAuto:true
   };
+  inp.afni=autoAFNI(inp); // derive AFNI from grosses by default
+  return inp;
+}
+function effectiveAFNI(inp){
+  // If AFNI is in auto mode, recompute from current grosses/deductions; else use the manual value.
+  return (inp.afniAuto===false) ? inp.afni : autoAFNI(inp);
 }
 function scenarioMonthlyIncome(inp,ym){
   // Compute take-home for a given scenario input set, for month ym.
@@ -929,7 +947,7 @@ function scenarioMonthlyIncome(inp,ym){
   var b=calcPerson(inp.bGross,inp.bEmpR,inp.bEeR,0,0,0,0);
   var a=calcPerson(inp.aGross,0,0,aUnion,aOmers,0,aBen);
   var yr=parseInt(ym.split('-')[1])>=7?"2627":"2526";
-  var ccb=calcCCB(inp.afni,u6,o6,yr);
+  var ccb=calcCCB(effectiveAFNI(inp),u6,o6,yr);
   return b.net+a.net+ccb;
 }
 function budgetedMonthSpend(ym){
@@ -966,6 +984,13 @@ function updateScenarioInput(which,field,raw){
   var v=parseFloat(String(raw).replace(/[^0-9.\-]/g,''));
   if(isNaN(v))v=0;
   SCENARIOS[which][field]=v;
+  if(field==='afni')SCENARIOS[which].afniAuto=false; // manual override engaged
+  renderScenario();scheduleCloudSave();
+}
+function resetAFNIauto(which){
+  if(!SCENARIOS[which])SCENARIOS[which]=currentScenarioInputs();
+  SCENARIOS[which].afniAuto=true;
+  SCENARIOS[which].afni=autoAFNI(SCENARIOS[which]);
   renderScenario();scheduleCloudSave();
 }
 function resetScenario(which){
@@ -985,7 +1010,17 @@ function renderScenario(){
 
   function inputRow(col,field,label){
     if(col.readonly){
-      return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span><span class="scen-inp-val">'+fmtR(col.inputs[field])+'</span></div>';
+      var rv=(field==='afni')?effectiveAFNI(col.inputs):col.inputs[field];
+      return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span><span class="scen-inp-val">'+fmtR(rv)+'</span></div>';
+    }
+    if(field==='afni'){
+      var isAuto=col.inputs.afniAuto!==false;
+      var shown=effectiveAFNI(col.inputs);
+      var badge=isAuto
+        ?'<span class="scen-afni-auto">auto</span>'
+        :'<button class="scen-afni-reset" onclick="resetAFNIauto(\''+col.key+'\')" title="Recalculate from salaries">auto</button>';
+      return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+' '+badge+'</span>'+
+        '<input class="scen-inp'+(isAuto?' scen-inp-auto':'')+'" type="text" value="'+Math.round(shown)+'" onblur="updateScenarioInput(\''+col.key+'\',\'afni\',this.value)" onfocus="this.select()"></div>';
     }
     return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span>'+
       '<input class="scen-inp" type="text" value="'+col.inputs[field]+'" onblur="updateScenarioInput(\''+col.key+'\',\''+field+'\',this.value)" onfocus="this.select()"></div>';
