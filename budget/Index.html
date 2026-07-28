@@ -433,6 +433,9 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-afni-reset{font-size:9px;font-weight:600;color:var(--text3);background:var(--surface2);padding:1px 5px;border-radius:8px;text-transform:uppercase;letter-spacing:.03em;border:none;cursor:pointer;vertical-align:middle;}
 .scen-afni-reset:hover{color:var(--accent);background:var(--accent-bg);}
 .scen-inp-auto{color:var(--text3);font-style:italic;}
+.ct-sel{font-size:11px;}
+.ct-sel.ct-fixed{color:var(--accent);font-weight:600;}
+.ct-sel.ct-variable{color:var(--text3);}
 </style>
 </head>
 <body>
@@ -1254,6 +1257,8 @@ function migrateData(data){
     // Migrate old credit/bank payType → specific source
     if(l.payType==='credit')l.payType='wealthsimple';
     // 'bank' stays as 'bank'
+    // Stage 1: default cost classification to 'variable' for lines that predate the feature
+    if(l.costType!=='fixed'&&l.costType!=='variable')l.costType='variable';
   });
   // Migrate old transactions: type:'credit' → source:'wealthsimple', type:'bank' → source:'bank'
   (data.transactions||data.txns||[]).forEach(function(t){
@@ -1771,11 +1776,12 @@ function renderBudget(){
   var tbl=document.getElementById('btbl');
   var months=computeProjection(parseFloat(document.getElementById('seed').value)||0);
   var years=[...new Set(months.map(function(m){return m.year;}))];
-  var COLS=12;
+  var COLS=13;  // +1 for the Type column
   var h='<thead><tr>'
     +'<th style="white-space:nowrap;">Expense</th>'
     +'<th class="r" style="width:82px;">$/mo now</th>'
     +'<th style="width:60px;">Pay via</th>'
+    +'<th style="width:72px;">Type</th>'
     +'<th class="h1" style="width:84px;">Change 1</th><th class="h1 r" style="width:90px;">New $/mo</th>'
     +'<th class="h2" style="width:84px;">Change 2</th><th class="h2 r" style="width:90px;">New $/mo</th>'
     +'<th class="h3" style="width:84px;">Change 3</th><th class="h3 r" style="width:90px;">New $/mo</th>'
@@ -1797,7 +1803,8 @@ function renderBudget(){
       h+='<tr draggable="true" data-id="'+l.id+'" data-group="'+g+'" ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
         +'<td style="white-space:nowrap;">'+nameCell+'</td>'
         +'<td style="text-align:right;"><input class="ni" type="number" step="0.01" value="'+l.current.toFixed(2)+'" onblur="upd('+l.id+',\'cur\',this.value)" onfocus="this.select()"/></td>'
-        +'<td><select class="pt" onchange="upd('+l.id+',\'pt\',this.value)">'+ptSel+'</select></td>';
+        +'<td><select class="pt" onchange="upd('+l.id+',\'pt\',this.value)">'+ptSel+'</select></td>'
+        +'<td><select class="pt ct-sel ct-'+(l.costType||'variable')+'" onchange="upd('+l.id+',\'ct\',this.value)"><option value="variable"'+((l.costType||'variable')==='variable'?' selected':'')+'>Variable</option><option value="fixed"'+(l.costType==='fixed'?' selected':'')+'>Fixed</option></select></td>';
       slots.forEach(function(s,i){
         var lbl=s.ym?ymlb(s.ym):'';
         var badge=s.ym?pctBadge(prevAmts[i],s.amount):'';
@@ -1878,10 +1885,11 @@ function upd(id,f,v){
   else if(f==='c3a'){var p=l.c2.ym?l.c2.amount:(l.c1.ym?l.c1.amount:l.current);var r=parseAmountInput(v,p);if(r!==null)l.c3.amount=r;}
   else if(f==='c4a'){var p=l.c3.ym?l.c3.amount:(l.c2.ym?l.c2.amount:(l.c1.ym?l.c1.amount:l.current));var r=parseAmountInput(v,p);if(r!==null)l.c4.amount=r;}
   else if(f==='pt'){l.payType=v;}
+  else if(f==='ct'){l.costType=v;}
   renderBudget();recalc();scheduleCloudSave();
 }
 function del(id){LINES=LINES.filter(function(l){return l.id!==id;});renderBudget();recalc();scheduleCloudSave();}
-function addLine(g){var nm=prompt('Expense name:');if(!nm||!nm.trim())return;var am=parseFloat(prompt('Monthly amount ($):')||'0')||0;var pt=prompt('Pay via? (credit / bank):','');LINES.push({id:_id++,group:g,name:nm.trim(),current:am,c1:{ym:'',amount:0},c2:{ym:'',amount:0},c3:{ym:'',amount:0},c4:{ym:'',amount:0},payType:pt||'',special:null});renderBudget();recalc();scheduleCloudSave();}
+function addLine(g){var nm=prompt('Expense name:');if(!nm||!nm.trim())return;var am=parseFloat(prompt('Monthly amount ($):')||'0')||0;var pt=prompt('Pay via? (credit / bank):','');LINES.push({id:_id++,group:g,name:nm.trim(),current:am,c1:{ym:'',amount:0},c2:{ym:'',amount:0},c3:{ym:'',amount:0},c4:{ym:'',amount:0},payType:pt||'',costType:(g==='Household (Fixed)'?'fixed':'variable'),special:null});renderBudget();recalc();scheduleCloudSave();}
 
 // ── TRACK TAB ────────────────────────────────────────────────
 var currentYM=PS;
