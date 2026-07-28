@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fit4Less · 3-Day Strength Log</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#111726; --panel-2:#0e1421; --line:#1e2740; --line-soft:#182034;
+    --ink:#e7ecf7; --muted:#8792ab; --muted-2:#5c6683;
+    --mon:#4d9fff; --wed:#2dd4bf; --fri:#a78bfa; --good:#38d39f; --warn:#e0a83b;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+    --accent:var(--mon);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased;padding:0 0 64px}
+  .wrap{max-width:860px;margin:0 auto;padding:0 18px}
+  .hidden{display:none !important}
+
+  /* ---- Login ---- */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .loginbox{width:100%;max-width:340px}
+  .loginbox .brand{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);margin-bottom:6px}
+  .loginbox h1{font-size:22px;margin:0 0 18px;letter-spacing:-.01em}
+  .loginbox label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin:12px 0 5px}
+  .loginbox input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:15px;padding:11px 13px}
+  .loginbox input:focus{outline:none;border-color:var(--accent)}
+  .loginbox button{width:100%;margin-top:18px;background:var(--accent);border:none;border-radius:10px;color:#06101f;font:inherit;font-weight:600;font-size:15px;padding:12px;cursor:pointer}
+  .loginbox button:disabled{opacity:.6;cursor:default}
+  .loginerr{color:var(--warn);font-size:12.5px;margin-top:12px;min-height:16px}
+
+  /* ---- Header ---- */
+  header{padding:28px 0 8px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);margin-bottom:6px}
+  h1{font-size:26px;line-height:1.15;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  .savebar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12.5px;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex:none;transition:background .2s}
+  .dot.saved{background:var(--good)} .dot.warn{background:var(--warn)}
+  .savebar .spacer{flex:1}
+  .linkbtn{background:none;border:1px solid var(--line);color:var(--muted);font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;cursor:pointer}
+  .linkbtn:hover{border-color:var(--accent);color:var(--ink)}
+
+  /* ---- Tabs ---- */
+  .tabs{display:flex;gap:6px;margin:20px 0 4px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 70%,transparent);padding:8px 0 10px}
+  .tab{flex:1;text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;color:var(--muted);font:inherit;transition:border-color .15s,color .15s;min-width:0}
+  .tab .d{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+  .tab .t{font-size:14px;font-weight:600;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tab[aria-selected="true"]{background:var(--panel)}
+  .tab[aria-selected="true"] .t{color:var(--ink)}
+  .tab[aria-selected="true"] .d{color:var(--accent)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .dayhead{border-left:3px solid var(--accent);padding:2px 0 2px 14px;margin:18px 0 8px}
+  .dayhead h2{margin:0;font-size:20px;letter-spacing:-.01em}
+  .dayhead p{margin:2px 0 0;color:var(--muted);font-size:13px}
+  .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line-soft);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;margin:14px 0}
+  .meta div{background:var(--panel-2);padding:12px 10px;text-align:center}
+  .meta .v{font-size:15px;font-weight:700;color:var(--accent)}
+  .meta .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:3px}
+
+  .warm{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:14px 0}
+  .warm .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:12.5px;color:var(--muted)}
+
+  .ex{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px;margin:12px 0}
+  .ex .top{display:flex;gap:12px;align-items:baseline;justify-content:space-between}
+  .ex h3{margin:0;font-size:16px}
+  .ex h3 .n{font-family:var(--mono);color:var(--accent);margin-right:8px;font-size:14px}
+  .target{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:5px 9px;white-space:nowrap;flex:none}
+  .target span{color:var(--muted-2);font-size:10px;display:block;text-align:center;letter-spacing:.08em}
+  .desc{color:var(--muted);font-size:13.5px;margin:9px 0 0}
+  .focus{color:var(--accent);font-size:12.5px;margin:8px 0 0;opacity:.92}
+
+  .sets{margin-top:13px;border-top:1px solid var(--line-soft);padding-top:13px}
+  .setrow{display:grid;grid-template-columns:52px 1fr 1fr;gap:9px;align-items:center;margin-bottom:8px}
+  .setrow:last-child{margin-bottom:0}
+  .setlbl{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.06em}
+  .field{position:relative}
+  .field input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font-family:var(--mono);font-size:15px;padding:9px 11px}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .field .u{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:var(--muted-2);pointer-events:none;letter-spacing:.05em}
+  .colhead{display:grid;grid-template-columns:52px 1fr 1fr;gap:9px;margin-bottom:7px}
+  .colhead span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+  .colhead span:first-child{visibility:hidden}
+
+  .tips{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:18px 0 6px}
+  .tips .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:9px}
+  .tips ul{margin:0;padding-left:18px}
+  .tips li{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .tips li:last-child{margin-bottom:0}
+  .tips b{color:var(--ink);font-weight:600}
+
+  footer{text-align:center;color:var(--muted-2);font-size:11.5px;margin-top:30px;font-family:var(--mono);letter-spacing:.05em}
+  @media (max-width:560px){.tab .t{white-space:normal}h1{font-size:22px}}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login">
+  <div class="loginbox">
+    <div class="brand">strang.pro · workout</div>
+    <h1>Sign in</h1>
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" autocomplete="username" inputmode="email">
+    <label for="login-pw">Password</label>
+    <input id="login-pw" type="password" autocomplete="current-password">
+    <button id="login-btn" type="button">Sign in</button>
+    <div class="loginerr" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app-shell" class="hidden">
+  <div class="wrap">
+    <header>
+      <div class="kicker">Fit4Less · 3-Day Beginner Strength</div>
+      <h1 id="dayTitle">Foundation &amp; Glute Drive</h1>
+      <p class="sub" id="daySub"></p>
+      <div class="savebar">
+        <span class="dot" id="saveDot"></span>
+        <span id="saveText">Loading…</span>
+        <span class="spacer"></span>
+        <button class="linkbtn" id="exportBtn">Export</button>
+        <button class="linkbtn" id="signoutBtn">Sign out</button>
+      </div>
+    </header>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <main id="day"></main>
+    <footer>Weight entries save automatically to your strang.pro account</footer>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   1. PROGRAM DATA  —  edit exercises here
+   Each exercise needs a STABLE `id`. Keep the id the same when
+   editing text/order and logged weights stay attached; only make
+   a NEW id when adding a genuinely new exercise.
+   `metric`: 'reps' or 'sec' (controls the 2nd input label).
+   ============================================================ */
+var PROGRAM = {
+  key: "fit4less_3day_v2",
+  sets: 3,
+  days: [
+    { id:"mon", accent:"var(--mon)", label:"Day 1 · Monday", title:"Foundation & Glute Drive",
+      focus:"Hip Hinge, Glute Drive & Lower Back / Shoulder Safety",
+      duration:"60 Min", moves:"5 Exercises", rest:"60–90s",
+      warmupTitle:"5-min dynamic warm-up · QL & shoulder relief",
+      warmup:["Cat-Cow (10 reps)","Bird-Dog (8 reps/side)","Glute Bridge (10 reps)","World's Greatest Stretch (5 reps/side)"],
+      exercises:[
+        {id:"mon-goblet-squat",name:"Dumbbell Goblet Squat",target:"3 × 8–10",metric:"reps",
+         desc:"Hold one dumbbell vertically close against your chest. Stand with feet slightly wider than shoulder-width. Sit your hips down and back between your ankles, keeping your chest tall. Drive through heels to stand.",
+         focus:"Builds quad and glute strength while keeping spine upright."},
+        {id:"mon-rdl",name:"DB Romanian Deadlift (RDL)",target:"3 × 10–12",metric:"reps",
+         desc:"Hold DBs in front of thighs. With soft knees, push your hips straight backward like closing a door with your glutes. Lower DBs along your shins until you feel a hamstring stretch. Keep lower back flat—do NOT round.",
+         focus:"Loads hamstrings/glutes to relieve overworking QL back muscle."},
+        {id:"mon-cs-row",name:"Chest-Supported DB Row",target:"3 × 10–12",metric:"reps",
+         desc:"Set an incline bench to 45 degrees. Lie chest down on the bench with feet planted. Hold DBs hanging straight down, then pull your elbows back toward your hips. Squeeze shoulder blades at the top.",
+         focus:"Strengthens upper back and relieves shoulder tightness without low-back stress."},
+        {id:"mon-floor-press",name:"DB Floor Press (or Incline DB Press)",target:"3 × 8–10",metric:"reps",
+         desc:"Lie flat on the floor or bench with knees bent. Hold dumbbells at chest height with elbows at a 45-degree angle to your body. Press DBs straight up until arms are extended. Lower under control.",
+         focus:"Safely builds chest/arm strength without overextending shoulder joints."},
+        {id:"mon-suitcase-carry",name:"Single-Arm Suitcase Carry",target:"3 × 30s",metric:"sec",
+         desc:"Pick up a heavy dumbbell in ONE hand like a suitcase. Stand tall with shoulders level. Walk briskly for 30 seconds without letting the weight pull your torso to the side. Switch hands and repeat.",
+         focus:"Direct QL anti-side-flexion training to stabilize the spine."}
+      ],
+      tips:[
+        ["RPE 8 Rule:","Always finish each set with 1–2 reps left \u201Cin the tank\u201D. Never go to total muscle failure."],
+        ["Suitcase Carry Note:","If your torso tilts or sways while walking, lower the dumbbell weight immediately."],
+        ["Post-Workout Cool Down:","60 seconds in Child's Pose and standing chest opener stretch."]
+      ] },
+    { id:"wed", accent:"var(--wed)", label:"Day 2 · Wednesday", title:"Core & Unilateral Strength",
+      focus:"Single-Leg Balance, Anti-Rotation & Shoulder Mobility",
+      duration:"60 Min", moves:"5 Exercises", rest:"60–90s",
+      warmupTitle:"5-min dynamic warm-up · hip & shoulder mobility",
+      warmup:["Cat-Cow (10 reps)","90/90 Hip Switches (8 reps)","Arm Circles & Hugs (10 reps)","Bird-Dog (8 reps/side)"],
+      exercises:[
+        {id:"wed-reverse-lunge",name:"Dumbbell Reverse Lunges",target:"3 × 8–10",metric:"reps",
+         desc:"Stand tall holding DBs at sides. Step one leg backward, dropping the rear knee gently toward the floor until both knees reach ~90 degrees. Push through front foot heel to return. Alternate sides.",
+         focus:"Stepping backward is easier on knees and directly targets glutes."},
+        {id:"wed-glute-bridge",name:"Weighted Glute Bridge",target:"3 × 12–15",metric:"reps",
+         desc:"Lie on back with knees bent, feet flat on floor. Place a dumbbell across hips. Drive through heels to lift hips upward until knees, hips, and shoulders form a straight line. Squeeze glutes for 2s at top.",
+         focus:"Powerful glute strengthening without any spinal compression."},
+        {id:"wed-seated-row",name:"Seated Cable Row",target:"3 × 10–12",metric:"reps",
+         desc:"Sit at cable row station with feet on pegs, knees slightly bent. Keep chest tall, pull handle into lower stomach. Drive elbows back and squeeze shoulder blades together. Slowly return to start.",
+         focus:"Builds mid-back thickness and pulls rounded shoulders back into alignment."},
+        {id:"wed-ohp",name:"DB Neutral-Grip Overhead Press",target:"3 × 8–10",metric:"reps",
+         desc:"Sit on upright bench holding DBs at shoulder height with palms facing each other (neutral grip). Brace core and press weights straight overhead until arms extend. Lower back to shoulders controlled.",
+         focus:"Neutral grip protects tight shoulders while building upper body overhead strength."},
+        {id:"wed-pallof",name:"Cable / Band Pallof Press",target:"3 × 10–12",metric:"reps",
+         desc:"Stand sideways to a cable stack, holding handle with both hands at chest. Step away to create tension. Brace abs and press handle straight out ahead. Hold 1-2s without letting cable twist your torso.",
+         focus:"Anti-rotation core stability—teaches core to resist twisting forces on low back."}
+      ],
+      tips:[
+        ["Lunge Balance:","Keep feet hip-width apart as if standing on train tracks, not a narrow tightrope."],
+        ["Pallof Press Secret:","Brace your core as if preparing to take a punch before pressing out."],
+        ["Post-Workout Cool Down:","Standing Quad Stretch & Figure-4 Hip/Glute Stretch."]
+      ] },
+    { id:"fri", accent:"var(--fri)", label:"Day 3 · Friday", title:"Posterior Chain & Core Shield",
+      focus:"Upper Back Density, Hamstring Control & QL Strengthening",
+      duration:"60 Min", moves:"5 Exercises", rest:"60–90s",
+      warmupTitle:"5-min dynamic warm-up · full body activation",
+      warmup:["Cat-Cow (10 reps)","Arm Circles & Swings (12 reps)","Bodyweight Sumo Squat (8 reps)","Glute Bridge (10 reps)"],
+      exercises:[
+        {id:"fri-sumo-squat",name:"Dumbbell Sumo Squat",target:"3 × 10–12",metric:"reps",
+         desc:"Take a wide stance with toes turned outward at 45 degrees. Hold one heavy DB hanging straight down between legs. Squat down pushing knees outward over toes. Stand and squeeze glutes.",
+         focus:"Wide stance takes shear stress off lower back while loading inner thighs & glutes."},
+        {id:"fri-kickstand-rdl",name:"Kickstand Single-Leg RDL",target:"3 × 8",metric:"reps",
+         desc:"Stand on working leg, place rear toe lightly on floor behind like a kickstand for balance. Hold DB in hand. Hinge forward at hips over front leg keeping back flat. Squeeze front glute to return upright.",
+         focus:"Unilateral hamstring & glute strength with easy balance support."},
+        {id:"fri-lat-pulldown",name:"Lat Pulldown Machine",target:"3 × 10–12",metric:"reps",
+         desc:"Sit at lat pulldown station, secure thighs under pads. Grip bar slightly wider than shoulder-width. Lean back slightly, pull bar down to upper chest while driving elbows down toward back pockets.",
+         focus:"Strengthens lats and upper back to pull shoulders into open, healthy posture."},
+        {id:"fri-incline-press",name:"DB Incline Bench Press",target:"3 × 10–12",metric:"reps",
+         desc:"Set bench to a slight incline (~30 degrees). Lie back with DBs at chest height. Press dumbbells straight up overhead until arms extend. Lower under control to upper chest.",
+         focus:"Builds upper chest aesthetics with comfortable shoulder arm paths."},
+        {id:"fri-side-plank",name:"Forearm Side Plank",target:"3 × 20–30s",metric:"sec",
+         desc:"Lie on side resting on forearm with elbow directly beneath shoulder. Stack or stagger feet. Lift hips off floor until body forms a straight line from head to heels. Hold for target time. Switch sides.",
+         focus:"Direct lateral isometric strengthening for the QL muscle and obliques."}
+      ],
+      tips:[
+        ["Kickstand RDL Weight:","Put 90% of bodyweight on front leg; back toe is just for balance."],
+        ["Side Plank Option:","If full plank causes low back fatigue, bend knees to 90° and lift from knees."],
+        ["Weekend Recovery:","Take Sat/Sun fully off for rest, walking, and muscle recovery."]
+      ] }
+  ]
+};
+
+/* ============================================================
+   2. CLOUD SYNC (Supabase) — mirrors the budget tool.
+   Same project + same login as strang.pro/budget; this tool
+   keeps its own single JSON blob in its own table:
+     workout_data(id uuid pk, household_id text unique,
+                  data jsonb, updated_at timestamptz)
+   RLS: any authenticated user may select/insert/update.
+   ============================================================ */
+var SUPABASE_URL='https://ldmoxearkzxhzjscprsh.supabase.co';
+var SUPABASE_ANON_KEY='sb_publishable_SsudrYZqBzDtw23c2mT6Lw_GYM-gbYR';
+var HOUSEHOLD_ID='strang';
+var APP_VERSION='fit4less-v1';
+var LOCAL_BUFFER_KEY='strangWorkout_offlineBuffer';
+var sbClient=(SUPABASE_URL.indexOf('YOUR_')===0)?null:supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+var LOG={};              // { "<exId>:s<n>:<w|r>": "value" }  — current values only
+var SAVE_HISTORY=[];     // last 10 save timestamps (retained inside the blob)
+
+function buildSavePayload(){
+  var now=new Date().toISOString();
+  SAVE_HISTORY.unshift(now);
+  if(SAVE_HISTORY.length>10)SAVE_HISTORY.length=10;
+  return {version:1,savedAt:now,appVersion:APP_VERSION,program:PROGRAM.key,saveHistory:SAVE_HISTORY,log:LOG};
+}
+function applyLoadedData(data,sourceLbl){
+  LOG=(data&&data.log)||{};
+  SAVE_HISTORY=(data&&data.saveHistory)||[];
+  renderDay();
+  var when=data&&data.savedAt?new Date(data.savedAt):null;
+  setStatus(when?(sourceLbl+' · '+when.toLocaleDateString('en-CA',{month:'short',day:'numeric'})+' '+when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})):sourceLbl,'saved');
+}
+
+var _cloudSaveTimer=null;
+function scheduleCloudSave(){ if(_cloudSaveTimer)clearTimeout(_cloudSaveTimer); _cloudSaveTimer=setTimeout(saveToCloud,600); }
+
+async function saveToCloud(){
+  var payload=buildSavePayload();
+  if(!sbClient){setStatus('Cloud not configured','warn');return;}
+  try{
+    if(!navigator.onLine)throw new Error('offline');
+    var res=await sbClient.from('workout_data').upsert(
+      {household_id:HOUSEHOLD_ID,data:payload,updated_at:new Date().toISOString()},
+      {onConflict:'household_id'}
+    );
+    if(res.error)throw res.error;
+    localStorage.removeItem(LOCAL_BUFFER_KEY);
+    setStatus('Saved ✓','saved');
+  }catch(err){
+    try{localStorage.setItem(LOCAL_BUFFER_KEY,JSON.stringify(payload));}catch(e){}
+    setStatus('Saved offline ⚠','warn');
+  }
+}
+function syncOfflineBuffer(){ var buf=null; try{buf=localStorage.getItem(LOCAL_BUFFER_KEY);}catch(e){} if(buf&&sbClient)saveToCloud(); }
+window.addEventListener('online',syncOfflineBuffer);
+
+async function loadFromCloud(){
+  if(!sbClient)return;
+  try{
+    var res=await sbClient.from('workout_data').select('data,updated_at').eq('household_id',HOUSEHOLD_ID).maybeSingle();
+    if(res.error)throw res.error;
+    if(res.data&&res.data.data){ applyLoadedData(res.data.data,'Loaded from cloud'); }
+    else{ setStatus('No log yet — start entering weights','muted'); }
+  }catch(err){
+    var buf=null; try{buf=localStorage.getItem(LOCAL_BUFFER_KEY);}catch(e){}
+    if(buf){ applyLoadedData(JSON.parse(buf),'Loaded offline (unsynced)'); }
+    else{ setStatus('Could not reach cloud — check connection','warn'); }
+  }
+}
+
+/* ---- Auth (same accounts as the budget tool) ---- */
+function showLogin(){ document.getElementById('login').classList.remove('hidden'); document.getElementById('app-shell').classList.add('hidden'); }
+function showApp(){ document.getElementById('login').classList.add('hidden'); document.getElementById('app-shell').classList.remove('hidden'); }
+async function doSignIn(){
+  var email=document.getElementById('login-email').value.trim();
+  var pw=document.getElementById('login-pw').value;
+  var errEl=document.getElementById('login-err'), btn=document.getElementById('login-btn');
+  errEl.textContent='';
+  if(!email||!pw){errEl.textContent='Enter your email and password.';return;}
+  if(!sbClient){errEl.textContent='Cloud backend not configured.';return;}
+  btn.disabled=true;btn.textContent='Signing in…';
+  var res=await sbClient.auth.signInWithPassword({email:email,password:pw});
+  btn.disabled=false;btn.textContent='Sign in';
+  if(res.error){errEl.textContent=res.error.message;return;}
+  document.getElementById('login-pw').value='';
+  await initAppAfterAuth();
+}
+async function doSignOut(){ if(sbClient)await sbClient.auth.signOut(); showLogin(); }
+async function initAppAfterAuth(){ showApp(); buildTabs(); renderDay(); syncTabs(); setStatus('Loading…','muted'); await loadFromCloud(); syncOfflineBuffer(); }
+async function initAuth(){
+  if(!sbClient){showLogin();document.getElementById('login-err').textContent='Cloud backend not configured.';return;}
+  var res=await sbClient.auth.getSession();
+  if(res.data&&res.data.session){ await initAppAfterAuth(); } else { showLogin(); }
+  sbClient.auth.onAuthStateChange(function(event){ if(event==='SIGNED_OUT')showLogin(); });
+}
+
+/* ============================================================
+   3. RENDER + WIRING
+   ============================================================ */
+function el(t,c,txt){var n=document.createElement(t);if(c)n.className=c;if(txt!=null)n.textContent=txt;return n;}
+var tabsEl,dayEl,dayTitle,daySub,saveDot,saveText;
+var current=0;
+
+function setStatus(msg,kind){
+  if(!saveText)return;
+  saveText.textContent=msg;
+  saveDot.classList.remove('saved','warn');
+  if(kind==='saved')saveDot.classList.add('saved');
+  else if(kind==='warn')saveDot.classList.add('warn');
+}
+
+function buildTabs(){
+  tabsEl.innerHTML='';
+  PROGRAM.days.forEach(function(d,i){
+    var b=el('button','tab'); b.setAttribute('role','tab');
+    b.setAttribute('aria-selected',i===current?'true':'false');
+    b.style.setProperty('--accent',d.accent);
+    b.appendChild(el('div','d',d.label.toUpperCase()));
+    b.appendChild(el('div','t',d.title));
+    b.onclick=function(){current=i;renderDay();syncTabs();};
+    tabsEl.appendChild(b);
+  });
+}
+function syncTabs(){
+  Array.prototype.forEach.call(tabsEl.children,function(b,i){
+    b.setAttribute('aria-selected',i===current?'true':'false');
+    b.style.borderColor=i===current?PROGRAM.days[i].accent:'';
+  });
+}
+
+function renderDay(){
+  if(!dayEl)return;
+  var d=PROGRAM.days[current];
+  document.documentElement.style.setProperty('--accent',d.accent);
+  dayTitle.textContent=d.title;
+  daySub.textContent='Fit4Less Routine · Focus: '+d.focus;
+  dayEl.innerHTML='';
+
+  var head=el('div','dayhead'); head.appendChild(el('h2',null,d.title)); head.appendChild(el('p',null,d.focus)); dayEl.appendChild(head);
+
+  var meta=el('div','meta');
+  [[d.duration,'Duration'],[d.moves,'Total Moves'],[d.rest,'Rest / Sets']].forEach(function(p){
+    var c=el('div'); c.appendChild(el('div','v',p[0])); c.appendChild(el('div','l',p[1])); meta.appendChild(c);
+  });
+  dayEl.appendChild(meta);
+
+  var warm=el('div','warm'); warm.appendChild(el('div','h',d.warmupTitle));
+  var chips=el('div','chips'); d.warmup.forEach(function(w){chips.appendChild(el('span','chip',w));});
+  warm.appendChild(chips); dayEl.appendChild(warm);
+
+  d.exercises.forEach(function(ex,idx){dayEl.appendChild(exerciseCard(ex,idx));});
+
+  var tips=el('div','tips'); tips.appendChild(el('div','h',d.title.split(' ')[0].toUpperCase()+' form & safety'));
+  var ul=el('ul');
+  d.tips.forEach(function(t){ var li=el('li'); li.appendChild(el('b',null,t[0]+' ')); li.appendChild(document.createTextNode(t[1])); ul.appendChild(li); });
+  tips.appendChild(ul); dayEl.appendChild(tips);
+}
+
+function exerciseCard(ex,idx){
+  var card=el('div','ex'), top=el('div','top'), h3=el('h3');
+  h3.appendChild(el('span','n',String(idx+1<10?'0'+(idx+1):idx+1)));
+  h3.appendChild(document.createTextNode(ex.name)); top.appendChild(h3);
+  var tgt=el('div','target'); tgt.appendChild(document.createTextNode(ex.target)); tgt.appendChild(el('span',null,'TARGET')); top.appendChild(tgt);
+  card.appendChild(top);
+  card.appendChild(el('p','desc',ex.desc));
+  card.appendChild(el('p','focus','Focus: '+ex.focus));
+
+  var sets=el('div','sets'), ch=el('div','colhead');
+  ch.appendChild(el('span',null,'set')); ch.appendChild(el('span',null,'weight')); ch.appendChild(el('span',null,ex.metric==='sec'?'seconds':'reps'));
+  sets.appendChild(ch);
+  for(var s=1;s<=PROGRAM.sets;s++){
+    var row=el('div','setrow');
+    row.appendChild(el('div','setlbl','Set '+s));
+    row.appendChild(field(ex.id+':s'+s+':w','lb / kg'));
+    row.appendChild(field(ex.id+':s'+s+':r',ex.metric==='sec'?'sec':''));
+    sets.appendChild(row);
+  }
+  card.appendChild(sets);
+  return card;
+}
+
+function field(fieldId,unit){
+  var wrap=el('div','field'), input=document.createElement('input');
+  input.type='text'; input.inputMode='decimal'; input.autocomplete='off';
+  input.dataset.field=fieldId;
+  input.value=LOG[fieldId]||'';
+  input.addEventListener('input',function(){
+    var v=input.value.trim();
+    if(v)LOG[fieldId]=v; else delete LOG[fieldId];
+    setStatus('Saving…','muted');
+    scheduleCloudSave();
+  });
+  wrap.appendChild(input);
+  if(unit)wrap.appendChild(el('span','u',unit));
+  return wrap;
+}
+
+/* Export the exact stored payload */
+function exportData(){
+  var payload={version:1,savedAt:new Date().toISOString(),appVersion:APP_VERSION,program:PROGRAM.key,saveHistory:SAVE_HISTORY,log:LOG};
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='fit4less-log.json'; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ---- boot ---- */
+document.addEventListener('DOMContentLoaded',function(){
+  tabsEl=document.getElementById('tabs'); dayEl=document.getElementById('day');
+  dayTitle=document.getElementById('dayTitle'); daySub=document.getElementById('daySub');
+  saveDot=document.getElementById('saveDot'); saveText=document.getElementById('saveText');
+  document.getElementById('login-btn').addEventListener('click',doSignIn);
+  document.getElementById('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter')doSignIn();});
+  document.getElementById('exportBtn').addEventListener('click',exportData);
+  document.getElementById('signoutBtn').addEventListener('click',doSignOut);
+  initAuth();
+});
+</script>
+</body>
+</html>
