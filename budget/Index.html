@@ -2042,6 +2042,34 @@ function renderBalWidget(){
   }
 }
 
+// ── Stage 2: Blended month-end spend forecast ──────────────
+// Fixed lines counted at full budget; variable lines blend budget→actual as the month elapses.
+function forecastMonthSpend(ym,act){
+  var now=new Date(),dOfM=now.getDate();
+  var dInM=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var dayFrac=Math.min(dOfM/dInM,1); // 0 → start of month, 1 → month end
+  var fixedTotal=0, budgetedVar=0, actualVar=0;
+  LINES.forEach(function(l){
+    var amt=getMonthAmount(l,ym);
+    var isFixed=(l.costType==='fixed');
+    if(isFixed){
+      fixedTotal+=amt;
+    }else{
+      budgetedVar+=amt;
+      actualVar+=(act.byLine[l.id]||0);
+    }
+  });
+  // Variable run-rate: actual variable so far, scaled to full month.
+  var varRunRate=dOfM>0?(actualVar/dOfM*dInM):budgetedVar;
+  // Linear blend: budget-heavy early, actual-heavy late.
+  var variableForecast=budgetedVar*(1-dayFrac)+varRunRate*dayFrac;
+  return {
+    total:fixedTotal+variableForecast,
+    fixedTotal:fixedTotal, budgetedVar:budgetedVar, actualVar:actualVar,
+    varRunRate:varRunRate, variableForecast:variableForecast, dayFrac:dayFrac
+  };
+}
+
 function renderTrack(){
   var todym=todayYM();
   var isCurrMo=currentYM===todym;
@@ -2122,18 +2150,14 @@ function renderTrack(){
     feCls=pastPos>=0?'g':'r';
     feSub='final actual position';
   } else {
-    // Current month — pace-adjusted forecast
-    var nowD=new Date(),dOfM=nowD.getDate(),dInM=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
-    if(dOfM<5){
-      feVal='—';feCls='';feSub='too early to project pace';
-    } else {
-      var spendRunRate=act.total/dOfM*dInM;
-      var fePos=projInc-spendRunRate;
-      var vsBudget=fePos-projPos; // how forecast compares to the "If on budget" number
-      feVal=(fePos>=0?'+':'')+fmtR(fePos);
-      feCls=fePos>=0?'g':'r';
-      feSub=(vsBudget>=0?'+':'−')+fmtR(Math.abs(vsBudget))+' vs budget · at current pace';
-    }
+    // Current month — blended fixed/variable forecast (Stage 2).
+    // Fixed lines at full budget; variable lines slide from budget→actual as the month elapses.
+    var fc=forecastMonthSpend(currentYM,act);
+    var fePos=projInc-fc.total;            // projected leftover / savings this month
+    var vsBudget=fePos-projPos;            // vs the "If on budget" number
+    feVal=(fePos>=0?'+':'')+fmtR(fePos);
+    feCls=fePos>=0?'g':'r';
+    feSub='projected to save · '+(vsBudget>=0?'+':'−')+fmtR(Math.abs(vsBudget))+' vs budget · at current pace';
   }
 
   var cs=[
