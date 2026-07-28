@@ -2042,31 +2042,40 @@ function renderBalWidget(){
   }
 }
 
-// ── Stage 2: Blended month-end spend forecast ──────────────
-// Fixed lines counted at full budget; variable lines blend budget→actual as the month elapses.
+// ── Stage 2: Per-line month-end spend forecast (A-plus, power-curve) ──
+// Fixed lines → full budget. Variable lines, per line:
+//   • over budget  → capped at actual (one-time spikes don't project forward)
+//   • under budget → actual + (budget−actual) × remaining_frac^0.5
+//     (power curve: allowance stays high through mid-month, tapers late, never fully zero)
+var FORECAST_DECAY_EXP=0.5; // tune: smaller = stays higher longer & drops sharper at end
 function forecastMonthSpend(ym,act){
   var now=new Date(),dOfM=now.getDate();
   var dInM=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  var dayFrac=Math.min(dOfM/dInM,1); // 0 → start of month, 1 → month end
-  var fixedTotal=0, budgetedVar=0, actualVar=0;
+  var remainingFrac=Math.max(0,(dInM-dOfM)/dInM);      // 1 → month start, 0 → month end
+  var decay=Math.pow(remainingFrac,FORECAST_DECAY_EXP); // power-curve allowance weight
+  var fixedTotal=0, variableForecast=0, budgetedVar=0, actualVar=0;
   LINES.forEach(function(l){
-    var amt=getMonthAmount(l,ym);
-    var isFixed=(l.costType==='fixed');
-    if(isFixed){
-      fixedTotal+=amt;
-    }else{
-      budgetedVar+=amt;
-      actualVar+=(act.byLine[l.id]||0);
+    var budget=getMonthAmount(l,ym);
+    if(l.costType==='fixed'){
+      fixedTotal+=budget;
+      return;
     }
+    // variable line
+    var actual=act.byLine[l.id]||0;
+    budgetedVar+=budget; actualVar+=actual;
+    var lineFc;
+    if(actual>=budget){
+      lineFc=actual;                                   // over budget → capped at actual
+    }else{
+      lineFc=actual+(budget-actual)*decay;             // under → decaying budget allowance
+    }
+    variableForecast+=lineFc;
   });
-  // Variable run-rate: actual variable so far, scaled to full month.
-  var varRunRate=dOfM>0?(actualVar/dOfM*dInM):budgetedVar;
-  // Linear blend: budget-heavy early, actual-heavy late.
-  var variableForecast=budgetedVar*(1-dayFrac)+varRunRate*dayFrac;
   return {
     total:fixedTotal+variableForecast,
-    fixedTotal:fixedTotal, budgetedVar:budgetedVar, actualVar:actualVar,
-    varRunRate:varRunRate, variableForecast:variableForecast, dayFrac:dayFrac
+    fixedTotal:fixedTotal, variableForecast:variableForecast,
+    budgetedVar:budgetedVar, actualVar:actualVar,
+    remainingFrac:remainingFrac, decay:decay
   };
 }
 
