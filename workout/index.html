@@ -95,6 +95,18 @@
   .tips li:last-child{margin-bottom:0}
   .tips b{color:var(--ink);font-weight:600}
 
+  /* ---- progression flag ---- */
+  .next-chip{display:inline-block;margin-left:9px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--good);border:1px solid var(--good);border-radius:20px;padding:2px 7px;vertical-align:middle}
+  .ex.flagged{border-color:var(--good)}
+  .bump{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:13px;border:none;border-top:1px solid var(--line-soft);width:100%;text-align:left;cursor:pointer;font:inherit;background:none;color:var(--muted)}
+  .bump .bx{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
+  .bump .bx svg{opacity:0;transition:opacity .15s}
+  .bump .lbl{font-family:var(--mono);font-size:12px;letter-spacing:.02em}
+  .bump:hover .bx{border-color:var(--good)}
+  .bump[aria-pressed="true"] .bx{background:var(--good);border-color:var(--good)}
+  .bump[aria-pressed="true"] .bx svg{opacity:1}
+  .bump[aria-pressed="true"] .lbl{color:var(--good)}
+
   footer{text-align:center;color:var(--muted-2);font-size:11.5px;margin-top:30px;font-family:var(--mono);letter-spacing:.05em}
   @media (max-width:560px){.tab .t{white-space:normal}h1{font-size:22px}}
 </style>
@@ -390,9 +402,13 @@ function renderDay(){
 }
 
 function exerciseCard(ex,idx){
-  var card=el('div','ex'), top=el('div','top'), h3=el('h3');
+  var flagged=LOG[ex.id+':up']==='1';
+  var card=el('div','ex'); if(flagged)card.classList.add('flagged');
+  var top=el('div','top'), h3=el('h3');
   h3.appendChild(el('span','n',String(idx+1<10?'0'+(idx+1):idx+1)));
-  h3.appendChild(document.createTextNode(ex.name)); top.appendChild(h3);
+  h3.appendChild(document.createTextNode(ex.name));
+  var chip=el('span','next-chip','↑ NEXT'); if(flagged)h3.appendChild(chip);
+  top.appendChild(h3);
   var tgt=el('div','target'); tgt.appendChild(document.createTextNode(ex.target)); tgt.appendChild(el('span',null,'TARGET')); top.appendChild(tgt);
   card.appendChild(top);
   card.appendChild(el('p','desc',ex.desc));
@@ -409,6 +425,24 @@ function exerciseCard(ex,idx){
     sets.appendChild(row);
   }
   card.appendChild(sets);
+
+  // progression flag — "up the weight next time"
+  var bump=el('button','bump'); bump.type='button';
+  bump.setAttribute('aria-pressed',flagged?'true':'false');
+  var bx=el('span','bx');
+  bx.innerHTML='<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.4 6.2l2.3 2.3 4.8-5.1" stroke="#06101f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  bump.appendChild(bx);
+  bump.appendChild(el('span','lbl','Increase weight next session'));
+  bump.addEventListener('click',function(){
+    flagged=!flagged;
+    if(flagged)LOG[ex.id+':up']='1'; else delete LOG[ex.id+':up'];
+    bump.setAttribute('aria-pressed',flagged?'true':'false');
+    card.classList.toggle('flagged',flagged);
+    if(flagged){ if(!chip.parentNode)h3.appendChild(chip); } else if(chip.parentNode){ chip.remove(); }
+    setStatus('Saving…','muted');
+    scheduleCloudSave();
+  });
+  card.appendChild(bump);
   return card;
 }
 
