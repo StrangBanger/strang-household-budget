@@ -1183,9 +1183,16 @@ function taskDragStart(e,id,bucket){
   if(card)card.classList.add('dragging');
   // Picking up a card that HAS a date reveals the (hidden) Unscheduled drop
   // zone, so there's always somewhere to drop to clear the date.
+  // DEFERRED to the next tick on purpose: revealing it synchronously here
+  // reflows the list under the cursor mid-dragstart, which browsers treat as a
+  // reason to CANCEL the drag (the card never lifts). Letting dragstart commit
+  // first, then revealing, keeps the drag alive and still shows the drop zone.
   var t=findTask(id);
-  if(document.body&&t&&schemeFor(bucket)==='date'&&t.scheduledDate)
-    document.body.classList.add('dragging-scheduled');
+  if(document.body&&t&&schemeFor(bucket)==='date'&&t.scheduledDate){
+    setTimeout(function(){
+      if(_dragKind==='task'&&_dragId===id)document.body.classList.add('dragging-scheduled');
+    },0);
+  }
 }
 function taskDragOver(e,overId){
   if(_dragKind!=='task'||_dragId===null)return;
