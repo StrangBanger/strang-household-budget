@@ -107,6 +107,13 @@
   .bump[aria-pressed="true"] .bx svg{opacity:1}
   .bump[aria-pressed="true"] .lbl{color:var(--good)}
 
+  /* ---- notes ---- */
+  .note{margin-top:13px}
+  .note label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);margin-bottom:6px}
+  .note textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13.5px;line-height:1.5;padding:10px 12px;resize:vertical;min-height:42px;overflow:hidden}
+  .note textarea:focus{outline:none;border-color:var(--accent)}
+  .note textarea::placeholder{color:var(--muted-2)}
+
   footer{text-align:center;color:var(--muted-2);font-size:11.5px;margin-top:30px;font-family:var(--mono);letter-spacing:.05em}
   @media (max-width:560px){.tab .t{white-space:normal}h1{font-size:22px}}
 </style>
@@ -343,6 +350,7 @@ async function initAuth(){
    3. RENDER + WIRING
    ============================================================ */
 function el(t,c,txt){var n=document.createElement(t);if(c)n.className=c;if(txt!=null)n.textContent=txt;return n;}
+function autoGrow(ta){ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
 var tabsEl,dayEl,dayTitle,daySub,saveDot,saveText;
 var current=0;
 
@@ -399,6 +407,7 @@ function renderDay(){
   var ul=el('ul');
   d.tips.forEach(function(t){ var li=el('li'); li.appendChild(el('b',null,t[0]+' ')); li.appendChild(document.createTextNode(t[1])); ul.appendChild(li); });
   tips.appendChild(ul); dayEl.appendChild(tips);
+  Array.prototype.forEach.call(dayEl.querySelectorAll('.note textarea'),function(ta){autoGrow(ta);});
 }
 
 function exerciseCard(ex,idx){
@@ -425,6 +434,22 @@ function exerciseCard(ex,idx){
     sets.appendChild(row);
   }
   card.appendChild(sets);
+
+  // free-form notes — review later
+  var note=el('div','note');
+  var nlbl=document.createElement('label'); nlbl.textContent='Notes'; note.appendChild(nlbl);
+  var ta=document.createElement('textarea'); ta.rows=2;
+  ta.placeholder='e.g. form cue, how it felt, target next time…';
+  ta.value=LOG[ex.id+':note']||'';
+  ta.addEventListener('input',function(){
+    var v=ta.value;
+    if(v.trim())LOG[ex.id+':note']=v; else delete LOG[ex.id+':note'];
+    autoGrow(ta);
+    setStatus('Saving…','muted');
+    scheduleCloudSave();
+  });
+  note.appendChild(ta);
+  card.appendChild(note);
 
   // progression flag — "up the weight next time"
   var bump=el('button','bump'); bump.type='button';
