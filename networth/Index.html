@@ -180,19 +180,6 @@ table.proj-tbl tr.depleted td{color:var(--red);}
   .shell{padding:1.25rem .875rem;}
   .login-card{width:calc(100% - 2rem);}
 }
-.drag-grip{cursor:grab;color:var(--text3,#8A8580);font-size:13px;margin-right:6px;user-select:none;opacity:.5;transition:opacity .15s;}
-.drag-grip:active{cursor:grabbing;}
-tr.acct:hover .drag-grip{opacity:1;}
-tr.acct.dragging{opacity:.45;background:var(--surface2,#F0EEE9);}
-tr.acct[draggable="true"]{transition:background .1s;}
-.scen-tbl-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;min-width:0;}
-.scen-tbl-grid.single{grid-template-columns:1fr;}
-.scen-tbl-grid .sum-card{margin-bottom:0;min-width:0;}
-.scen-tbl-grid .proj-tbl{font-size:12px;min-width:0;width:100%;}
-.scen-tbl-grid .proj-tbl th,.scen-tbl-grid .proj-tbl td{padding:4px 8px;}
-.scen-tbl-grid .tbl-scroll{overflow-x:auto;}
-@media(max-width:760px){.scen-tbl-grid{grid-template-columns:1fr;}}
-.scen-tbl-grid .proj-tbl td:nth-child(3){white-space:normal;font-size:11px;color:var(--text3,#8A8580);line-height:1.3;}
 </style>
 </head>
 <body>
@@ -435,19 +422,18 @@ tr.acct[draggable="true"]{transition:background .1s;}
       <div class="chart-note" id="scen-chart-note"></div>
     </div>
 
-    <div class="scen-tbl-grid">
-      <div class="sum-card">
+    <div class="sum-card">
       <div class="sum-card-hd"><h3>Balance by year</h3></div>
       <div class="proj-tbl-scroll"><div class="tbl-scroll">
         <table class="nt proj-tbl" id="scen-tbl"><tbody></tbody></table>
       </div></div>
     </div>
-      <div class="sum-card" id="scen-scen-card" style="display:none;">
+
+    <div class="sum-card" id="scen-scen-card" style="display:none;">
       <div class="sum-card-hd"><h3>Scenario balance by year <span class="scen-tag">with extra savings</span></h3></div>
       <div class="proj-tbl-scroll"><div class="tbl-scroll">
         <table class="nt proj-tbl" id="scen-tbl-scen"><tbody></tbody></table>
       </div></div>
-    </div>
     </div>
   </div>
 </div>
@@ -587,10 +573,19 @@ function priorSnapshotMonth(ym){
   var months=allSnapshotMonths().filter(function(m){return ymCmp(m,ym)<0;});
   return months.length?months[months.length-1]:null;
 }
+// The furthest-forward month you can navigate to: the current month, or
+// next month once you're on the last calendar day of the current month
+// (so you can close out the month a day early).
+function reachableMaxYM(){
+  var d=new Date();
+  var lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  var cur=todayYM();
+  return (d.getDate()===lastDay)?ymAdd(cur,1):cur;
+}
 function snapBounds(){
   var months=allSnapshotMonths();
   var min=FLOOR_YM;
-  var cur=todayYM();
+  var cur=reachableMaxYM();
   var max=(ymCmp(cur,min)>=0)?cur:min;
   if(months.length&&ymCmp(months[months.length-1],max)>0)max=months[months.length-1];
   return {min:min,max:max};
@@ -634,66 +629,24 @@ function renderTrackCards(){
   var assets=totalAssets(selectedYM);
   var liab=totalLiabilities(selectedYM);
   var nw=netWorth(selectedYM);
-  // Change compares the two most recent ACTUAL snapshots at/before the selected month,
-  // ignoring carry-forward gap months (so a gap never produces a $0 or blank change).
-  var snaps=allSnapshotMonths().filter(function(m){return ymCmp(m,selectedYM)<=0;});
-  var recentM=snaps.length?snaps[snaps.length-1]:null;      // latest actual snapshot ≤ selected
-  var priorM=snaps.length>1?snaps[snaps.length-2]:null;      // the actual snapshot before it
-  var bigVal,deltaHtml,changeCls='a';
-  if(recentM&&priorM){
-    var d=netWorth(recentM)-netWorth(priorM);
-    bigVal=(d>=0?'+':'−')+fmtMoney(Math.abs(d));
-    changeCls=d>=0?'g':'r';
-    deltaHtml='<div class="card-s">'+ymLabel(priorM)+' → '+ymLabel(recentM)+'</div>';
-  }else{bigVal='—';deltaHtml='<div class="card-s">First snapshot</div>';}
+  var priorM=priorSnapshotMonth(selectedYM);
+  var deltaHtml,arrow;
+  if(priorM){
+    var d=nw-netWorth(priorM);
+    arrow=d>=0?'▲':'▼';
+    deltaHtml='<div class="card-s">'+(d>=0?'+':'−')+fmtMoney(Math.abs(d))+' vs '+ymLabel(priorM)+'</div>';
+  }else{arrow='—';deltaHtml='<div class="card-s">First snapshot</div>';}
   document.getElementById('track-cards').innerHTML=
     '<div class="card"><div class="card-l">Assets</div><div class="card-v">'+fmtMoney(assets)+'</div></div>'+
     '<div class="card r"><div class="card-l">Liabilities</div><div class="card-v">'+fmtMoney(liab)+'</div></div>'+
     '<div class="card g"><div class="card-l">Net worth</div><div class="card-v">'+fmtMoney(nw)+'</div></div>'+
-    '<div class="card '+changeCls+'"><div class="card-l">Change</div><div class="card-v">'+bigVal+'</div>'+deltaHtml+'</div>';
+    '<div class="card a"><div class="card-l">Change</div><div class="card-v" style="font-size:15px;">'+arrow+'</div>'+deltaHtml+'</div>';
 }
 
 function selHtml(cls,id,opts,current,handler){
   var h='<select class="'+cls+'" onchange="'+handler+'('+id+',this.value)">';
   opts.forEach(function(o){h+='<option value="'+o+'"'+(o===current?' selected':'')+'>'+o+'</option>';});
   return h+'</select>';
-}
-
-// ── Drag-to-reorder accounts within a bucket (persisted) ──
-var _dragAcctId=null, _dragBucket=null;
-function acctDragStart(e,id,bucket){
-  _dragAcctId=id; _dragBucket=bucket;
-  e.dataTransfer.effectAllowed='move';
-  try{e.dataTransfer.setData('text/plain',String(id));}catch(_){}
-  var tr=e.target.closest?e.target.closest('tr'):null;
-  if(tr)tr.classList.add('dragging');
-}
-function acctDragOver(e,overId){
-  if(_dragAcctId===null)return;
-  var over=findAcct(overId);
-  if(!over||over.bucket!==_dragBucket)return; // only within the same bucket
-  e.preventDefault();
-  e.dataTransfer.dropEffect='move';
-}
-function acctDrop(e,targetId){
-  if(_dragAcctId===null)return;
-  var dragged=findAcct(_dragAcctId), target=findAcct(targetId);
-  if(!dragged||!target||dragged.bucket!==target.bucket||dragged.id===target.id){return;}
-  e.preventDefault();
-  // Reorder within ACCOUNTS: remove dragged, reinsert before/after target
-  var di=ACCOUNTS.indexOf(dragged), ti=ACCOUNTS.indexOf(target);
-  ACCOUNTS.splice(di,1);
-  ti=ACCOUNTS.indexOf(target); // recompute after removal
-  // Insert before target if dragging upward, after if downward
-  var insertAt=(di<ti)?ti+1:ti;
-  ACCOUNTS.splice(insertAt,0,dragged);
-  _dragAcctId=null;_dragBucket=null;
-  renderRegister();
-  scheduleCloudSave();
-}
-function acctDragEnd(e){
-  _dragAcctId=null;_dragBucket=null;
-  document.querySelectorAll('tr.acct.dragging').forEach(function(t){t.classList.remove('dragging');});
 }
 
 function renderRegister(){
@@ -729,9 +682,8 @@ function renderRegister(){
           '<button class="act del" onclick="delAccount('+a.id+')" title="Delete permanently (alters past totals)">×</button>';
       }
       var closedTag=closedNow?'<span class="closed-tag">Closed '+ymLabel(a.closedYM)+'</span>':'';
-      html+='<tr class="acct'+(closedNow?' closed':'')+'" draggable="true" data-acct="'+a.id+'" data-bucket="'+bucket+'"'+
-        ' ondragstart="acctDragStart(event,'+a.id+',\''+bucket+'\')" ondragover="acctDragOver(event,'+a.id+')" ondrop="acctDrop(event,'+a.id+')" ondragend="acctDragEnd(event)">'+
-        '<td><div class="name-wrap"><span class="drag-grip" title="Drag to reorder">⠿</span><span class="nm" onclick="editAcctName('+a.id+',this)">'+escapeHtml(a.name)+'</span><span class="pencil" onclick="editAcctName('+a.id+',this)">✎</span></div>'+closedTag+'</td>'+
+      html+='<tr class="acct'+(closedNow?' closed':'')+'">'+
+        '<td><div class="name-wrap" onclick="editAcctName('+a.id+',this)"><span class="nm">'+escapeHtml(a.name)+'</span><span class="pencil">✎</span></div>'+closedTag+'</td>'+
         '<td>'+selHtml('sel',a.id,OWNERS,a.owner||'Joint','setAcctOwner')+'</td>'+
         '<td>'+selHtml('sel',a.id,BUCKETS,a.bucket,'setAcctBucket')+'</td>'+
         '<td style="text-align:right;">'+valCell+'</td>'+
@@ -1295,14 +1247,11 @@ function renderProjTable(P,V){
   document.getElementById(V.baseTbl).innerHTML=buildYearTable(P,function(r){return r.base;},'Balance');
   if(!V.scenCard)return;
   var scenCard=document.getElementById(V.scenCard);
-  var scenGrid=scenCard.closest?scenCard.closest('.scen-tbl-grid'):null;
   if(V.withScenario && P.hasScenario){
     scenCard.style.display='block';
-    if(scenGrid)scenGrid.classList.remove('single');
     document.getElementById(V.scenTbl).innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance');
   }else{
     scenCard.style.display='none';
-    if(scenGrid)scenGrid.classList.add('single');
     document.getElementById(V.scenTbl).innerHTML='';
   }
 }
