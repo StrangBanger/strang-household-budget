@@ -1991,7 +1991,12 @@ function getEffectiveSeed(ym){
 
 function saveBalanceForMonth(){
   var todym=todayYM();
-  if(currentYM>todym)return; // locked for future months
+  // Allow saving next month's balance early on the last calendar day of the current month.
+  var now=new Date();
+  var lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var nYM=(function(){var d=new Date(now.getFullYear(),now.getMonth()+1,1);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);})();
+  var earlyUnlock=(now.getDate()===lastDay)&&(currentYM===nYM);
+  if(currentYM>todym&&!earlyUnlock)return; // locked for future months (except next-month early unlock)
   var val=parseFloat(document.getElementById('bal-input').value);
   if(!isNaN(val)&&val>=0){
     BAL_SNAPSHOTS[currentYM]=val;
@@ -2009,6 +2014,12 @@ function renderBalWidget(){
   var todym=todayYM();
   var isFuture=currentYM>todym;
   var isCurrent=currentYM===todym;
+  // Exception: on the LAST calendar day of the current month, unlock the immediately-next month.
+  var now=new Date();
+  var lastDayOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var isLastDay=now.getDate()===lastDayOfMonth;
+  var nextYM=(function(){var d=new Date(now.getFullYear(),now.getMonth()+1,1);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);})();
+  var isNextMonthEarlyUnlock=isLastDay&&(currentYM===nextYM);
   var lbl=document.getElementById('bal-month-lbl');
   var inp=document.getElementById('bal-input');
   var lockIcon=document.getElementById('bal-lock-icon');
@@ -2019,11 +2030,29 @@ function renderBalWidget(){
 
   // Value — show saved snapshot if exists, else blank for editable months
   // For future months, show the carried-forward value
-  if(isFuture){
+  if(isFuture&&!isNextMonthEarlyUnlock){
     var carried=getEffectiveSeed(currentYM);
     if(inp){inp.value=carried>0?carried:'';inp.disabled=true;inp.style.opacity='.5';}
     if(lockIcon)lockIcon.style.display='inline';
     if(hint)hint.textContent='Future months show the most recent balance carried forward. Set a balance when the month arrives.';
+  } else if(isNextMonthEarlyUnlock){
+    // Last day of prior month — allow setting next month's opening balance a day early.
+    var savedNext=BAL_SNAPSHOTS[currentYM];
+    if(inp){
+      inp.value=(savedNext!==undefined)?savedNext:'';
+      inp.disabled=false;
+      inp.style.opacity='1';
+    }
+    if(lockIcon)lockIcon.style.display='none';
+    if(hint){
+      if(savedNext!==undefined){
+        hint.textContent='Saved · Used as projection anchor for '+ymlb(currentYM)+' onwards';
+        hint.style.color='var(--green)';
+      } else {
+        hint.textContent='Editable early — set your expected opening balance for '+ymlb(currentYM);
+        hint.style.color='var(--accent)';
+      }
+    }
   } else {
     var saved=BAL_SNAPSHOTS[currentYM];
     if(inp){
