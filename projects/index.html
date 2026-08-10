@@ -131,6 +131,7 @@ select.stage-sel:focus{outline:2px solid var(--accent);outline-offset:-1px;borde
 .chip{font-size:10px;font-weight:500;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;}
 .chip .k{font-weight:700;opacity:.75;margin-right:3px;}
 .chip.sched{color:var(--accent);background:var(--accent-bg);border-color:#B8D4F0;}
+.chip.sched.wd{color:var(--amber);background:var(--amber-bg);border-color:#EFD9AC;}
 .chip.month{color:var(--amber);background:var(--amber-bg);border-color:#EFD9AC;}
 .chip.done-dt{color:var(--green);background:var(--green-bg);border-color:#A8DDD0;}
 .chip.actual{color:var(--green);background:var(--green-bg);border-color:#A8DDD0;}
@@ -255,6 +256,17 @@ button.add-grp:hover{background:var(--accent-bg);border-color:#B8D4F0;color:var(
 .wk-overdue .wk-head{background:var(--red-bg);border-color:#EFC2C2;border-left-color:var(--red);}
 .wk-overdue .wk-head .wk-when{color:var(--red);font-weight:700;}
 .wk-unsched .wk-head{background:var(--surface);border-style:dashed;border-left:3px solid var(--border-strong);}
+/* THIS WEEKEND — pinned hero block. Bordered, shadowed, accent header, so the
+   current weekend is unmistakably where your eye lands first. */
+.wk-thisweekend{border:1.5px solid #B8D4F0;border-radius:10px;padding:.5rem .6rem .65rem;
+  margin-bottom:1.5rem;background:#FAFCFE;box-shadow:0 3px 14px rgba(24,95,165,.09);}
+.wk-thisweekend .tw-head{background:var(--accent);border:none;border-left:none;margin-bottom:.55rem;}
+.wk-thisweekend .tw-head .wk-when,.wk-thisweekend .tw-head .wk-date,.wk-thisweekend .tw-head .wk-sub{color:#fff;}
+.wk-thisweekend .tw-head .wk-date{opacity:.85;}
+.tw-summary{font-size:12px;font-weight:600;color:var(--accent);padding:0 4px .55rem;}
+.tw-summary .tw-none{color:var(--text3);font-weight:500;font-style:italic;}
+.tw-empty{font-size:13px;color:var(--text3);text-align:center;padding:1.1rem;border:1px dashed var(--border);
+  border-radius:var(--radius);background:var(--surface);}
 .wk-unsched .wk-head .wk-when{font-weight:700;color:var(--text);}
 /* An empty Unscheduled pile is just clutter — but it's also the drop target for
    REMOVING a date, so it can't simply not exist. Hide it when empty, and reveal
@@ -511,8 +523,18 @@ function tasksInWeek(bucket,weekKey){
     if(t.bucket!==bucket)return false;
     var k=weekKeyOf(t.scheduledDate);
     return (weekKey===null)?(k===null):(k===weekKey);
-  }).sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+  }).sort(function(a,b){
+    // Date is the default order (Fri before Sat before Sun); manual drag order
+    // is the tiebreaker WITHIN a day. Unscheduled (all dates null) falls straight
+    // through to sortOrder, so that pile behaves exactly as before.
+    var da=a.scheduledDate||'',db=b.scheduledDate||'';
+    if(da!==db)return da<db?-1:1;
+    return (a.sortOrder||0)-(b.sortOrder||0);
+  });
 }
+// helper: is a yyyy-mm-dd part of the Fri/Sat/Sun scheduling weekend?
+// (Mon–Thu are the "weekday" oddballs that get the amber chip.)
+function isWeekendDate(ds){var d=parseYMD(ds);if(!d)return true;var g=d.getDay();return g===5||g===6||g===0;}
 function weekTotal(bucket,weekKey){
   return tasksInWeek(bucket,weekKey).reduce(function(s,t){return s+effAmount(t);},0);
 }
@@ -686,13 +708,16 @@ function renderGrouped(b){
   return html;
 }
 // ── Soon: rolling weekend list ──
-// Order: Overdue → Unscheduled → this weekend → onward. A weekend with work
-// expands into cards; a free one collapses to a single quiet line you can still
-// drop onto. Scanning the column shows you your clear weekends at a glance.
+// Order: THIS WEEKEND (pinned, elevated) → Overdue → Unscheduled → future
+// weekends. A weekend with work expands into cards; a free one collapses to a
+// single quiet line you can still drop onto.
 function renderDated(b){
   var html='';
   if(editingId==='new:'+b)html+='<div class="pcards" style="margin-bottom:1.2rem;">'+editorCard(null,b)+'</div>';
   var filtering=isFiltering();
+  // This weekend — pinned hero at the very top (not while filtering; then it
+  // just renders inline in the loop like any other match).
+  if(!filtering)html+=renderThisWeekend(b);
   // Overdue
   var od=vis(overdueTasks(b));
   if(od.length){
@@ -726,11 +751,49 @@ function renderDated(b){
     }
     html+='</div>';
   }
-  // Weekends
-  soonWeekKeys(b).forEach(function(k){html+=renderWeek(b,k);});
-  // free weekends and "show more" are about planning, not finding — while
-  // filtering they'd just be empty rows, so they're suppressed
+  // Future weekends — skip this weekend, it's pinned above (unless filtering)
+  soonWeekKeys(b).forEach(function(k){
+    if(!filtering && k===currentWeekKey())return;
+    html+=renderWeek(b,k);
+  });
   if(!filtering)html+='<button class="wk-more" onclick="showMoreWeeks()">Show more weekends</button>';
+  return html;
+}
+// Break the week's tasks down by day for the summary line, e.g.
+// "2 Saturday · 1 Sunday · 1 weekday". Weekend = Fri/Sat/Sun (our scheduling
+// weekend); Mon–Thu roll up as "weekday".
+function weekendSummary(tasks){
+  var names={5:'Friday',6:'Saturday',0:'Sunday'},counts={},weekday=0;
+  tasks.forEach(function(t){
+    var d=parseYMD(t.scheduledDate);if(!d)return;
+    var g=d.getDay();
+    if(names[g])counts[g]=(counts[g]||0)+1; else weekday++;
+  });
+  var parts=[];
+  [5,6,0].forEach(function(g){if(counts[g])parts.push(counts[g]+' '+names[g]);});
+  if(weekday)parts.push(weekday+(weekday===1?' weekday':' weekdays'));
+  return parts.join(' \u00b7 ');
+}
+function renderThisWeekend(b){
+  var wk=currentWeekKey();
+  var tasks=tasksInWeek(b,wk);
+  var dateLbl=fmtWeekLabel(wk);
+  var dnd='ondragover="wkDragOver(event)" ondragleave="wkDragLeave(event)" '+
+    'ondrop="wkDrop(event,\''+esc(b)+'\',\''+wk+'\')"';
+  var html='<div class="wk wk-thisweekend"><div class="wk-head tw-head" '+dnd+'>'+
+    '<span class="wk-when now-lbl">This weekend</span>'+
+    '<span class="wk-date">'+esc(dateLbl)+'</span>'+
+    '<span class="wk-sub">'+fmtMoney(weekTotal(b,wk))+'</span></div>';
+  if(tasks.length){
+    html+='<div class="tw-summary">'+tasks.length+(tasks.length===1?' project':' projects')+
+      ' \u00b7 '+weekendSummary(tasks)+'</div>';
+    html+='<div class="pcards">';
+    tasks.forEach(function(t){html+=(editingId===t.id)?editorCard(t,b):taskCard(t,null);});
+    html+='</div>';
+  }else{
+    html+='<div class="tw-empty" '+dnd+'>Nothing scheduled this weekend \u2014 enjoy it, or drag a project in.</div>';
+  }
+  html+='</div>';
   return html;
 }
 function renderWeek(b,weekKey){
@@ -963,7 +1026,13 @@ function taskCard(t,rank){
   // Chips show whenever the data EXISTS — not only on the stage that "owns" the
   // field. A note added in Long Term stays visible after it moves to Soon.
   var chips='';
-  if(t.scheduledDate)chips+='<span class="chip sched"><span class="k">Sched</span>'+esc(fmtDateLabel(t.scheduledDate))+'</span>';
+  // Scheduled-date chip: blue for a weekend job, amber for a weekday one, so
+  // the weekday oddballs stand out from the Sat/Sun norm at a glance.
+  if(t.scheduledDate){
+    var wd=!isWeekendDate(t.scheduledDate);
+    chips+='<span class="chip sched'+(wd?' wd':'')+'"><span class="k">'+(wd?'Weekday':'Sched')+'</span>'+
+      esc(fmtDateLabel(t.scheduledDate))+'</span>';
+  }
   if(t.targetMonth)chips+='<span class="chip month"><span class="k">Target</span>'+esc(fmtMonthLabel(t.targetMonth))+'</span>';
   if(t.completedDate)chips+='<span class="chip done-dt"><span class="k">Done</span>'+esc(fmtDateLabel(t.completedDate))+'</span>';
   // If an actual is recorded AND an estimate exists, surface the estimate too so
