@@ -66,6 +66,9 @@
   .warm .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
   .chips{display:flex;flex-wrap:wrap;gap:7px}
   .chip{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:12.5px;color:var(--muted)}
+  .daybar{display:flex;justify-content:flex-end;margin:14px 0 2px}
+  .clear-reps{background:none;border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:7px 13px;font:inherit;font-family:var(--mono);font-size:12px;letter-spacing:.03em;cursor:pointer}
+  .clear-reps:hover{border-color:var(--accent);color:var(--ink)}
 
   .ex{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px;margin:12px 0}
   .ex .top{display:flex;gap:12px;align-items:baseline;justify-content:space-between}
@@ -474,6 +477,11 @@ function renderDay(){
   var chips=el('div','chips'); d.warmup.forEach(function(w){chips.appendChild(el('span','chip',w));});
   warm.appendChild(chips); dayEl.appendChild(warm);
 
+  var bar=el('div','daybar');
+  var cr=el('button','clear-reps','↺ Clear reps for this day'); cr.type='button';
+  cr.onclick=function(){ clearRepsForDay(); };
+  bar.appendChild(cr); dayEl.appendChild(bar);
+
   d.exercises.forEach(function(ex,idx){dayEl.appendChild(exerciseCard(ex,idx));});
 
   var tips=el('div','tips'); tips.appendChild(el('div','h',d.title.split(' ')[0].toUpperCase()+' form & safety'));
@@ -550,6 +558,7 @@ function field(fieldId,unit){
   input.type='text'; input.inputMode='decimal'; input.autocomplete='off';
   input.dataset.field=fieldId;
   input.value=LOG[fieldId]||'';
+  input.addEventListener('focus',function(){ setTimeout(function(){ try{input.select();}catch(e){} },0); });
   input.addEventListener('input',function(){
     var v=input.value.trim();
     if(v)LOG[fieldId]=v; else delete LOG[fieldId];
@@ -559,6 +568,23 @@ function field(fieldId,unit){
   wrap.appendChild(input);
   if(unit)wrap.appendChild(el('span','u',unit));
   return wrap;
+}
+
+/* Clear only the reps/seconds (2nd column) for the current day; keep weights */
+function clearRepsForDay(){
+  var d=DEF.days[current];
+  var keys=[];
+  d.exercises.forEach(function(ex){
+    Object.keys(LOG).forEach(function(k){
+      if(k.indexOf(ex.id+':')===0 && k.slice(-2)===':r') keys.push(k);
+    });
+  });
+  if(!keys.length){ setStatus('No reps to clear for this day','muted'); return; }
+  if(!window.confirm('Clear all reps for '+d.label+'?\n\nYour logged weights are kept — only the reps/seconds are removed.')) return;
+  keys.forEach(function(k){ delete LOG[k]; });
+  setStatus('Saving…','muted');
+  scheduleCloudSave();
+  renderDay();
 }
 
 /* ============================================================
