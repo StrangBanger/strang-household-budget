@@ -145,6 +145,8 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 /* PROJECTIONS */
 .proj-controls{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;}
 .proj-controls.proj-controls-single{grid-template-columns:1fr;}
+.pc-row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:640px){.pc-row2{grid-template-columns:1fr;}}
 .scen-intro{font-size:12px;color:var(--text2);background:var(--accent-bg);border:1px solid #B8D4F0;border-radius:var(--radius);padding:9px 13px;margin-bottom:14px;line-height:1.45;}
 @media(max-width:720px){.proj-controls{grid-template-columns:1fr;}}
 .pc-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.15rem;}
@@ -394,6 +396,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
           <div class="assum-field"><label>Until age <span class="sub">blank = retirement</span></label><input type="number" step="1" id="sc-sc-end" onchange="updProj('scEndAge',this.value)"></div>
         </div>
       </div>
+      <div class="pc-row2">
       <div class="pc-group">
         <h3>One-time amount #1 <span class="pc-hint">lump sum</span></h3>
         <div class="pc-grid">
@@ -419,6 +422,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
             </div>
           </div>
         </div>
+      </div>
       </div>
       <div class="pc-note">All three savings inputs feed one blended scenario line — recurring extra savings plus up to two one-time lump sums (e.g. an inheritance or house-sale proceeds), each landing in the year you hit that age.</div>
     </div>
