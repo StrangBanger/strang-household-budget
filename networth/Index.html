@@ -402,7 +402,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
           <div class="assum-field" style="grid-column:1/-1;"><label>Amount is entered as</label>
             <div class="mini-toggle">
               <button class="mt-btn" id="sc-ot1-mode-nominal" onclick="setOneTimeMode(1,'nominal')">Exact future $</button>
-              <button class="mt-btn" id="sc-ot1-mode-real" onclick="setOneTimeMode(1,'real')">Today's $ (grows with inflation)</button>
+              <button class="mt-btn" id="sc-ot1-mode-real" onclick="setOneTimeMode(1,'real')">Today's $ (grows at real return)</button>
             </div>
           </div>
         </div>
@@ -415,7 +415,7 @@ table.proj-tbl tr.depleted td{color:var(--red);}
           <div class="assum-field" style="grid-column:1/-1;"><label>Amount is entered as</label>
             <div class="mini-toggle">
               <button class="mt-btn" id="sc-ot2-mode-nominal" onclick="setOneTimeMode(2,'nominal')">Exact future $</button>
-              <button class="mt-btn" id="sc-ot2-mode-real" onclick="setOneTimeMode(2,'real')">Today's $ (grows with inflation)</button>
+              <button class="mt-btn" id="sc-ot2-mode-real" onclick="setOneTimeMode(2,'real')">Today's $ (grows at real return)</button>
             </div>
           </div>
         </div>
@@ -1120,11 +1120,14 @@ function computeProjection(){
     var inWin=(PROJ.scStartAge==null||ba>=PROJ.scStartAge)&&(PROJ.scEndAge==null||ba<=PROJ.scEndAge);
     if(PROJ.scExtra>0 && inWin && y<drawdownStartYear) scen+=PROJ.scExtra*12;
     // one-time lump sums (any age) — scenario only.
-    // 'nominal' = exact amount that future year; 'real' = today's $ grown by inflation to that year.
+    // 'nominal' = exact amount dropped in that future year (e.g. a fixed inheritance).
+    // 'real'    = today's $ that grows in real terms until received: grow the entry at the
+    //             full nominal return from now to the receipt year (nominal growth == real
+    //             growth once inflation is added), so it lands larger in today's-dollar terms.
     if(PROJ.oneTime1Amt>0 && PROJ.oneTime1Age===ba)
-      scen+=(PROJ.oneTime1Mode==='real'?PROJ.oneTime1Amt*Math.pow(1+inf,y-cy):PROJ.oneTime1Amt);
+      scen+=(PROJ.oneTime1Mode==='real'?PROJ.oneTime1Amt*Math.pow(1+g,y-cy):PROJ.oneTime1Amt);
     if(PROJ.oneTime2Amt>0 && PROJ.oneTime2Age===ba)
-      scen+=(PROJ.oneTime2Mode==='real'?PROJ.oneTime2Amt*Math.pow(1+inf,y-cy):PROJ.oneTime2Amt);
+      scen+=(PROJ.oneTime2Mode==='real'?PROJ.oneTime2Amt*Math.pow(1+g,y-cy):PROJ.oneTime2Amt);
     // withdrawals (Bryan retired), inflated forward from today's $
     if(y>=drawdownStartYear){
       var wdToday=(ba<PROJ.wdBreakAge)?PROJ.wdTier1:PROJ.wdTier2;
