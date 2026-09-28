@@ -168,6 +168,8 @@ table.proj-tbl tr.ret td{background:var(--accent-bg);}
 table.proj-tbl tr.ret td:first-child{font-weight:700;color:var(--accent);}
 table.proj-tbl tr.brk td{background:var(--surface2);}
 table.proj-tbl tr.brk td:first-child{font-weight:600;}
+table.proj-tbl tr.lump td{background:var(--green-bg);}
+table.proj-tbl tr.lump td:first-child{font-weight:600;color:var(--green);}
 table.proj-tbl .agebr{color:var(--text3);font-size:11px;}
 table.proj-tbl tr.depleted td{color:var(--red);}
 .proj-tbl-scroll{max-height:420px;overflow-y:auto;border-radius:var(--radius);}
@@ -1244,16 +1246,20 @@ function renderProjChart(P,V){
   document.getElementById(V.chartNote).textContent=note;
 }
 
-function buildYearTable(P,valFn,colHead){
+function buildYearTable(P,valFn,colHead,markLumps){
   var cy=P.cy, inf=P.inf;
   var head='<thead><tr><th>Your age</th><th>Year</th><th>Household</th><th class="r">'+colHead+'</th></tr></thead>';
   var body='';
   P.rows.forEach(function(r){
     var isRet=(r.bryanAge===PROJ.bryanRetireAge);
     var isBrk=(r.bryanAge===PROJ.wdBreakAge && r.bryanAge>=PROJ.bryanRetireAge);
+    // lump-sum landing years — only marked on the scenario table (markLumps)
+    var isLump=markLumps && ((PROJ.oneTime1Amt>0 && PROJ.oneTime1Age===r.bryanAge)||(PROJ.oneTime2Amt>0 && PROJ.oneTime2Age===r.bryanAge));
     var depleted=(P.depBase!==null && r.bryanAge>=P.depBase);
-    var cls=((isRet?'ret':(isBrk?'brk':''))+(depleted?' depleted':'')).trim();
+    var bg=isRet?'ret':(isBrk?'brk':(isLump?'lump':''));
+    var cls=(bg+(depleted?' depleted':'')).trim();
     var tag=isRet?' · retires':(isBrk?' · rate change':'');
+    if(isLump)tag+=' · lump';
     body+='<tr'+(cls?' class="'+cls+'"':'')+'>'+
       '<td>'+r.bryanAge+tag+'</td>'+
       '<td>'+r.year+'</td>'+
@@ -1264,12 +1270,12 @@ function buildYearTable(P,valFn,colHead){
   return head+'<tbody>'+body+'</tbody>';
 }
 function renderProjTable(P,V){
-  document.getElementById(V.baseTbl).innerHTML=buildYearTable(P,function(r){return r.base;},'Balance');
+  document.getElementById(V.baseTbl).innerHTML=buildYearTable(P,function(r){return r.base;},'Balance',false);
   if(!V.scenCard)return;
   var scenCard=document.getElementById(V.scenCard);
   if(V.withScenario && P.hasScenario){
     scenCard.style.display='block';
-    document.getElementById(V.scenTbl).innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance');
+    document.getElementById(V.scenTbl).innerHTML=buildYearTable(P,function(r){return r.scen;},'Balance',true);
   }else{
     scenCard.style.display='none';
     document.getElementById(V.scenTbl).innerHTML='';
