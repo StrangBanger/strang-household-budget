@@ -156,6 +156,9 @@ button.ab:hover{color:var(--accent);background:var(--accent-bg);}
 .proj-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px;}
 .proj-toggle .pt-btn{font-size:12px;font-weight:600;padding:5px 14px;border:none;background:none;color:var(--text3);border-radius:16px;cursor:pointer;}
 .proj-toggle .pt-btn.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.mini-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:2px;flex-wrap:wrap;}
+.mini-toggle .mt-btn{font-size:11px;font-weight:600;padding:4px 11px;border:none;background:none;color:var(--text3);border-radius:13px;cursor:pointer;white-space:nowrap;}
+.mini-toggle .mt-btn.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.06);}
 .proj-mode-note{font-size:11px;color:var(--text3);}
 table.proj-tbl{min-width:520px;}
 table.proj-tbl td,table.proj-tbl th{padding:7px 12px;font-size:12px;border-bottom:1px solid var(--border);text-align:left;}
@@ -390,17 +393,29 @@ table.proj-tbl tr.depleted td{color:var(--red);}
         </div>
       </div>
       <div class="pc-group">
-        <h3>One-time amount #1 <span class="pc-hint">lump sum, actual $</span></h3>
+        <h3>One-time amount #1 <span class="pc-hint">lump sum</span></h3>
         <div class="pc-grid">
-          <div class="assum-field"><label>Amount <span class="sub">actual $ that year</span></label><input type="number" step="1000" id="sc-ot1-amt" onchange="updProj('oneTime1Amt',this.value)"></div>
+          <div class="assum-field"><label>Amount</label><input type="number" step="1000" id="sc-ot1-amt" onchange="updProj('oneTime1Amt',this.value)"></div>
           <div class="assum-field"><label>At your age</label><input type="number" step="1" id="sc-ot1-age" onchange="updProj('oneTime1Age',this.value)"></div>
+          <div class="assum-field" style="grid-column:1/-1;"><label>Amount is entered as</label>
+            <div class="mini-toggle">
+              <button class="mt-btn" id="sc-ot1-mode-nominal" onclick="setOneTimeMode(1,'nominal')">Exact future $</button>
+              <button class="mt-btn" id="sc-ot1-mode-real" onclick="setOneTimeMode(1,'real')">Today's $ (grows with inflation)</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="pc-group">
-        <h3>One-time amount #2 <span class="pc-hint">lump sum, actual $</span></h3>
+        <h3>One-time amount #2 <span class="pc-hint">lump sum</span></h3>
         <div class="pc-grid">
-          <div class="assum-field"><label>Amount <span class="sub">actual $ that year</span></label><input type="number" step="1000" id="sc-ot2-amt" onchange="updProj('oneTime2Amt',this.value)"></div>
+          <div class="assum-field"><label>Amount</label><input type="number" step="1000" id="sc-ot2-amt" onchange="updProj('oneTime2Amt',this.value)"></div>
           <div class="assum-field"><label>At your age</label><input type="number" step="1" id="sc-ot2-age" onchange="updProj('oneTime2Age',this.value)"></div>
+          <div class="assum-field" style="grid-column:1/-1;"><label>Amount is entered as</label>
+            <div class="mini-toggle">
+              <button class="mt-btn" id="sc-ot2-mode-nominal" onclick="setOneTimeMode(2,'nominal')">Exact future $</button>
+              <button class="mt-btn" id="sc-ot2-mode-real" onclick="setOneTimeMode(2,'real')">Today's $ (grows with inflation)</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="pc-note">All three savings inputs feed one blended scenario line — recurring extra savings plus up to two one-time lump sums (e.g. an inheritance or house-sale proceeds), each landing in the year you hit that age.</div>
@@ -465,13 +480,15 @@ var ASSUMPTIONS={blendedReturn:0.061, inflation:0.03, monthlySavings:3667};
 // If one ever must change, edit here and it flows through.
 var FAMILY={bryan:'1991-03-26', ashley:'1988-07-21', regan:'2022-05-20', harrison:'2024-04-23'};
 // Projection inputs (persisted).
-var PROJ={
+var PROJ_DEFAULTS={
   bryanRetireAge:60, ashleyRetireAge:60, endAge:100,
   wdTier1:80000, wdBreakAge:65, wdTier2:65000,
   scExtra:0, scStartAge:null, scEndAge:null,
-  oneTime1Amt:null, oneTime1Age:null, oneTime2Amt:null, oneTime2Age:null,
+  oneTime1Amt:null, oneTime1Age:null, oneTime1Mode:'nominal',
+  oneTime2Amt:null, oneTime2Age:null, oneTime2Mode:'nominal',
   displayMode:'nominal'
 };
+var PROJ=Object.assign({},PROJ_DEFAULTS);
 var SAVE_HISTORY=[];
 var selectedYM='';
 var _cloudSaveTimer=null;
@@ -795,7 +812,7 @@ function applyLoadedData(data,sourceLbl){
   _acctId=data.acctNextId||(ACCOUNTS.length?Math.max.apply(null,ACCOUNTS.map(function(a){return a.id||0;}))+1:1);
   if(data.assumptions)ASSUMPTIONS={blendedReturn:0.061,inflation:0.03,monthlySavings:3667,...data.assumptions};
   if(data.family)FAMILY={...FAMILY,...data.family};
-  if(data.proj)PROJ={...PROJ,...data.proj};
+  if(data.proj)PROJ=Object.assign({},PROJ_DEFAULTS,data.proj);
   SAVE_HISTORY=data.saveHistory||[];
   var d=new Date(data.savedAt||Date.now());
   document.getElementById('last-saved-lbl').textContent=
@@ -1100,9 +1117,12 @@ function computeProjection(){
     // scenario extra savings within window, during accumulation
     var inWin=(PROJ.scStartAge==null||ba>=PROJ.scStartAge)&&(PROJ.scEndAge==null||ba<=PROJ.scEndAge);
     if(PROJ.scExtra>0 && inWin && y<drawdownStartYear) scen+=PROJ.scExtra*12;
-    // one-time lump sums (nominal $, any age) — scenario only
-    if(PROJ.oneTime1Amt>0 && PROJ.oneTime1Age===ba) scen+=PROJ.oneTime1Amt;
-    if(PROJ.oneTime2Amt>0 && PROJ.oneTime2Age===ba) scen+=PROJ.oneTime2Amt;
+    // one-time lump sums (any age) — scenario only.
+    // 'nominal' = exact amount that future year; 'real' = today's $ grown by inflation to that year.
+    if(PROJ.oneTime1Amt>0 && PROJ.oneTime1Age===ba)
+      scen+=(PROJ.oneTime1Mode==='real'?PROJ.oneTime1Amt*Math.pow(1+inf,y-cy):PROJ.oneTime1Amt);
+    if(PROJ.oneTime2Amt>0 && PROJ.oneTime2Age===ba)
+      scen+=(PROJ.oneTime2Mode==='real'?PROJ.oneTime2Amt*Math.pow(1+inf,y-cy):PROJ.oneTime2Amt);
     // withdrawals (Bryan retired), inflated forward from today's $
     if(y>=drawdownStartYear){
       var wdToday=(ba<PROJ.wdBreakAge)?PROJ.wdTier1:PROJ.wdTier2;
@@ -1265,6 +1285,12 @@ function syncProjInputs(V){
   v('sc-extra',PROJ.scExtra);v('sc-start',PROJ.scStartAge);v('sc-end',PROJ.scEndAge);
   v('ot1-amt',PROJ.oneTime1Amt);v('ot1-age',PROJ.oneTime1Age);
   v('ot2-amt',PROJ.oneTime2Amt);v('ot2-age',PROJ.oneTime2Age);
+  // one-time entry-mode toggles (Scenarios view only; guarded when absent)
+  ['1','2'].forEach(function(n){
+    var mode=PROJ['oneTime'+n+'Mode']||'nominal';
+    var bn=document.getElementById(p+'-ot'+n+'-mode-nominal'), br=document.getElementById(p+'-ot'+n+'-mode-real');
+    if(bn&&br){bn.classList.toggle('on',mode==='nominal');br.classList.toggle('on',mode==='real');}
+  });
   var n=document.getElementById(p+'-mode-nominal'),r=document.getElementById(p+'-mode-real');
   if(n&&r){n.classList.toggle('on',PROJ.displayMode==='nominal');r.classList.toggle('on',PROJ.displayMode==='real');}
 }
@@ -1276,6 +1302,7 @@ function updProj(key,val){
   renderAllProjViews();scheduleCloudSave();
 }
 function setProjMode(mode){PROJ.displayMode=mode;renderAllProjViews();scheduleCloudSave();}
+function setOneTimeMode(n,mode){PROJ['oneTime'+n+'Mode']=mode;renderAllProjViews();scheduleCloudSave();}
 
 // ═══════════════ TABS ═══════════════
 function showTab(n){
