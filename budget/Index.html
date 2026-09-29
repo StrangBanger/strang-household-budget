@@ -412,13 +412,13 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-reset{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;}
 .scen-reset:hover{color:var(--accent);}
 .scen-inputs{margin-bottom:.875rem;}
-.scen-inp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;}
+.scen-inp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;min-height:26px;}
 .scen-inp-lbl{font-size:11px;color:var(--text3);white-space:nowrap;}
 .scen-inp-val{font-size:13px;font-family:var(--mono);font-weight:600;color:var(--text2);}
 .scen-inp{width:92px;padding:4px 8px;font-size:12px;font-family:var(--mono);text-align:right;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg);color:var(--text);}
 .scen-inp:focus{outline:2px solid var(--accent);outline-offset:-1px;}
 .scen-results{}
-.scen-res-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:8px;}
+.scen-res-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:8px;min-height:22px;}
 .scen-res-lbl{font-size:11px;color:var(--text3);}
 .scen-res-v{font-size:14px;font-weight:600;font-family:var(--mono);text-align:right;}
 .scen-res-v.pos{color:var(--green);}
@@ -449,7 +449,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-kr-v{font-size:18px;font-weight:700;color:var(--accent);font-family:var(--mono);}
 .scen-kr-unit{font-size:10px;font-weight:500;color:var(--text3);font-family:var(--font);}
 .scen-kr-sub{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
-.scen-adj-note{font-size:10px;color:var(--text3);text-align:right;margin:-2px 0 6px;line-height:1.4;}
+.scen-adj-note{font-size:10px;color:var(--text3);text-align:right;margin:-2px 0 6px;line-height:1.4;min-height:14px;}
 .scen-rrsp-inputs{display:inline-flex;gap:4px;align-items:center;}
 .scen-inp-rrsp{width:64px;}
 .scen-inp-pct{width:38px;padding:4px 5px;font-size:12px;font-family:var(--mono);text-align:right;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg);color:var(--text3);}
@@ -1105,22 +1105,24 @@ function rrspRow(col,field,label){
     '<span class="scen-rrsp-inputs">'+dollar+pctbox+'</span></div>';
 }
 function spendAdjRow(col){
-  if(col.readonly){
-    return '<div class="scen-inp-row"><span class="scen-inp-lbl">Spend adj / mo</span><span class="scen-inp-val">'+fmtR(col.inputs.spendAdj||0)+'</span></div>';
-  }
   var adj=col.inputs.spendAdj||0;
-  var curSpend=budgetedMonthSpend(todayYM());
-  var base=currentScenarioInputs();
-  var thIncr=scenarioMonthlyIncome(col.inputs,todayYM())-scenarioMonthlyIncome(base,todayYM()); // monthly take-home gain vs current
-  var note='';
-  if(adj!==0){
-    var parts=[];
-    if(curSpend>0){var pc=adj/curSpend*100;parts.push((pc>=0?'+':'')+pc.toFixed(0)+'% vs current spend');}
-    if(adj>0&&thIncr>0){parts.push((adj/thIncr*100).toFixed(0)+'% of take-home gain');}
-    if(parts.length)note='<div class="scen-adj-note">'+parts.join(' &middot; ')+'</div>';
+  var inner;
+  if(col.readonly){
+    inner='<span class="scen-inp-val">'+fmtR(adj)+'</span>';
+  }else{
+    inner='<input class="scen-inp" type="text" value="'+adj+'" onblur="updateScenarioInput(\''+col.key+'\',\'spendAdj\',this.value)" onfocus="this.select()">';
   }
-  return '<div class="scen-inp-row"><span class="scen-inp-lbl">Spend adj / mo</span>'+
-    '<input class="scen-inp" type="text" value="'+adj+'" onblur="updateScenarioInput(\''+col.key+'\',\'spendAdj\',this.value)" onfocus="this.select()"></div>'+note;
+  var parts=[];
+  if(!col.readonly&&adj!==0){
+    var curSpend=budgetedMonthSpend(todayYM());
+    if(curSpend>0){var pc=adj/curSpend*100;parts.push((pc>=0?'+':'')+pc.toFixed(0)+'% vs current spend');}
+    var base=currentScenarioInputs();
+    var thIncr=scenarioMonthlyIncome(col.inputs,todayYM())-scenarioMonthlyIncome(base,todayYM());
+    if(adj>0&&thIncr>0){parts.push((adj/thIncr*100).toFixed(0)+'% of take-home gain');}
+  }
+  // Always render the note line (blank placeholder when empty) so all columns stay row-aligned.
+  var note='<div class="scen-adj-note">'+(parts.length?parts.join(' &middot; '):'&nbsp;')+'</div>';
+  return '<div class="scen-inp-row"><span class="scen-inp-lbl">Spend adj / mo</span>'+inner+'</div>'+note;
 }
 function renderScenario(){
   var grid=document.getElementById('scenario-grid');
@@ -1149,8 +1151,13 @@ function renderScenario(){
     return '<div class="scen-inp-row"><span class="scen-inp-lbl">'+label+'</span>'+
       '<input class="scen-inp" type="text" value="'+col.inputs[field]+'" onblur="updateScenarioInput(\''+col.key+'\',\''+field+'\',this.value)" onfocus="this.select()"></div>';
   }
-  function resultRow(label,val,delta,cls){
-    var deltaHtml=delta!==null?'<span class="scen-delta '+(delta>=0?'pos':'neg')+'">'+fmtDelta(delta)+'</span>':'';
+  function resultRow(label,val,delta,cls,hasDelta){
+    var deltaHtml='';
+    if(hasDelta){
+      deltaHtml=(delta!==null)
+        ?'<span class="scen-delta '+(delta>=0?'pos':'neg')+'">'+fmtDelta(delta)+'</span>'
+        :'<span class="scen-delta" style="visibility:hidden">+$0</span>'; // reserve line so Current aligns
+    }
     return '<div class="scen-res-row"><span class="scen-res-lbl">'+label+'</span><span class="scen-res-v '+(cls||'')+'">'+val+deltaHtml+'</span></div>';
   }
 
@@ -1183,13 +1190,13 @@ function renderScenario(){
         spendAdjRow(col)+
       '</div>'+
       '<div class="scen-results">'+
-        resultRow('Monthly income',fmtR(r.monthInc),isCur?null:(r.monthInc-cur.monthInc),'')+
-        resultRow('Monthly spend',fmtR(r.monthSpend),null,'muted')+
-        resultRow('Monthly surplus',fmtDelta(r.monthSurplus),isCur?null:(r.monthSurplus-cur.monthSurplus),mSurCls)+
+        resultRow('Monthly income',fmtR(r.monthInc),isCur?null:(r.monthInc-cur.monthInc),'',true)+
+        resultRow('Monthly spend',fmtR(r.monthSpend),null,'muted',false)+
+        resultRow('Monthly surplus',fmtDelta(r.monthSurplus),isCur?null:(r.monthSurplus-cur.monthSurplus),mSurCls,true)+
         '<div class="scen-res-divider"></div>'+
-        resultRow('Annual income',fmtR(r.annualInc),isCur?null:(r.annualInc-cur.annualInc),'')+
-        resultRow('Annual spend',fmtR(r.annualSpend),null,'muted')+
-        resultRow('Annual surplus',fmtDelta(r.annualSurplus),isCur?null:(r.annualSurplus-cur.annualSurplus),aSurCls)+
+        resultRow('Annual income',fmtR(r.annualInc),isCur?null:(r.annualInc-cur.annualInc),'',true)+
+        resultRow('Annual spend',fmtR(r.annualSpend),null,'muted',false)+
+        resultRow('Annual surplus',fmtDelta(r.annualSurplus),isCur?null:(r.annualSurplus-cur.annualSurplus),aSurCls,true)+
       '</div>'+
       krHtml+
     '</div>';
