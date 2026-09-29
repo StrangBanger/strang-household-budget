@@ -461,6 +461,8 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-basis-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text2);border-radius:999px;cursor:pointer;font-family:var(--font);}
 .scen-basis-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 .scen-basis-note{font-size:11px;color:var(--text3);}
+.scen-keeprate-base{background:var(--surface2);border-color:var(--border);}
+.scen-keeprate-base .scen-kr-lbl,.scen-keeprate-base .scen-kr-v{color:var(--text2);}
 </style>
 </head>
 <body>
@@ -1020,6 +1022,15 @@ function computeScenarioResult(inp){
     annualInc:annualInc, annualSpend:annualSpend, annualSurplus:annualInc-annualSpend
   };
 }
+function currentKeepRate(){
+  // Baseline: household take-home (net incl CCB) per $1 of total current gross.
+  var base=currentScenarioInputs();
+  var gross=base.bGross+base.aGross;
+  if(gross<=0)return null;
+  var yr=parseInt(todayYM().split('-')[0]);
+  var net=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;net+=scenarioMonthlyIncome(base,ym);}
+  return {gross:gross,net:net,rate:net/gross};
+}
 function scenarioKeepRate(inp){
   // How much of the gross raise survives tax, CPP/EI and CCB clawback.
   // Both sides use the scenario (no-variance) engine so the delta is apples-to-apples.
@@ -1226,6 +1237,15 @@ function renderScenario(){
           '<div class="scen-kr-lbl">Raise keep rate</div>'+
           '<div class="scen-kr-v">'+Math.round(kr.rate*100)+'&cent;<span class="scen-kr-unit"> of each $1 gross</span></div>'+
           '<div class="scen-kr-sub">+'+fmtR(kr.grossDelta)+' gross &rarr; +'+fmtR(kr.netDelta)+' take-home / yr</div>'+
+        '</div>';
+      }
+    } else {
+      var krc=currentKeepRate();
+      if(krc){
+        krHtml='<div class="scen-keeprate scen-keeprate-base">'+
+          '<div class="scen-kr-lbl">Overall keep rate</div>'+
+          '<div class="scen-kr-v">'+Math.round(krc.rate*100)+'&cent;<span class="scen-kr-unit"> of each $1 gross</span></div>'+
+          '<div class="scen-kr-sub">'+fmtR(krc.gross)+' gross &rarr; '+fmtR(krc.net)+' take-home / yr &middot; your baseline</div>'+
         '</div>';
       }
     }
