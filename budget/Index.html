@@ -455,6 +455,12 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-inp-pct{width:38px;padding:4px 5px;font-size:12px;font-family:var(--mono);text-align:right;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg);color:var(--text3);}
 .scen-inp-pct.on{color:var(--accent);border-color:var(--accent);font-weight:600;}
 .scen-inp-derived{color:var(--text3);font-style:italic;background:var(--surface2);}
+.scen-basis-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1rem;}
+.scen-basis-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);}
+.scen-basis-toggle{display:inline-flex;gap:4px;}
+.scen-basis-btn{font-size:11px;padding:4px 12px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text2);border-radius:999px;cursor:pointer;font-family:var(--font);}
+.scen-basis-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.scen-basis-note{font-size:11px;color:var(--text3);}
 </style>
 </head>
 <body>
@@ -711,6 +717,11 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   <div style="margin-bottom:1rem;">
     <h2 style="font-size:16px;font-weight:700;margin-bottom:.25rem;">Income projection</h2>
     <p style="font-size:12px;color:var(--text3);line-height:1.5;max-width:640px;">Test how different incomes affect your surplus, holding your budgeted expenses constant. Column 1 is your current reality; edit Scenarios A and B to compare. Gross salaries run through the full tax engine, and AFNI drives CCB.</p>
+  </div>
+  <div class="scen-basis-bar">
+    <span class="scen-basis-lbl">Spend basis</span>
+    <div id="scen-basis-toggle" class="scen-basis-toggle"></div>
+    <span id="scen-basis-note" class="scen-basis-note"></span>
   </div>
   <div id="scenario-grid" class="scenario-grid"></div>
   <div class="scen-chart-card">
@@ -1001,9 +1012,9 @@ function computeScenarioResult(inp){
   var yr=parseInt(todayYM().split('-')[0]);
   var adj=inp.spendAdj||0;
   var monthInc=scenarioMonthlyIncome(inp,todayYM());
-  var monthSpend=budgetedMonthSpend(todayYM())+adj;
+  var monthSpend=modelMonthlySpend()+adj;
   var annualInc=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;annualInc+=scenarioMonthlyIncome(inp,ym);}
-  var annualSpend=annualBudgetedSpend(yr)+adj*12;
+  var annualSpend=modelAnnualSpend(yr)+adj*12;
   return {
     monthInc:monthInc, monthSpend:monthSpend, monthSurplus:monthInc-monthSpend,
     annualInc:annualInc, annualSpend:annualSpend, annualSurplus:annualInc-annualSpend
@@ -1021,13 +1032,51 @@ function scenarioKeepRate(inp){
   var netDelta=scenNet-baseNet;
   return {grossDelta:grossDelta,netDelta:netDelta,rate:netDelta/grossDelta};
 }
+function trailingActualMonths(n){
+  var t=todayYM(),set={};
+  TXNS.forEach(function(tx){if(tx.ym<t)set[tx.ym]=1;});
+  return Object.keys(set).sort().slice(-n); // last n completed months that have any tracked data
+}
+function _varTrailing(){
+  var months=trailingActualMonths(12),byMonth={};
+  months.forEach(function(ym){byMonth[ym]=getActualsForMonth(ym).byLine;});
+  return {months:months,byMonth:byMonth};
+}
+function modelMonthlySpend(){
+  // 'budget' = plan. 'actual' = fixed lines at budget + variable lines at trailing-12 actual avg.
+  if(SCEN_SPEND_BASIS!=='actual')return budgetedMonthSpend(todayYM());
+  var tv=_varTrailing(); if(!tv.months.length)return budgetedMonthSpend(todayYM());
+  var t=todayYM(),total=0;
+  LINES.forEach(function(l){
+    var budget=getMonthAmount(l,t);
+    if(l.costType==='fixed'){total+=budget;return;}
+    var sum=0,any=false;
+    tv.months.forEach(function(ym){var a=(tv.byMonth[ym][l.id])||0;sum+=a;if(a>0)any=true;});
+    total+= any?(sum/tv.months.length):budget; // no history for this line -> fall back to budget
+  });
+  return total;
+}
+function modelAnnualSpend(yr){
+  if(SCEN_SPEND_BASIS!=='actual')return annualBudgetedSpend(yr);
+  var tv=_varTrailing(); if(!tv.months.length)return annualBudgetedSpend(yr);
+  function lineAnnualBudget(l){var s=0;for(var m=1;m<=12;m++){s+=getMonthAmount(l,yr+'-'+(m<10?'0':'')+m);}return s;}
+  var total=0;
+  LINES.forEach(function(l){
+    if(l.costType==='fixed'){total+=lineAnnualBudget(l);return;}
+    var sum=0,any=false;
+    tv.months.forEach(function(ym){var a=(tv.byMonth[ym][l.id])||0;sum+=a;if(a>0)any=true;});
+    total+= any?(sum/tv.months.length*12):lineAnnualBudget(l);
+  });
+  return total;
+}
+function setScenSpendBasis(b){SCEN_SPEND_BASIS=b;renderScenario();scheduleCloudSave();}
 function currentResult(){
   // Baseline uses the real monthlyIncome (respects locks, variance, everything).
   var yr=parseInt(todayYM().split('-')[0]);
   var monthInc=monthlyIncome(todayYM());
-  var monthSpend=budgetedMonthSpend(todayYM());
+  var monthSpend=modelMonthlySpend();
   var annualInc=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;annualInc+=monthlyIncome(ym);}
-  var annualSpend=annualBudgetedSpend(yr);
+  var annualSpend=modelAnnualSpend(yr);
   return {monthInc:monthInc,monthSpend:monthSpend,monthSurplus:monthInc-monthSpend,
     annualInc:annualInc,annualSpend:annualSpend,annualSurplus:annualInc-annualSpend};
 }
@@ -1127,6 +1176,10 @@ function spendAdjRow(col){
 function renderScenario(){
   var grid=document.getElementById('scenario-grid');
   if(!grid)return;
+  var bt=document.getElementById('scen-basis-toggle');
+  if(bt){bt.innerHTML=[['budget','Budgeted'],['actual','Actual \u00b7 12-mo avg']].map(function(o){return '<button class="scen-basis-btn'+(SCEN_SPEND_BASIS===o[0]?' on':'')+'" onclick="setScenSpendBasis(\''+o[0]+'\')">'+o[1]+'</button>';}).join('');}
+  var bn=document.getElementById('scen-basis-note');
+  if(bn){var mo=trailingActualMonths(12).length;bn.textContent=(SCEN_SPEND_BASIS==='actual')?('fixed at budget \u00b7 variable = avg of last '+mo+' mo'):'all lines at budgeted plan';}
   var cur=currentResult();
   var cols=[{key:'current',label:'Current',inputs:currentScenarioInputs(),res:cur,readonly:true}];
   ['a','b'].forEach(function(k){
@@ -1463,6 +1516,7 @@ function buildSavePayload(){
     balanceSnapshots:BAL_SNAPSHOTS,
     lockedIncome:LOCKED_INCOME,
     scenarios:SCENARIOS,
+    scenSpendBasis:SCEN_SPEND_BASIS,
     incomeLines:INC_LINES,
     oneTimeIncome:OTI,
     otiNextId:_otiId,
@@ -1483,6 +1537,7 @@ function applyLoadedData(data,sourceLbl){
   BAL_SNAPSHOTS=data.balanceSnapshots||{};
   LOCKED_INCOME=data.lockedIncome||{};
   SCENARIOS=data.scenarios||{a:null,b:null};
+  SCEN_SPEND_BASIS=data.scenSpendBasis||'actual';
   _txId=data.txNextId||1;
   INC_LINES=data.incomeLines;
   OTI=data.oneTimeIncome||[];
@@ -2859,6 +2914,7 @@ var CH_SPEND=null;
 var CH_CUM=null;
 var CH_SCENPROJ=null;
 var SCEN_HORIZON=5;
+var SCEN_SPEND_BASIS='actual'; // 'budget' | 'actual' (12-mo hybrid)
 var ACTIVE_RANGE="ytd"; // projection range: "ytd" or a year string; default YTD
 function renderSnapshots(allMonths){
   var el=document.getElementById('bal-history');if(!el)return;
