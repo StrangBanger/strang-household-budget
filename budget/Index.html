@@ -436,6 +436,14 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .ct-sel{font-size:11px;}
 .ct-sel.ct-fixed{color:var(--accent);font-weight:600;}
 .ct-sel.ct-variable{color:var(--text3);}
+.scen-chart-card{margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem 1.1rem;}
+.scen-chart-hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;}
+.scen-chart-title{font-size:13px;font-weight:700;}
+.scen-chart-box{height:300px;}
+.scen-chart-note{font-size:11px;color:var(--text3);margin-top:.6rem;line-height:1.5;}
+.scen-horizon-toggle{display:inline-flex;gap:4px;}
+.scen-hz-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text2);border-radius:999px;cursor:pointer;font-family:var(--font);}
+.scen-hz-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 </style>
 </head>
 <body>
@@ -694,6 +702,14 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
     <p style="font-size:12px;color:var(--text3);line-height:1.5;max-width:640px;">Test how different incomes affect your surplus, holding your budgeted expenses constant. Column 1 is your current reality; edit Scenarios A and B to compare. Gross salaries run through the full tax engine, and AFNI drives CCB.</p>
   </div>
   <div id="scenario-grid" class="scenario-grid"></div>
+  <div class="scen-chart-card">
+    <div class="scen-chart-hd">
+      <span class="scen-chart-title">Cumulative surplus over time</span>
+      <div id="scen-horizon-toggle" class="scen-horizon-toggle"></div>
+    </div>
+    <div class="scen-chart-box"><canvas id="ch-scenproj"></canvas></div>
+    <div class="scen-chart-note">Money accumulated if each year&rsquo;s surplus stacks up, starting from $0 today. Flat projection &mdash; assumes today&rsquo;s numbers hold each year. This is cumulative surplus, not net worth (it excludes investment growth &amp; debt paydown).</div>
+  </div>
 </div>
 
 <!-- end shell / app-shell -->
@@ -930,6 +946,7 @@ function currentScenarioInputs(){
     aGross:getIncValue(INC_LINES.ashleyGross,ym),
     bEmpR:getIncValue(INC_LINES.bryanEmpRRSP,ym),
     bEeR:getIncValue(INC_LINES.bryanEeRRSP,ym),
+    spendAdj:0,
     afniAuto:true
   };
   inp.afni=autoAFNI(inp); // derive AFNI from grosses by default
@@ -963,10 +980,11 @@ function annualBudgetedSpend(yr){
 function computeScenarioResult(inp){
   // Returns {monthInc, monthSpend, monthSurplus, annualInc, annualSpend, annualSurplus}
   var yr=parseInt(todayYM().split('-')[0]);
+  var adj=inp.spendAdj||0;
   var monthInc=scenarioMonthlyIncome(inp,todayYM());
-  var monthSpend=budgetedMonthSpend(todayYM());
+  var monthSpend=budgetedMonthSpend(todayYM())+adj;
   var annualInc=0;for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;annualInc+=scenarioMonthlyIncome(inp,ym);}
-  var annualSpend=annualBudgetedSpend(yr);
+  var annualSpend=annualBudgetedSpend(yr)+adj*12;
   return {
     monthInc:monthInc, monthSpend:monthSpend, monthSurplus:monthInc-monthSpend,
     annualInc:annualInc, annualSpend:annualSpend, annualSurplus:annualInc-annualSpend
@@ -1001,6 +1019,35 @@ function resetScenario(which){
   renderScenario();scheduleCloudSave();
 }
 function fmtDelta(v){return (v>=0?'+':'−')+fmtR(Math.abs(v));}
+function setScenHorizon(n){SCEN_HORIZON=n;renderScenario();}
+function renderScenarioChart(cols){
+  var el=document.getElementById('ch-scenproj');
+  if(!el||typeof Chart==='undefined')return;
+  var H=SCEN_HORIZON;
+  var labels=['Now'];for(var y=1;y<=H;y++)labels.push('Yr '+y);
+  var colorMap={current:'#6B7280',a:'#185FA5',b:'#0F6E56'};
+  var datasets=cols.map(function(col){
+    var S=col.res.annualSurplus;
+    var data=[];for(var y=0;y<=H;y++)data.push(Math.round(S*y));
+    return {label:col.label,data:data,
+      borderColor:colorMap[col.key],backgroundColor:colorMap[col.key],
+      borderWidth:col.key==='current'?2:2.5,
+      borderDash:col.key==='current'?[5,4]:[],
+      pointRadius:3,pointHoverRadius:5,tension:0.1,fill:false};
+  });
+  // toggle buttons reflect current horizon
+  var tg=document.getElementById('scen-horizon-toggle');
+  if(tg){tg.innerHTML=[1,2,3,4,5].map(function(n){return '<button class="scen-hz-btn'+(SCEN_HORIZON===n?' on':'')+'" onclick="setScenHorizon('+n+')">'+n+'yr</button>';}).join('');}
+  if(CH_SCENPROJ)CH_SCENPROJ.destroy();
+  CH_SCENPROJ=new Chart(el.getContext('2d'),{type:'line',
+    data:{labels:labels,datasets:datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,usePointStyle:true,font:{size:11}}},
+        tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmtR(ctx.parsed.y);}}}},
+      scales:{y:{beginAtZero:true,ticks:{callback:function(v){return '$'+Math.round(v/1000)+'k';}}}}}});
+}
+
 function renderScenario(){
   var grid=document.getElementById('scenario-grid');
   if(!grid)return;
@@ -1048,6 +1095,7 @@ function renderScenario(){
         inputRow(col,'afni','AFNI (for CCB)')+
         inputRow(col,'bEmpR','Bryan empl. RRSP')+
         inputRow(col,'bEeR','Bryan empe. RRSP')+
+        inputRow(col,'spendAdj','Spend adj / mo')+
       '</div>'+
       '<div class="scen-results">'+
         resultRow('Monthly income',fmtR(r.monthInc),isCur?null:(r.monthInc-cur.monthInc),'')+
@@ -1061,6 +1109,7 @@ function renderScenario(){
     '</div>';
   });
   grid.innerHTML=html;
+  renderScenarioChart(cols);
 }
 
 // getMonthIncomeParts: for a specific month, returns full breakdown (used by Income tab)
@@ -1154,11 +1203,9 @@ function pctBadge(prev,next){if(!prev||prev===0)return'';var pct=((next-prev)/pr
 function parseAmountInput(raw,prev){raw=(raw||'').trim().replace(/,/g,'');if(!raw||raw==='\u2014')return null;var pm=raw.match(/^([+\-]?\d+(\.\d+)?)%$/);if(pm)return Math.max(0,prev*(1+parseFloat(pm[1])/100));var d=parseFloat(raw.replace(/^\$/,''));return isNaN(d)?null:Math.max(0,d);}
 function getMonthAmount(line,ym){
   var mi=ymx(ym);if(mi===null)return 0;
-  // Compute the scheduled amount (walking c1-c4 changes) for ALL lines, including propTax.
+  if(line.special==='propTax'){var mo=parseInt(ym.split('-')[1]);return(mo>=1&&mo<=10)?line.current:0;}
   var slots=[line.c1,line.c2,line.c3,line.c4],amt=line.current;
   for(var i=slots.length-1;i>=0;i--){var s=slots[i];if(s&&s.ym){var si=ymx(s.ym);if(si!==null&&mi>=si){amt=s.amount;break;}}}
-  // Property tax only applies Jan-Oct — zero it out for Nov/Dec, but honor scheduled changes within the window.
-  if(line.special==='propTax'){var mo=parseInt(ym.split('-')[1]);return(mo>=1&&mo<=10)?amt:0;}
   return amt;
 }
 function computeProjection(seed){
@@ -1991,12 +2038,7 @@ function getEffectiveSeed(ym){
 
 function saveBalanceForMonth(){
   var todym=todayYM();
-  // Allow saving next month's balance early on the last calendar day of the current month.
-  var now=new Date();
-  var lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  var nYM=(function(){var d=new Date(now.getFullYear(),now.getMonth()+1,1);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);})();
-  var earlyUnlock=(now.getDate()===lastDay)&&(currentYM===nYM);
-  if(currentYM>todym&&!earlyUnlock)return; // locked for future months (except next-month early unlock)
+  if(currentYM>todym)return; // locked for future months
   var val=parseFloat(document.getElementById('bal-input').value);
   if(!isNaN(val)&&val>=0){
     BAL_SNAPSHOTS[currentYM]=val;
@@ -2014,12 +2056,6 @@ function renderBalWidget(){
   var todym=todayYM();
   var isFuture=currentYM>todym;
   var isCurrent=currentYM===todym;
-  // Exception: on the LAST calendar day of the current month, unlock the immediately-next month.
-  var now=new Date();
-  var lastDayOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  var isLastDay=now.getDate()===lastDayOfMonth;
-  var nextYM=(function(){var d=new Date(now.getFullYear(),now.getMonth()+1,1);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);})();
-  var isNextMonthEarlyUnlock=isLastDay&&(currentYM===nextYM);
   var lbl=document.getElementById('bal-month-lbl');
   var inp=document.getElementById('bal-input');
   var lockIcon=document.getElementById('bal-lock-icon');
@@ -2030,29 +2066,11 @@ function renderBalWidget(){
 
   // Value — show saved snapshot if exists, else blank for editable months
   // For future months, show the carried-forward value
-  if(isFuture&&!isNextMonthEarlyUnlock){
+  if(isFuture){
     var carried=getEffectiveSeed(currentYM);
     if(inp){inp.value=carried>0?carried:'';inp.disabled=true;inp.style.opacity='.5';}
     if(lockIcon)lockIcon.style.display='inline';
     if(hint)hint.textContent='Future months show the most recent balance carried forward. Set a balance when the month arrives.';
-  } else if(isNextMonthEarlyUnlock){
-    // Last day of prior month — allow setting next month's opening balance a day early.
-    var savedNext=BAL_SNAPSHOTS[currentYM];
-    if(inp){
-      inp.value=(savedNext!==undefined)?savedNext:'';
-      inp.disabled=false;
-      inp.style.opacity='1';
-    }
-    if(lockIcon)lockIcon.style.display='none';
-    if(hint){
-      if(savedNext!==undefined){
-        hint.textContent='Saved · Used as projection anchor for '+ymlb(currentYM)+' onwards';
-        hint.style.color='var(--green)';
-      } else {
-        hint.textContent='Editable early — set your expected opening balance for '+ymlb(currentYM);
-        hint.style.color='var(--accent)';
-      }
-    }
   } else {
     var saved=BAL_SNAPSHOTS[currentYM];
     if(inp){
@@ -2071,43 +2089,6 @@ function renderBalWidget(){
       }
     }
   }
-}
-
-// ── Stage 2: Per-line month-end spend forecast (A-plus, power-curve) ──
-// Fixed lines → full budget. Variable lines, per line:
-//   • over budget  → capped at actual (one-time spikes don't project forward)
-//   • under budget → actual + (budget−actual) × remaining_frac^0.5
-//     (power curve: allowance stays high through mid-month, tapers late, never fully zero)
-var FORECAST_DECAY_EXP=0.5; // tune: smaller = stays higher longer & drops sharper at end
-function forecastMonthSpend(ym,act){
-  var now=new Date(),dOfM=now.getDate();
-  var dInM=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  var remainingFrac=Math.max(0,(dInM-dOfM)/dInM);      // 1 → month start, 0 → month end
-  var decay=Math.pow(remainingFrac,FORECAST_DECAY_EXP); // power-curve allowance weight
-  var fixedTotal=0, variableForecast=0, budgetedVar=0, actualVar=0;
-  LINES.forEach(function(l){
-    var budget=getMonthAmount(l,ym);
-    if(l.costType==='fixed'){
-      fixedTotal+=budget;
-      return;
-    }
-    // variable line
-    var actual=act.byLine[l.id]||0;
-    budgetedVar+=budget; actualVar+=actual;
-    var lineFc;
-    if(actual>=budget){
-      lineFc=actual;                                   // over budget → capped at actual
-    }else{
-      lineFc=actual+(budget-actual)*decay;             // under → decaying budget allowance
-    }
-    variableForecast+=lineFc;
-  });
-  return {
-    total:fixedTotal+variableForecast,
-    fixedTotal:fixedTotal, variableForecast:variableForecast,
-    budgetedVar:budgetedVar, actualVar:actualVar,
-    remainingFrac:remainingFrac, decay:decay
-  };
 }
 
 function renderTrack(){
@@ -2190,14 +2171,18 @@ function renderTrack(){
     feCls=pastPos>=0?'g':'r';
     feSub='final actual position';
   } else {
-    // Current month — blended fixed/variable forecast (Stage 2).
-    // Fixed lines at full budget; variable lines slide from budget→actual as the month elapses.
-    var fc=forecastMonthSpend(currentYM,act);
-    var fePos=projInc-fc.total;            // projected leftover / savings this month
-    var vsBudget=fePos-projPos;            // vs the "If on budget" number
-    feVal=(fePos>=0?'+':'')+fmtR(fePos);
-    feCls=fePos>=0?'g':'r';
-    feSub='projected to save · '+(vsBudget>=0?'+':'−')+fmtR(Math.abs(vsBudget))+' vs budget · at current pace';
+    // Current month — pace-adjusted forecast
+    var nowD=new Date(),dOfM=nowD.getDate(),dInM=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
+    if(dOfM<5){
+      feVal='—';feCls='';feSub='too early to project pace';
+    } else {
+      var spendRunRate=act.total/dOfM*dInM;
+      var fePos=projInc-spendRunRate;
+      var vsBudget=fePos-projPos; // how forecast compares to the "If on budget" number
+      feVal=(fePos>=0?'+':'')+fmtR(fePos);
+      feCls=fePos>=0?'g':'r';
+      feSub=(vsBudget>=0?'+':'−')+fmtR(Math.abs(vsBudget))+' vs budget · at current pace';
+    }
   }
 
   var cs=[
@@ -2779,6 +2764,8 @@ function delSnapshot(ym){
 var CH_BALANCE=null;
 var CH_SPEND=null;
 var CH_CUM=null;
+var CH_SCENPROJ=null;
+var SCEN_HORIZON=5;
 var ACTIVE_RANGE="ytd"; // projection range: "ytd" or a year string; default YTD
 function renderSnapshots(allMonths){
   var el=document.getElementById('bal-history');if(!el)return;
