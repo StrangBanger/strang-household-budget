@@ -449,6 +449,7 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-kr-v{font-size:18px;font-weight:700;color:var(--accent);font-family:var(--mono);}
 .scen-kr-unit{font-size:10px;font-weight:500;color:var(--text3);font-family:var(--font);}
 .scen-kr-sub{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
+.scen-adj-note{font-size:10px;color:var(--text3);text-align:right;margin:-2px 0 6px;line-height:1.4;}
 </style>
 </head>
 <body>
@@ -1065,6 +1066,24 @@ function renderScenarioChart(cols){
       scales:{y:{beginAtZero:true,ticks:{callback:function(v){return '$'+Math.round(v/1000)+'k';}}}}}});
 }
 
+function spendAdjRow(col){
+  if(col.readonly){
+    return '<div class="scen-inp-row"><span class="scen-inp-lbl">Spend adj / mo</span><span class="scen-inp-val">'+fmtR(col.inputs.spendAdj||0)+'</span></div>';
+  }
+  var adj=col.inputs.spendAdj||0;
+  var curSpend=budgetedMonthSpend(todayYM());
+  var base=currentScenarioInputs();
+  var thIncr=scenarioMonthlyIncome(col.inputs,todayYM())-scenarioMonthlyIncome(base,todayYM()); // monthly take-home gain vs current
+  var note='';
+  if(adj!==0){
+    var parts=[];
+    if(curSpend>0){var pc=adj/curSpend*100;parts.push((pc>=0?'+':'')+pc.toFixed(0)+'% vs current spend');}
+    if(adj>0&&thIncr>0){parts.push((adj/thIncr*100).toFixed(0)+'% of take-home gain');}
+    if(parts.length)note='<div class="scen-adj-note">'+parts.join(' &middot; ')+'</div>';
+  }
+  return '<div class="scen-inp-row"><span class="scen-inp-lbl">Spend adj / mo</span>'+
+    '<input class="scen-inp" type="text" value="'+adj+'" onblur="updateScenarioInput(\''+col.key+'\',\'spendAdj\',this.value)" onfocus="this.select()"></div>'+note;
+}
 function renderScenario(){
   var grid=document.getElementById('scenario-grid');
   if(!grid)return;
@@ -1123,7 +1142,7 @@ function renderScenario(){
         inputRow(col,'afni','AFNI (for CCB)')+
         inputRow(col,'bEmpR','Bryan empl. RRSP')+
         inputRow(col,'bEeR','Bryan empe. RRSP')+
-        inputRow(col,'spendAdj','Spend adj / mo')+
+        spendAdjRow(col)+
       '</div>'+
       '<div class="scen-results">'+
         resultRow('Monthly income',fmtR(r.monthInc),isCur?null:(r.monthInc-cur.monthInc),'')+
