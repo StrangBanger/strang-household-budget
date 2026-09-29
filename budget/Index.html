@@ -1095,8 +1095,18 @@ function updateScenarioInput(which,field,raw){
   if(!SCENARIOS[which])SCENARIOS[which]=currentScenarioInputs();
   var v=parseFloat(String(raw).replace(/[^0-9.\-]/g,''));
   if(isNaN(v))v=0;
+  if(field==='afni'){
+    // Only switch to manual if the entered value actually differs from the auto value,
+    // so simply clicking into and out of the field never freezes AFNI.
+    var autoVal=Math.round(autoAFNI(SCENARIOS[which]));
+    if(Math.round(v)!==autoVal){
+      SCENARIOS[which].afni=v;
+      SCENARIOS[which].afniAuto=false;
+    } // else: stays in auto mode
+    renderScenario();scheduleCloudSave();
+    return;
+  }
   SCENARIOS[which][field]=v;
-  if(field==='afni')SCENARIOS[which].afniAuto=false; // manual override engaged
   renderScenario();scheduleCloudSave();
 }
 function resetAFNIauto(which){
