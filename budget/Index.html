@@ -444,6 +444,11 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 .scen-horizon-toggle{display:inline-flex;gap:4px;}
 .scen-hz-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text2);border-radius:999px;cursor:pointer;font-family:var(--font);}
 .scen-hz-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.scen-keeprate{margin-top:.75rem;padding:.6rem .75rem;background:var(--accent-bg);border:1px solid #B8D4F0;border-radius:var(--radius);}
+.scen-kr-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px;}
+.scen-kr-v{font-size:18px;font-weight:700;color:var(--accent);font-family:var(--mono);}
+.scen-kr-unit{font-size:10px;font-weight:500;color:var(--text3);font-family:var(--font);}
+.scen-kr-sub{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
 </style>
 </head>
 <body>
@@ -990,6 +995,18 @@ function computeScenarioResult(inp){
     annualInc:annualInc, annualSpend:annualSpend, annualSurplus:annualInc-annualSpend
   };
 }
+function scenarioKeepRate(inp){
+  // How much of the gross raise survives tax, CPP/EI and CCB clawback.
+  // Both sides use the scenario (no-variance) engine so the delta is apples-to-apples.
+  var base=currentScenarioInputs();
+  var grossDelta=(inp.bGross+inp.aGross)-(base.bGross+base.aGross);
+  if(grossDelta<=0)return null; // only meaningful for an actual raise
+  var yr=parseInt(todayYM().split('-')[0]);
+  var baseNet=0,scenNet=0;
+  for(var m=1;m<=12;m++){var ym=yr+'-'+(m<10?'0':'')+m;baseNet+=scenarioMonthlyIncome(base,ym);scenNet+=scenarioMonthlyIncome(inp,ym);}
+  var netDelta=scenNet-baseNet;
+  return {grossDelta:grossDelta,netDelta:netDelta,rate:netDelta/grossDelta};
+}
 function currentResult(){
   // Baseline uses the real monthlyIncome (respects locks, variance, everything).
   var yr=parseInt(todayYM().split('-')[0]);
@@ -1084,6 +1101,17 @@ function renderScenario(){
   cols.forEach(function(col){
     var r=col.res, isCur=col.key==='current';
     var mSurCls=r.monthSurplus>=0?'pos':'neg', aSurCls=r.annualSurplus>=0?'pos':'neg';
+    var krHtml='';
+    if(!isCur){
+      var kr=scenarioKeepRate(col.inputs);
+      if(kr){
+        krHtml='<div class="scen-keeprate">'+
+          '<div class="scen-kr-lbl">Raise keep rate</div>'+
+          '<div class="scen-kr-v">'+Math.round(kr.rate*100)+'&cent;<span class="scen-kr-unit"> of each $1 gross</span></div>'+
+          '<div class="scen-kr-sub">+'+fmtR(kr.grossDelta)+' gross &rarr; +'+fmtR(kr.netDelta)+' take-home / yr</div>'+
+        '</div>';
+      }
+    }
     html+='<div class="scen-col'+(isCur?' scen-col-cur':'')+'">'+
       '<div class="scen-col-hd">'+
         '<span class="scen-col-title">'+col.label+'</span>'+
@@ -1106,6 +1134,7 @@ function renderScenario(){
         resultRow('Annual spend',fmtR(r.annualSpend),null,'muted')+
         resultRow('Annual surplus',fmtDelta(r.annualSurplus),isCur?null:(r.annualSurplus-cur.annualSurplus),aSurCls)+
       '</div>'+
+      krHtml+
     '</div>';
   });
   grid.innerHTML=html;
