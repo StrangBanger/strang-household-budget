@@ -94,6 +94,36 @@ body {
 
 /* ============ HEADER ACTIONS ============ */
 .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Solo / FFA structure toggle — lives in the header because every tab follows it */
+.structure-toggle { display: inline-flex; align-self: center; border: 1px solid rgba(247,243,237,0.35); }
+.structure-toggle button {
+  font-family: var(--font-sans); font-size: 11.5px; font-weight: 500;
+  background: transparent; color: var(--linen); border: none;
+  padding: 6px 14px; cursor: pointer; white-space: nowrap;
+}
+.structure-toggle button + button { border-left: 1px solid rgba(247,243,237,0.35); }
+.structure-toggle button:hover:not(.active) { background: rgba(247,243,237,0.1); }
+.structure-toggle button.active { background: var(--ochre); color: var(--linen); }
+
+/* FFA funding schedule grid (Runway tab) */
+.ffa-grid { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 5px 6px; align-items: center; margin: 0.6rem 0; }
+.ffa-grid .hdr { font-size: 9px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; text-align: right; }
+.ffa-grid .hdr:first-child { text-align: left; }
+.ffa-in {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--teal);
+  background: var(--linen); border: 1px solid var(--border-strong);
+  padding: 5px 7px; width: 100%; text-align: right; font-variant-numeric: tabular-nums;
+}
+.ffa-in:focus { outline: none; border-color: var(--ochre); background: var(--linen-card); }
+.ffa-fixed { font-size: 11px; color: var(--text-muted); text-align: right; font-style: italic; }
+.ffa-outcome { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.4rem; font-size: 11.5px; }
+.ffa-outcome .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.ffa-outcome .k { color: var(--text-muted); }
+.ffa-outcome .v { font-variant-numeric: tabular-nums; color: var(--teal); font-weight: 600; text-align: right; }
+.ffa-outcome .v.bad { color: var(--danger); }
+.ffa-outcome .v.warn { color: var(--warning); }
+.ffa-outcome .v.good { color: var(--success); }
 .hdr-btn {
   font-family: var(--font-sans); font-size: 11.5px; font-weight: 500;
   background: transparent; color: var(--linen);
@@ -887,6 +917,7 @@ footer.model-footer {
 <header class="page-header">
   <div class="header-inner">
     <div class="wordmark">Modern Pension</div>
+    <div class="structure-toggle" id="structure-toggle" title="Business structure — every tab follows this"></div>
     <div class="header-actions">
       <span class="saved-badge" id="saved-badge"></span>
       <button class="hdr-btn" onclick="importData()">Import</button>
@@ -1018,6 +1049,27 @@ const DEFAULTS = {
   hhBurnMonthly: 0,
   adamMonthly: 0,
   adamMonthsActive: 0,
+
+  // ---- Structure ----
+  // 'solo' = the original plan: 100% owned, uncapped graded commission, Adam's
+  // support is a personal gift to the household. 'ffa' = the co-owned Flat Fee
+  // Annuities version: capped commission, and Adam's money goes INTO THE CORP
+  // as a salary top-up. Both stay live so the two can be compared directly.
+  structure: 'solo',
+
+  // FFA only. Commission per sale can never exceed this. Achieved by electing a
+  // lower carrier comp scale (client gets the higher payout) — not a rebate.
+  // 0 = no cap.
+  feeCap: 0,
+
+  // FFA funding. Adam pays the GAP between the guaranteed salary and what FFA
+  // can pay itself, up to the year's cap — never a flat cheque. Year 1 is
+  // committed; later years renew only if trailing-12-month sales clear the bar.
+  ffaGuaranteedSalary: 0,
+  ffaCaps:     [0, 0, 0, 0, 0],   // annual ceiling on Adam's money, per year
+  ffaRenewTTM: [0, 0, 0, 0, 0],   // TTM sales needed at each anniversary (index 0 unused — Y1 committed)
+  ffaGrowthPct: 0,                // % of each year's cap reserved for growth (marketing), not salary
+  ffaMissPct: 0,                  // % of cap Adam still funds if renewal is missed (0 = declines, funding ends)
 };
 
 // Ongoing operating expenses — [Year1, Year2, Year3, Year4, Year5], grouped by category
@@ -1166,11 +1218,26 @@ const Engine = (function () {
   }
 
   // ---- Commission ----
-  function commissionPerSale(avgDeposit) {
+  // cap (optional): FFA's per-sale ceiling. 0 or undefined = uncapped (Solo).
+  function commissionPerSale(avgDeposit, cap) {
     const t1 = Math.min(avgDeposit, COMMISSION.tier1Cap) * COMMISSION.tier1Rate;
     const t2 = Math.max(0, Math.min(avgDeposit, COMMISSION.tier2Cap) - COMMISSION.tier1Cap) * COMMISSION.tier2Rate;
     const t3 = Math.max(0, avgDeposit - COMMISSION.tier2Cap) * COMMISSION.tier3Rate;
-    return t1 + t2 + t3;
+    const graded = t1 + t2 + t3;
+    return (cap > 0) ? Math.min(graded, cap) : graded;
+  }
+
+  // capBindsAt: the deposit size above which the cap takes over. Graded
+  // commission is monotonic, so bisection is exact enough.
+  function capBindsAt(cap) {
+    if (!(cap > 0)) return null;
+    let lo = 0, hi = 50000000;
+    if (commissionPerSale(hi) < cap) return null;
+    for (let i = 0; i < 80; i++) {
+      const mid = (lo + hi) / 2;
+      if (commissionPerSale(mid) < cap) lo = mid; else hi = mid;
+    }
+    return hi;
   }
 
   // ---- Opex ----
@@ -1221,12 +1288,12 @@ const Engine = (function () {
   // expectedCommission: probability-weighted commission across the deposit
   // distribution. Deterministic (no sampling) so it stays Excel-checkable.
   // Weights are normalised by their sum; a zero-sum falls back to the mid point.
-  function expectedCommission(deposits) {
+  function expectedCommission(deposits, cap) {
     const pts = [deposits.low, deposits.mid, deposits.high];
     const sum = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
-    if (sum <= 0) return commissionPerSale(Number(deposits.mid.amt) || 0);
+    if (sum <= 0) return commissionPerSale(Number(deposits.mid.amt) || 0, cap);
     return pts.reduce((t, p) =>
-      t + ((Number(p.w) || 0) / sum) * commissionPerSale(Number(p.amt) || 0), 0);
+      t + ((Number(p.w) || 0) / sum) * commissionPerSale(Number(p.amt) || 0, cap), 0);
   }
 
   // meanDeposit: the average this distribution actually implies. Surfaced in the
@@ -1274,8 +1341,21 @@ const Engine = (function () {
       deposits, floorGross, ceilingGross, corpFunding, minBuffer, surplusTriggerMonths,
       ashleyMonthly, hhBurnMonthly, adamMonthly, adamMonthsActive, expenseState, scenarioKey, salesArr,
       corpTaxRate, salaryReviewMonths, runRateWindowMonths, salaryStep, coverageRatio, hhSavingsStart,
-      savingsFloor, baseSalary
+      savingsFloor, baseSalary,
+      structure, feeCap, ffa
     } = params;
+
+    // ---- Structure ----
+    // Solo must reproduce the pre-FFA engine EXACTLY: no cap, Adam as household
+    // income, no corp injections. Every FFA branch below is gated on isFFA.
+    const isFFA = structure === 'ffa';
+    const F = isFFA ? {
+      salary:   Math.max(0, Number(ffa && ffa.guaranteedSalary) || 0),
+      caps:     (ffa && ffa.caps) || [],
+      renewTTM: (ffa && ffa.renewTTM) || [],
+      growth:   Math.min(1, Math.max(0, (Number(ffa && ffa.growthPct) || 0) / 100)),
+      miss:     Math.min(1, Math.max(0, (Number(ffa && ffa.missPct) || 0) / 100)),
+    } : null;
 
     const reviewEvery = Math.max(1, Number(salaryReviewMonths) || 12);
     const rrWindow    = Math.max(1, Number(runRateWindowMonths) || 6);
@@ -1284,7 +1364,7 @@ const Engine = (function () {
 
     const taxRate = (corpTaxRate !== undefined) ? corpTaxRate : CORP_TAX.smallBusinessRate;
 
-    const comm = expectedCommission(deposits);
+    const comm = expectedCommission(deposits, isFFA ? feeCap : 0);
     const sales = salesArr || SCENARIO_SALES[scenarioKey];
 
     // Surplus Threshold = months x (Floor total monthly corp cost + Year 1 monthly opex)
@@ -1307,25 +1387,95 @@ const Engine = (function () {
     let fiscalYearTaxableIncome = 0; // accumulates across the 12 months of the current fiscal year
     let carryforwardAtYearStart = 0; // loss carryforward as of the END of the prior fiscal year
 
+    // ---- FFA funding state ----
+    const fundingYears = [];     // one record per year: cap, renewal test, outcome, what was drawn
+    let fundingEnded = false;    // a declined renewal (or a zero-cap year) ends funding for good
+    let yearSalaryLeft = 0;      // what's left of this year's salary top-up allowance
+    let yearGrowthMo = 0;        // this year's growth money, paid in evenly
+    let yearFunded = false;
+    let adamCapitalCum = 0;
+    let wasFunded = false;
+    let forceReview = false;     // first month after funding stops: re-run the salary review
+    // The month the household loses its support. Solo: the month after Adam's
+    // gift stops (this was hard-coded as 13). FFA: the month after the top-up stops.
+    let cliffMonth = (!isFFA && adamMonthsActive > 0 && adamMonthsActive < 60) ? adamMonthsActive + 1 : null;
+
     for (let i = 0; i < 60; i++) {
       const monthNum = i + 1;
       const salesThisMonth = sales[i];
       const grossCommission = salesThisMonth * comm;
       const opex = monthlyOpex(expenseState, i);
 
-      const adam = monthNum <= adamMonthsActive ? adamMonthly : 0;
+      // Trailing-12 sales INCLUDING this month (display + ladder later).
+      let ttmSales = 0;
+      for (let j = Math.max(0, i - 11); j <= i; j++) ttmSales += Number(sales[j]) || 0;
+
+      // ---- FFA: anniversary — set this year's funding ----
+      if (isFFA && i % 12 === 0) {
+        const y = i / 12;
+        const cap = Math.max(0, Number(F.caps[y]) || 0);
+        let status, factor = 0, testTTM = null, threshold = null;
+        if (fundingEnded) { status = 'ended'; }
+        else if (cap <= 0) { status = 'none'; fundingEnded = (y > 0); }
+        else if (y === 0) { status = 'committed'; factor = 1; }
+        else {
+          // Renewal is tested on the 12 months that just CLOSED — not this month.
+          testTTM = 0;
+          for (let j = i - 12; j < i; j++) testTTM += Number(sales[j]) || 0;
+          threshold = Math.max(0, Number(F.renewTTM[y]) || 0);
+          if (testTTM >= threshold) { status = 'renewed'; factor = 1; }
+          else if (F.miss > 0)      { status = 'reduced'; factor = F.miss; }
+          else                      { status = 'declined'; fundingEnded = true; }
+        }
+        const amount = cap * factor;
+        yearSalaryLeft = amount * (1 - F.growth);
+        yearGrowthMo = amount * F.growth / 12;
+        yearFunded = amount > 0;
+        fundingYears.push({ year: y + 1, cap, amount, testTTM, threshold, status, toppedUp: 0, growth: 0 });
+      }
+
+      // Funded = there's still salary allowance left this year.
+      const funded = isFFA && yearFunded && yearSalaryLeft > 0.005;
+      if (isFFA && wasFunded && !funded) {
+        forceReview = true;
+        if (cliffMonth === null) cliffMonth = monthNum;
+      }
+      const growthIn = (isFFA && yearFunded) ? yearGrowthMo : 0;
+
+      // Solo: Adam is household income. FFA: Adam never touches the household.
+      const adam = (!isFFA && monthNum <= adamMonthsActive) ? adamMonthly : 0;
       const neededNetMonthly = Math.max(0, hhBurnMonthly - adam - ashleyMonthly);
       const neededNetAnnual = neededNetMonthly * 12;
       const hhNeededGross = grossForNet(neededNetAnnual);
 
-      const availAfterOpex = corpBalance + grossCommission - opex;
+      // ---- FFA top-up ----
+      // Adam pays the GAP between the guaranteed salary's full cost and what FFA
+      // can pay from its own cash (above the buffer). FFA's money goes first, so
+      // the corp can't sit on cash while Adam funds payroll — no double-dipping.
+      let topUp = 0;
+      if (funded) {
+        const costMo = F.salary / 12 + employerCPP(F.salary) / 12;
+        const canPay = Math.max(0, corpBalance + growthIn + grossCommission - opex - minBuffer);
+        topUp = Math.min(yearSalaryLeft, Math.max(0, costMo - canPay));
+        yearSalaryLeft -= topUp;
+      }
+      const adamIn = topUp + growthIn;   // capital into the corp — NOT revenue, never taxed
+      if (isFFA && fundingYears.length) {
+        const fy = fundingYears[fundingYears.length - 1];
+        fy.toppedUp += topUp; fy.growth += growthIn;
+      }
+      adamCapitalCum += adamIn;
+
+      const availAfterOpex = corpBalance + adamIn + grossCommission - opex;
 
       // ---- SALARY REVIEW ----
       // Mode is chosen at the review and HELD for the interval. Growth mode only
       // when the business genuinely carries the real salary AND there's a cushion.
+      // FFA: skipped while funded; forced once the month funding stops.
       const isReviewMonth = ((monthNum - 1) % reviewEvery) === 0;
       let reviewed = false;
-      if (isReviewMonth && i > 0) {
+      if (!funded && ((isReviewMonth && i > 0) || forceReview)) {
+        forceReview = false;
         reviewed = true;
         // Trailing run rate: sum the window, annualise it. A FLOW — unlike a
         // balance test, seed capital cannot masquerade as earning power.
@@ -1349,7 +1499,12 @@ const Engine = (function () {
 
       let targetGross;
       let regime;
-      if (availAfterOpex <= minBuffer) {
+      if (funded) {
+        // FFA REGIME 0 — guaranteed salary, Adam covers the gap. If this year's
+        // allowance runs out mid-month, drawFraction throttles it honestly.
+        targetGross = F.salary;
+        regime = 0;
+      } else if (availAfterOpex <= minBuffer) {
         // EMERGENCY — corp under buffer. Drop to survival; sticks to next review.
         growthMode = false;
         heldTarget = baseSal;
@@ -1393,7 +1548,12 @@ const Engine = (function () {
 
       let drawFraction;
       const availForSalary = availAfterOpex - minBuffer;
-      if (availForSalary >= neededTotalCostMo) drawFraction = 1;
+      // FFA funded months: the salary is GUARANTEED — paid in full. Adam's top-up
+      // covers the salary gap only; if opex can't be met too, the corp balance
+      // drops below the buffer, and that shortfall is the finding (seed / growth
+      // budget too small), not something to hide by quietly cutting the salary.
+      if (funded) drawFraction = 1;
+      else if (availForSalary >= neededTotalCostMo) drawFraction = 1;
       else if (availForSalary > 0) drawFraction = availForSalary / neededTotalCostMo;
       else drawFraction = 0;
 
@@ -1428,7 +1588,10 @@ const Engine = (function () {
         corpTaxOwed = taxableAfterCarryforward * taxRate;
       }
 
-      corpBalance = corpBalance + netCashFlow - corpTaxOwed;
+      // Adam's money lands in the balance but stays out of netCashFlow (which is
+      // operating cash) and out of taxable income — it is capital, not revenue.
+      corpBalance = corpBalance + adamIn + netCashFlow - corpTaxOwed;
+      wasFunded = funded;
 
       const annualizedGross = grossSalaryPaid * 12;
       const yourNetMonthly = netAnnual(annualizedGross) / 12;
@@ -1459,18 +1622,24 @@ const Engine = (function () {
         corpBalance, regime,
         annualizedGross, yourNetMonthly, adam, ashleyMonthly,
         totalHHNet, hhBurnMonthly, hhSurplus, hhSavings, savingsBreached, growthMode,
+        ttmSales, funded, topUp, growthIn, adamIn, adamCapitalCum,
       });
     }
+
+    // Last month Adam actually topped up salary (null = never needed).
+    let lastTopUpMonth = null;
+    months.forEach(m => { if (m.topUp > 0.5) lastTopUpMonth = m.month; });
 
     return {
       months, comm, surplusThreshold, floorChain, ceilingChain: salaryChain(ceilingGross),
       hhRuinMonth, hhBreachMonth, hhSavingsLow, hhSavingsEnd: hhSavings,
+      isFFA, fundingYears, adamCapitalTotal: adamCapitalCum, cliffMonth, lastTopUpMonth,
     };
   }
 
   return {
     federalTax, ontarioTax, employeeCPP, employerCPP, netAnnual, grossForNet,
-    commissionPerSale, expectedCommission, meanDeposit, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
+    commissionPerSale, capBindsAt, expectedCommission, meanDeposit, itemAnnual, annualOpexTotal, startupTotal, monthlyOpex, salaryChain, simulate,
   };
 })();
 
@@ -1501,6 +1670,15 @@ const State = {
   hhBurnMonthly: DEFAULTS.hhBurnMonthly,
   adamMonthly: DEFAULTS.adamMonthly,
   adamMonthsActive: DEFAULTS.adamMonthsActive,
+
+  // Structure + FFA funding (see DEFAULTS for what each one means)
+  structure: DEFAULTS.structure,
+  feeCap: DEFAULTS.feeCap,
+  ffaGuaranteedSalary: DEFAULTS.ffaGuaranteedSalary,
+  ffaCaps: [...DEFAULTS.ffaCaps],
+  ffaRenewTTM: [...DEFAULTS.ffaRenewTTM],
+  ffaGrowthPct: DEFAULTS.ffaGrowthPct,
+  ffaMissPct: DEFAULTS.ffaMissPct,
 
   // Scenario selection (shared across Runway + Monthly Detail)
   scenario: 'base',
@@ -1550,6 +1728,13 @@ function getExpenseStateForEngine() {
   };
 }
 
+function ffaParams() {
+  return {
+    guaranteedSalary: State.ffaGuaranteedSalary, caps: State.ffaCaps, renewTTM: State.ffaRenewTTM,
+    growthPct: State.ffaGrowthPct, missPct: State.ffaMissPct,
+  };
+}
+
 function runSimulation(scenarioKey) {
   const key = JSON.stringify({
     deposits: State.deposits, floorGross: State.floorGross, ceilingGross: State.ceilingGross,
@@ -1557,6 +1742,9 @@ function runSimulation(scenarioKey) {
     hhSavingsStart: State.hhSavingsStart, savingsFloor: State.savingsFloor, baseSalary: State.baseSalary,
     corpFunding: State.corpFunding, minBuffer: State.minBuffer, surplusTriggerMonths: State.surplusTriggerMonths,
     corpTaxRate: State.corpTaxRate,
+    ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
+    adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
+    structure: State.structure, feeCap: State.feeCap, ffa: ffaParams(),
     expense: State.expense, sales: State.sales, scenarioKey,
   });
   if (State.cache.key === key && State.cache.results[scenarioKey]) {
@@ -1570,6 +1758,7 @@ function runSimulation(scenarioKey) {
     ashleyMonthly: State.ashleyMonthly, hhBurnMonthly: State.hhBurnMonthly,
     adamMonthly: State.adamMonthly, adamMonthsActive: State.adamMonthsActive,
     corpTaxRate: State.corpTaxRate,
+    structure: State.structure, feeCap: State.feeCap, ffa: ffaParams(),
     expenseState: getExpenseStateForEngine(), scenarioKey, salesArr: State.sales[scenarioKey],
   });
   if (!State.cache.results || State.cache.key !== key) {
@@ -1583,8 +1772,10 @@ function invalidateCache() { State.cache = {}; }
 
 // ---- Formatters ----
 function fmtCurrency(n, decimals = 0) {
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(n * Math.pow(10, decimals)) / Math.pow(10, decimals));
+  // Round BEFORE taking the sign, so -0.004 shows as $0 rather than -$0.
+  const rounded = Math.round(n * Math.pow(10, decimals)) / Math.pow(10, decimals);
+  const sign = rounded < 0 ? '-' : '';
+  const abs = Math.abs(rounded);
   return sign + '$' + abs.toLocaleString('en-CA', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 function fmtCurrencySigned(n) {
@@ -1599,6 +1790,7 @@ function fmtCompact(n) {
 function fmtNum1(n) { return n.toFixed(1); }
 function regimeLabel(r) {
   const labels = {
+    0: '0 — Funded (Adam top-up)',
     1: '1 — Constrained',
     2: '2 — Base salary (savings funding)',
     3: '3 — Escalated (savings at floor)',
@@ -1608,7 +1800,47 @@ function regimeLabel(r) {
   return labels[r] || String(r);
 }
 function regimePillClass(r) {
-  return r === 1 ? 'bad' : r === 2 ? 'neutral' : r === 3 ? 'warn' : r === 4 ? 'good' : 'good';
+  return r === 0 ? 'neutral' : r === 1 ? 'bad' : r === 2 ? 'neutral' : r === 3 ? 'warn' : r === 4 ? 'good' : 'good';
+}
+
+// Shared regime colours (runway chart + summary regime chart).
+const REGIME_COLOURS = {
+  0: '#7a9a94',  // Funded — soft teal (salary guaranteed by Adam's top-up)
+  1: '#b3392e',  // Constrained — red
+  2: '#8a9eb5',  // Base salary — muted blue-grey (conserving, calm)
+  3: '#CC7722',  // Escalated — ochre (savings at its floor, payroll defending it)
+  4: '#1A3D3A',  // Earned salary — deep teal
+  5: '#1e7a52',  // At Ceiling — green (thriving)
+};
+
+function isFFA() { return State.structure === 'ffa'; }
+
+// ---- Structure toggle (header) ----
+function renderStructureToggle() {
+  const el = document.getElementById('structure-toggle');
+  if (!el) return;
+  el.innerHTML = [['solo', 'Solo'], ['ffa', 'FFA · co-owned']].map(([k, lbl]) =>
+    `<button class="${State.structure === k ? 'active' : ''}" data-structure="${k}">${lbl}</button>`).join('');
+  el.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (State.structure === btn.dataset.structure) return;
+      State.structure = btn.dataset.structure;
+      invalidateCache();
+      scheduleCloudSave();
+      renderStructureToggle();
+      renderActiveTab(currentTab());
+    });
+  });
+}
+
+// Funding outcome for one year, as a word and a pill/colour class.
+function fundingStatusLabel(f) {
+  return { committed: 'Committed', renewed: 'Renewed', reduced: 'Reduced', declined: 'Declined',
+           ended: 'Ended', none: 'No funding' }[f.status] || f.status;
+}
+function fundingStatusClass(f) {
+  return (f.status === 'committed' || f.status === 'renewed') ? 'good'
+    : f.status === 'reduced' ? 'warn' : f.status === 'declined' ? 'bad' : '';
 }
 
 // ---- Tab switching ----
@@ -1655,7 +1887,7 @@ var SUPABASE_URL     = 'https://iipxxwkrakwehtewomdi.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_o1O2-NcNqceCaY7UKW76cw_Rwwz_Yof';
 var LOCAL_BUFFER_KEY = 'mpModel_offlineBuffer';
 var APP_VERSION      = 'MP-Model-v1';
-var PAYLOAD_VERSION  = 6;
+var PAYLOAD_VERSION  = 7;
 
 var sbClient = (SUPABASE_URL.indexOf('YOUR_') === 0)
   ? null
@@ -1694,6 +1926,13 @@ function buildSavePayload() {
       runRateWindowMonths: State.runRateWindowMonths,
       salaryStep: State.salaryStep,
       coverageRatio: State.coverageRatio,
+      structure: State.structure,
+      feeCap: State.feeCap,
+      ffaGuaranteedSalary: State.ffaGuaranteedSalary,
+      ffaCaps: State.ffaCaps,
+      ffaRenewTTM: State.ffaRenewTTM,
+      ffaGrowthPct: State.ffaGrowthPct,
+      ffaMissPct: State.ffaMissPct,
     },
     expense: {
       opexFlat: State.expense.opexFlat,
@@ -1792,6 +2031,20 @@ function migrateData(data) {
     }
     data.version = 6;
   }
+
+  // v6 -> v7: Solo / FFA structure toggle. Additive only — structure defaults to
+  // 'solo', and Solo runs the exact pre-v7 engine, so a saved model's numbers
+  // cannot move. FFA inputs start at zero until you fill them in.
+  if (data.version < 7) {
+    if (!data.assumptions) data.assumptions = {};
+    ['structure','feeCap','ffaGuaranteedSalary','ffaGrowthPct','ffaMissPct'].forEach(function (k) {
+      if (data.assumptions[k] === undefined) data.assumptions[k] = DEFAULTS[k];
+    });
+    ['ffaCaps','ffaRenewTTM'].forEach(function (k) {
+      if (!Array.isArray(data.assumptions[k])) data.assumptions[k] = DEFAULTS[k].slice();
+    });
+    data.version = 7;
+  }
   return data;
 }
 
@@ -1814,8 +2067,12 @@ function applyLoadedData(data, sourceLbl) {
    'surplusTriggerMonths','corpTaxRate','ashleyMonthly','hhBurnMonthly',
    'adamMonthly','adamMonthsActive',
    'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
-   'hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) {
+   'hhSavingsStart','savingsFloor','baseSalary',
+   'structure','feeCap','ffaGuaranteedSalary','ffaGrowthPct','ffaMissPct'].forEach(function (k) {
     if (a[k] !== undefined) State[k] = a[k];
+  });
+  ['ffaCaps','ffaRenewTTM'].forEach(function (k) {
+    if (Array.isArray(a[k])) State[k] = [0,1,2,3,4].map(function (i) { return Number(a[k][i]) || 0; });
   });
 
   if (data.deposits) State.deposits = data.deposits;
@@ -1833,6 +2090,7 @@ function applyLoadedData(data, sourceLbl) {
   if (data.ui && data.ui.scenario) State.scenario = data.ui.scenario;
 
   invalidateCache();
+  renderStructureToggle();
 
   var d = new Date(data.savedAt || Date.now());
   setLastSavedLbl(sourceLbl + ' · Saved ' +
@@ -1960,7 +2218,11 @@ function resetToDefaults() {
   ['floorGross','ceilingGross','corpFunding','minBuffer',
    'surplusTriggerMonths','ashleyMonthly','hhBurnMonthly','adamMonthly',
    'adamMonthsActive','salaryReviewMonths','runRateWindowMonths','salaryStep',
-   'coverageRatio','hhSavingsStart','savingsFloor','baseSalary'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+   'coverageRatio','hhSavingsStart','savingsFloor','baseSalary',
+   'structure','feeCap','ffaGuaranteedSalary','ffaGrowthPct','ffaMissPct'].forEach(function (k) { State[k] = DEFAULTS[k]; });
+  State.ffaCaps = DEFAULTS.ffaCaps.slice();
+  State.ffaRenewTTM = DEFAULTS.ffaRenewTTM.slice();
+  renderStructureToggle();
   State.corpTaxRate = CORP_TAX.smallBusinessRate;
   State.deposits = JSON.parse(JSON.stringify(DEFAULTS.deposits));
   State.scenarioDesc = { pessimistic: '', base: '', optimistic: '' };
@@ -2011,6 +2273,7 @@ async function initAppAfterAuth() {
     document.getElementById('import-file').addEventListener('change', handleImportFile);
     _appBuilt = true;
   }
+  renderStructureToggle();
   renderRunwayTab();
   await loadFromCloud();
   syncOfflineBuffer();
@@ -2083,6 +2346,8 @@ function renderRunwayTab() {
   if (!container) return;
 
   const adamGrossAnnual = Engine.grossForNet(State.adamMonthly * 12);
+  const ffa = isFFA();
+  const result = runSimulation(State.scenario);
 
   container.innerHTML = `
     <div class="runway-two-col">
@@ -2097,13 +2362,14 @@ function renderRunwayTab() {
             <button class="help-btn ${openHelpKey === 'deposits' ? 'open' : ''}" data-help="deposits" title="What is this?">?</button>
           </div>
           ${helpHTML('deposits')}
+          ${ffa ? numFieldHTML('feeCap', 'Commission cap per sale', State.feeCap, '$', '', 250) : ''}
           ${depositBlockHTML()}
           ${numFieldHTML('floorGross', 'Annual salary floor', State.floorGross, '$', '', 1000)}
           ${numFieldHTML('ceilingGross', 'Annual salary ceiling', State.ceilingGross, '$', '', 1000)}
         </div>
 
         <div class="input-section">
-          <div class="input-section-title">Salary policy</div>
+          <div class="input-section-title">Salary policy${ffa ? ' — after Adam’s funding ends' : ''}</div>
           ${numFieldHTML('baseSalary', 'Base salary (survival mode)', State.baseSalary, '$', '', 1000)}
           ${numFieldHTML('salaryReviewMonths', 'Review salary every', State.salaryReviewMonths, '', ' months', 1)}
           ${numFieldHTML('runRateWindowMonths', 'Run-rate window', State.runRateWindowMonths, '', ' months', 1)}
@@ -2134,6 +2400,7 @@ function renderRunwayTab() {
           ${numFieldHTML('savingsFloor', 'Savings floor (hard reserve)', State.savingsFloor, '$', '', 2500)}
         </div>
 
+        ${ffa ? ffaFundingSectionHTML(result) : `
         <div class="input-section">
           <div class="input-section-title">Adam's contribution</div>
           ${numFieldHTML('adamMonthly', 'Monthly net amount', State.adamMonthly, '$', '/mo', 100)}
@@ -2142,7 +2409,7 @@ function renderRunwayTab() {
             ≈ <strong>${fmtCurrency(adamGrossAnnual)}</strong> gross annual equivalent
             <span class="adam-gross-sub">(personal income, not corp revenue — directional only, Ontario+Federal brackets)</span>
           </div>
-        </div>
+        </div>`}
       </div>
 
       <!-- RIGHT: Stats + chart -->
@@ -2155,6 +2422,7 @@ function renderRunwayTab() {
         <div class="chart-box">
           <div class="eyebrow">Corporate bank balance &amp; net cash flow — 60 months</div>
           <div class="chart-legend">
+            ${ffa ? `<span><span class="legend-dot" style="background:${REGIME_COLOURS[0]}"></span>0 — Funded</span>` : ''}
             <span><span class="legend-dot" style="background:#b3392e"></span>1 — Constrained</span>
             <span><span class="legend-dot" style="background:#8a9eb5"></span>2 — Base salary</span>
             <span><span class="legend-dot" style="background:#CC7722"></span>3 — Escalated</span>
@@ -2171,14 +2439,91 @@ function renderRunwayTab() {
 
   attachNumFieldHandlers(renderRunwayTab);
   attachDepositHandlers(renderRunwayTab);
+  attachFfaGridHandlers(renderRunwayTab);
   attachHelpHandlers();
   renderDepositReadout();
   attachScenarioButtonHandlers('runway-scenario-bar', renderRunwayTab);
 
-  const result = runSimulation(State.scenario);
   renderRunwayStats(result);
   renderRunwayNarrative(result);
   renderRunwayChart(result);
+}
+
+
+// ============================================================
+// FFA FUNDING PANEL (Runway tab, FFA only)
+// Inputs on top; underneath, what actually happened to each year's funding in
+// the selected scenario — renewals are the thing most likely to surprise you.
+// ============================================================
+function ffaFundingSectionHTML(result) {
+  const caps = State.ffaCaps, thr = State.ffaRenewTTM;
+  const committed = Number(caps[0]) || 0;
+  const maxTotal = caps.reduce((t, v) => t + (Number(v) || 0), 0);
+
+  const rows = [0, 1, 2, 3, 4].map(y => `
+    <div class="dep-lbl">Y${y + 1}</div>
+    <input class="ffa-in" type="number" min="0" step="5000" data-arr="caps" data-y="${y}" value="${caps[y]}">
+    ${y === 0
+      ? '<div class="ffa-fixed">Committed</div>'
+      : `<input class="ffa-in" type="number" min="0" step="1" data-arr="renew" data-y="${y}" value="${thr[y]}">`}`).join('');
+
+  const years = (result.fundingYears || []).filter(f => f.cap > 0);
+  const outcome = years.length ? years.map(f => {
+    const test = f.testTTM !== null
+      ? `TTM ${fmtNum1(f.testTTM)} vs ${f.threshold}` : (f.status === 'committed' ? 'committed' : '');
+    const drawn = f.toppedUp + f.growth;
+    return `<div class="row">
+      <span class="k">Y${f.year}${test ? ' · ' + test : ''}</span>
+      <span class="v ${fundingStatusClass(f)}">${fundingStatusLabel(f)}${f.amount > 0 ? ' · ' + fmtCompact(drawn) + ' of ' + fmtCompact(f.amount) : ''}</span>
+    </div>`;
+  }).join('') + `
+    <div class="row" style="border-top:1px solid var(--border);margin-top:3px;padding-top:4px">
+      <span class="k">Adam capital in (5 yrs)</span><span class="v">${fmtCurrency(result.adamCapitalTotal)}</span>
+    </div>
+    <div class="row"><span class="k">Salary top-up stops</span>
+      <span class="v ${result.cliffMonth ? 'warn' : 'good'}">${result.cliffMonth ? 'Month ' + result.cliffMonth : 'Not within 60 months'}</span>
+    </div>`
+    : '<div class="row"><span class="k">No funding caps set yet.</span></div>';
+
+  return `
+    <div class="input-section">
+      <div class="input-section-title" style="display:flex;align-items:center;gap:6px">
+        <span>Adam's funding (FFA)</span>
+        <button class="help-btn ${openHelpKey === 'ffaCaps' ? 'open' : ''}" data-help="ffaCaps" title="What is this?">?</button>
+      </div>
+      ${helpHTML('ffaCaps')}
+      ${numFieldHTML('ffaGuaranteedSalary', 'Guaranteed salary', State.ffaGuaranteedSalary, '$', '', 1000)}
+      <div class="ffa-grid">
+        <div class="hdr">Yr</div><div class="hdr">Annual cap</div><div class="hdr">Renew if TTM ≥</div>
+        ${rows}
+      </div>
+      ${numFieldHTML('ffaGrowthPct', 'Growth budget share of cap', State.ffaGrowthPct, '', '%', 5)}
+      ${numFieldHTML('ffaMissPct', 'If renewal missed, Adam funds', State.ffaMissPct, '', '% of cap', 5)}
+      <div class="adam-gross-note">
+        Year 1 committed: <strong>${fmtCurrency(committed)}</strong> · most Adam could put in: <strong>${fmtCurrency(maxTotal)}</strong>
+        <span class="adam-gross-sub">Capital into the corp, not income. Adam only pays the gap between the guaranteed salary and what FFA can pay itself.</span>
+      </div>
+      <div class="ffa-outcome">
+        <div class="eyebrow" style="margin-bottom:4px">Outcome — ${SCENARIO_META[State.scenario].label}</div>
+        ${outcome}
+      </div>
+    </div>`;
+}
+
+function attachFfaGridHandlers(rerenderFn) {
+  document.querySelectorAll('.ffa-in').forEach(inp => {
+    enhanceNumericInput(inp);
+    inp.addEventListener('change', () => {
+      const val = Math.max(0, Number(inp.value) || 0);
+      inp.value = val;
+      const arr = inp.dataset.arr === 'caps' ? 'ffaCaps' : 'ffaRenewTTM';
+      State[arr] = State[arr].slice();          // new array -> new cache key
+      State[arr][Number(inp.dataset.y)] = val;
+      invalidateCache();
+      scheduleCloudSave();
+      withFocusRestored(rerenderFn);
+    });
+  });
 }
 
 
@@ -2237,7 +2582,7 @@ const FIELD_META = {
     affects: 'Monthly Detail → <strong>Savings Balance</strong>, <strong>Regime</strong> 3',
   },
   adamMonthly: {
-    what: "Adam's monthly contribution. Flows as personal household income, never through the corp's taxable income.",
+    what: "Solo only. Adam's monthly contribution. Flows as personal household income, never through the corp's taxable income. (In FFA his money goes into the corp instead — see Adam's funding.)",
     affects: 'Monthly Detail → <strong>Adam</strong>, <strong>HH Net Total</strong>',
   },
   adamMonthsActive: {
@@ -2259,6 +2604,28 @@ const FIELD_META = {
   corpTaxRate: {
     what: 'Small business deduction rate, applied to corporate profit at year-end. Losses carry forward and shelter later profit.',
     affects: 'Monthly Detail → <strong>Corp Tax Owed</strong>, <strong>Loss Carryforward</strong> · 🧾 year-end rows',
+  },
+
+  // ---- FFA ----
+  feeCap: {
+    what: 'FFA only. The most FFA earns on any one sale. Delivered by electing a lower carrier comp scale, so the client gets a higher payout — not a rebate. Graded commission hits $4,000 at a $175,000 deposit, so above that every sale pays the same. 0 = no cap. This is GROSS commission; your real costs live in the Expense Model, not in a haircut here.',
+    affects: 'Deposit readout · Monthly Detail → <strong>Gross Commission</strong> · "Commission per sale" stat',
+  },
+  ffaGuaranteedSalary: {
+    what: 'FFA only. The salary you are paid in full while Adam’s funding runs, whatever sales do. FFA pays what it can from its own cash first; Adam covers the rest, up to the year’s cap. When funding stops, the salary policy below takes over.',
+    affects: 'Monthly Detail → <strong>Target Gross</strong>, <strong>Adam In</strong>, <strong>Regime</strong> 0',
+  },
+  ffaCaps: {
+    what: 'FFA only. The most Adam puts in each year — a ceiling, not a cheque. He pays only the gap between the guaranteed salary and what FFA can afford, so a strong year costs him less. Year 1 is committed. Years 2+ renew only if trailing-12-month sales at that anniversary meet the bar beside it; miss it and Adam funds the "if missed" % instead (0% = he declines, and funding ends for good). Adam’s money is capital into the corp — never revenue, never taxed. Whether it is a loan or equity is not modelled yet.',
+    affects: 'Funding outcome readout · Monthly Detail → <strong>Adam In</strong>, ✓/✗ anniversary rows · "Adam capital in" stat',
+  },
+  ffaGrowthPct: {
+    what: 'FFA only. Share of each year’s cap set aside for growth (marketing) and paid in evenly, rather than salary top-up. Watch the trade: at 20% of a $100K cap, only $80K is left for a $100K salary — the top-up runs out before year-end.',
+    affects: 'Monthly Detail → <strong>Adam In</strong>, <strong>Corp Balance</strong> · "Salary top-up stops" readout',
+  },
+  ffaMissPct: {
+    what: 'FFA only. If a renewal test is missed, the % of that year’s cap Adam still provides. 0% models him declining — funding ends permanently. Anything above 0% models a renegotiation at a lower amount.',
+    affects: 'Funding outcome readout · Monthly Detail → <strong>Adam In</strong>',
   },
 };
 
@@ -2322,6 +2689,9 @@ function focusSignature(el) {
   if (el.id) return '#' + el.id.replace(/([^\w-])/g, '\\$1');
   if (el.classList.contains('dep-in')) {
     return `.dep-in[data-dep="${el.dataset.dep}"][data-f="${el.dataset.f}"]`;
+  }
+  if (el.classList.contains('ffa-in')) {
+    return `.ffa-in[data-arr="${el.dataset.arr}"][data-y="${el.dataset.y}"]`;
   }
   return null;
 }
@@ -2401,19 +2771,41 @@ function renderDepositReadout() {
   }
   const out = document.getElementById('dep-readout');
   if (!out) return;
+  const cap = isFFA() ? (Number(State.feeCap) || 0) : 0;
   const mean = Engine.meanDeposit(d);
-  const exp = Engine.expectedCommission(d);
-  const naive = Engine.commissionPerSale(mean);
+  const exp = Engine.expectedCommission(d, cap);
+  const naive = Engine.commissionPerSale(mean, cap);
   const gap = naive - exp;
+
+  // FFA: where the cap starts to bite, and how much of the distribution it hits.
+  // Above that point deposit size stops mattering — only the low end moves revenue.
+  let capRows = '', capNote = '';
+  if (cap > 0) {
+    const binds = Engine.capBindsAt(cap);
+    const pts = ['low', 'mid', 'high'].map(k => d[k]);
+    const ws = pts.reduce((t, p) => t + (Number(p.w) || 0), 0);
+    const cappedShare = ws > 0
+      ? pts.reduce((t, p) => t + ((Number(p.amt) || 0) >= binds ? (Number(p.w) || 0) : 0), 0) / ws : 0;
+    const uncapped = Engine.expectedCommission(d, 0);
+    capRows = `
+      <div class="row"><span class="k">Cap binds above</span><span class="v">${binds ? fmtCurrency(binds) : '—'}</span></div>
+      <div class="row naive"><span class="k">Uncapped (Solo) / sale</span><span class="v">${fmtCurrency(uncapped)}</span></div>`;
+    capNote = ` <strong>${Math.round(cappedShare * 100)}%</strong> of your weighted deposits hit the cap,
+      costing <strong>${fmtCurrency(uncapped - exp)}</strong>/sale vs. Solo. Above the cap, deposit size no longer changes revenue.`;
+  }
+
   out.innerHTML = `
     <div class="row"><span class="k">Implied mean deposit</span><span class="v">${fmtCurrency(mean)}</span></div>
     <div class="row"><span class="k">Expected commission / sale</span><span class="v">${fmtCurrency(exp)}</span></div>
     <div class="row naive"><span class="k">Naive — single average</span><span class="v">${fmtCurrency(naive)}</span></div>
+    ${capRows}
     <div class="dep-gap">${gap > 0.5
       ? `Averaging the deposit first would overstate commission by <strong>${fmtCurrency(gap)}</strong>/sale
-         (${(gap / naive * 100).toFixed(1)}%) — the grade is concave, so E[f(X)] &lt; f(E[X]).`
-      : `No gap — the spread sits in the flat 1.5% band above ${fmtCurrency(COMMISSION.tier2Cap)},
-         where the grade is linear and averaging first is exact.`}</div>`;
+         (${(gap / naive * 100).toFixed(1)}%) — the ${cap > 0 ? 'capped curve' : 'grade'} is concave, so E[f(X)] &lt; f(E[X]).`
+      : cap > 0
+        ? `No averaging gap — the spread sits on a straight stretch of the capped curve.`
+        : `No gap — the spread sits in the flat 1.5% band above ${fmtCurrency(COMMISSION.tier2Cap)},
+         where the grade is linear and averaging first is exact.`}${capNote}</div>`;
 }
 
 function attachDepositHandlers(rerenderFn) {
@@ -2435,7 +2827,8 @@ function attachNumFieldHandlers(rerenderFn) {
                  'surplusTriggerMonths','corpTaxRate','adamMonthly','adamMonthsActive',
                  'ashleyMonthly','hhBurnMonthly',
                  'salaryReviewMonths','runRateWindowMonths','salaryStep','coverageRatio',
-                 'hhSavingsStart','savingsFloor','baseSalary'];
+                 'hhSavingsStart','savingsFloor','baseSalary',
+                 'feeCap','ffaGuaranteedSalary','ffaGrowthPct','ffaMissPct'];
   keys.forEach(key => {
     const el = document.getElementById('input-' + key);
     if (!el) return;
@@ -2544,6 +2937,19 @@ function renderRunwayStats(result) {
       <div class="stat-label">Months above floor (Regimes 4+5)</div>
       <div class="stat-value good">${r4r5} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
     </div>
+    ${result.isFFA ? `
+    <div class="stat-card">
+      <div class="stat-label">Adam capital in (5 years)</div>
+      <div class="stat-value">${fmtCurrency(result.adamCapitalTotal)}</div>
+    </div>
+    <div class="stat-card ${result.cliffMonth ? 'warn' : 'good'}">
+      <div class="stat-label">Salary top-up stops</div>
+      <div class="stat-value ${result.cliffMonth ? 'warn' : 'good'}">${result.cliffMonth ? 'Month ' + result.cliffMonth : 'Funded to 60'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Months funded (Regime 0)</div>
+      <div class="stat-value">${months.filter(m => m.regime === 0).length} <span style="font-size:14px;color:var(--text-muted)">/ 60</span></div>
+    </div>` : ''}
     <div class="stat-card">
       <div class="stat-label">Commission per sale</div>
       <div class="stat-value">${fmtCurrency(result.comm)}</div>
@@ -2567,7 +2973,12 @@ function renderRunwayNarrative(result) {
   const cls = lowestBalance >= State.minBuffer ? 'good' : lowestBalance >= 0 ? 'warn' : 'bad';
 
   let verdict;
-  if (lowestBalance < 0) {
+  const firstNeg = months.find(m => m.corpBalance < 0);
+  if (firstNeg && firstNeg.funded) {
+    // FFA: salary is guaranteed, so a negative balance during funding can only
+    // mean opex (incl. month-1 startup) outran the seed + growth money.
+    verdict = `The corporate account goes negative in month ${firstNeg.month}, while Adam is still funding your salary. The salary is covered, so this is opex outrunning the starting seed and growth budget. Raise initial funding or the growth share, or trim startup and early opex.`;
+  } else if (lowestBalance < 0) {
     verdict = `Under this scenario, the corporate account runs out of cash entirely at some point — the business cannot cover its own costs even at the throttled-down salary. The plan needs more starting capital, lower opex, or a faster sales ramp to survive.`;
   } else if (lowestBalance < State.minBuffer) {
     verdict = `The corp balance dips below your minimum buffer of ${fmtCurrency(State.minBuffer)} at its lowest point, meaning salary gets throttled during that stretch. The business recovers, but this scenario tests the edge of what the buffer is meant to protect against.`;
@@ -2575,10 +2986,27 @@ function renderRunwayNarrative(result) {
     verdict = `The corp balance never falls below your minimum buffer — the buffer is doing its job. By month 60 the account has grown to ${fmtCurrency(endingBalance)}, well past the original ${fmtCurrency(State.corpFunding)} funding.`;
   }
 
+  // FFA: say plainly what happened to Adam's funding — the renewal path is the
+  // thing the rest of the numbers hang on.
+  let fundingLine = '';
+  if (result.isFFA) {
+    const fy = (result.fundingYears || []).filter(f => f.cap > 0);
+    if (!fy.length) {
+      fundingLine = `FFA structure, but no funding caps are set — Adam puts nothing in.`;
+    } else {
+      const path = fy.map(f => `Y${f.year} ${fundingStatusLabel(f).toLowerCase()}`).join(', ');
+      const miss = fy.find(f => f.status === 'declined' || f.status === 'reduced');
+      fundingLine = `Adam's funding: ${path}. He puts in <strong>${fmtCurrency(result.adamCapitalTotal)}</strong> in total` +
+        (result.cliffMonth ? `, and the salary top-up stops at <strong>month ${result.cliffMonth}</strong> — from there the salary policy takes over.` : `, and the salary stays funded through month 60.`) +
+        (miss ? ` The Y${miss.year} renewal test was missed (TTM ${fmtNum1(miss.testTTM)} vs ${miss.threshold} needed).` : '');
+    }
+  }
+
   document.getElementById('runway-narrative').innerHTML = `
     <div class="narrative-box ${cls}">
-      <h3>${meta.label} scenario</h3>
-      <p>${meta.desc}</p>
+      <h3>${meta.label} scenario${result.isFFA ? ' · FFA' : ''}</h3>
+      <p>${scenarioDesc(State.scenario)}</p>
+      ${fundingLine ? `<p style="margin-top:0.6rem">${fundingLine}</p>` : ''}
       <p style="margin-top:0.6rem">${verdict}</p>
     </div>
   `;
@@ -2588,14 +3016,6 @@ function renderRunwayChart(result) {
   const ctx = document.getElementById('runway-chart');
   if (!ctx) return;
   if (runwayChartInstance) runwayChartInstance.destroy();
-
-  const REGIME_COLOURS = {
-    1: '#b3392e',  // Constrained — red
-    2: '#8a9eb5',  // Base salary — muted blue-grey (conserving, calm)
-    3: '#CC7722',  // Escalated — ochre (savings at its floor, payroll defending it)
-    4: '#1A3D3A',  // Earned salary — deep teal
-    5: '#1e7a52',  // At Ceiling — green (thriving)
-  };
 
   const labels = result.months.map(m => 'M' + m.month);
   const netCash = result.months.map(m => Math.round(m.netCashFlow));
@@ -2640,7 +3060,9 @@ function renderRunwayChart(result) {
               const idx = items[0]?.dataIndex;
               if (idx === undefined) return '';
               const m = result.months[idx];
-              return `Regime: ${regimeLabel(m.regime)}`;
+              const lines = [`Regime: ${regimeLabel(m.regime)}`];
+              if (result.isFFA && m.adamIn > 0.5) lines.push(`Adam in: ${fmtCurrency(m.adamIn)}`);
+              return lines;
             },
           },
         },
@@ -2999,7 +3421,7 @@ function renderSummaryTab() {
 
   container.innerHTML = `
     <div class="dash-hero">
-      <div class="eyebrow" style="color:rgba(247,243,237,0.7)">Base case headline — month 60 outlook</div>
+      <div class="eyebrow" style="color:rgba(247,243,237,0.7)">Base case headline — month 60 outlook · ${baseR.isFFA ? 'FFA (co-owned)' : 'Solo'}</div>
       <div class="dash-hero-grid">
         <div>
           <div class="dash-stat-label">Ending corp balance</div>
@@ -3021,6 +3443,11 @@ function renderSummaryTab() {
           <div class="dash-stat-label">Commission per sale</div>
           <div class="dash-stat-value">${fmtCurrency(baseR.comm)}</div>
         </div>
+        ${baseR.isFFA ? `
+        <div>
+          <div class="dash-stat-label">Adam capital in</div>
+          <div class="dash-stat-value">${fmtCurrency(baseR.adamCapitalTotal)}</div>
+        </div>` : ''}
       </div>
     </div>
 
@@ -3082,6 +3509,10 @@ function renderSummaryTab() {
               ${comparisonRow('Year 5 total commission', results, r => fmtCurrency(sumYear(r.months, 4)))}
               ${comparisonRow('Year 1 sales volume', results, r => fmtNum1(sumYearSales(r.months, 0)))}
               ${comparisonRow('Year 5 sales volume', results, r => fmtNum1(sumYearSales(r.months, 4)))}
+              ${baseR.isFFA ? `
+              ${comparisonRow('Adam capital in (5yr)', results, r => fmtCurrency(r.adamCapitalTotal))}
+              ${comparisonRow('Salary top-up stops', results, r => r.cliffMonth ? 'Month ' + r.cliffMonth : 'Funded to 60')}
+              ${comparisonRow('Funding path', results, r => r.fundingYears.filter(f => f.cap > 0).map(f => 'Y' + f.year + ' ' + ({committed:'✓',renewed:'✓',reduced:'½',declined:'✗',ended:'–',none:'–'}[f.status])).join(' ') || '—')}` : ''}
             </tbody>
           </table>
         </div>
@@ -3225,22 +3656,18 @@ function renderSummaryCharts(results) {
   if (summaryRegimeChart) summaryRegimeChart.destroy();
   if (regCtx) {
     const scenarios = ['pessimistic', 'base', 'optimistic'];
-    const r1 = scenarios.map(k => results[k].months.filter(m => m.regime === 1).length);
-    const r2 = scenarios.map(k => results[k].months.filter(m => m.regime === 2).length);
-    const r3 = scenarios.map(k => results[k].months.filter(m => m.regime === 3).length);
-    const r4 = scenarios.map(k => results[k].months.filter(m => m.regime === 4).length);
-    const r5 = scenarios.map(k => results[k].months.filter(m => m.regime === 5).length);
+    // Regime 0 (Funded) only exists in FFA. Labels come from regimeLabel so the
+    // legend can't drift from the Monthly Detail pills again.
+    const regimes = results.base.isFFA ? [0, 1, 2, 3, 4, 5] : [1, 2, 3, 4, 5];
     summaryRegimeChart = new Chart(regCtx.getContext('2d'), {
       type: 'bar',
       data: {
         labels: scenarios.map(k => SCENARIO_META[k].label),
-        datasets: [
-          { label: '1 — Constrained',          data: r1, backgroundColor: '#b3392e', borderRadius: 2 },
-          { label: '2 — Below Floor',           data: r2, backgroundColor: '#8a9eb5', borderRadius: 2 },
-          { label: '3 — At Floor',              data: r3, backgroundColor: '#CC7722', borderRadius: 2 },
-          { label: '4 — At Ceiling',            data: r4, backgroundColor: '#1A3D3A', borderRadius: 2 },
-          { label: '5 — Full Ceiling + Growing',data: r5, backgroundColor: '#1e7a52', borderRadius: 2 },
-        ],
+        datasets: regimes.map(r => ({
+          label: regimeLabel(r),
+          data: scenarios.map(k => results[k].months.filter(m => m.regime === r).length),
+          backgroundColor: REGIME_COLOURS[r], borderRadius: 2,
+        })),
       },
       options: {
         indexAxis: 'y',
@@ -3343,8 +3770,9 @@ function renderCompositionChart(results) {
               const m = months[idx];
               const totalCosts = m.opex + m.grossSalaryPaid + m.employerCppPaid + m.corpTaxOwed;
               const gap = m.grossCommission - totalCosts;
-              const labels = { 1: '1 — Constrained', 2: '2 — Recovering', 3: '3 — Surplus' };
-              return [`Net: ${fmtCurrencySigned(Math.round(gap))}`, `Regime: ${labels[m.regime]}`];
+              const out = [`Net: ${fmtCurrencySigned(Math.round(gap))}`, `Regime: ${regimeLabel(m.regime)}`];
+              if (m.adamIn > 0.5) out.push(`Adam in: ${fmtCurrency(m.adamIn)}`);
+              return out;
             },
           },
         },
@@ -3484,6 +3912,7 @@ function renderSalesSummary() {
 function renderMonthlyTab() {
   const container = document.getElementById('monthly-content');
   if (!container) return;
+  const ffa = isFFA();
 
   container.innerHTML = `
     <div class="scenario-bar" id="monthly-scenario-bar">
@@ -3507,12 +3936,14 @@ function renderMonthlyTab() {
             <tr>
               <th style="text-align:left">Month</th>
               <th>Sales</th>
+              ${ffa ? '<th>TTM Sales</th>' : ''}
               <th>Gross Commission</th>
               <th>Opex/mo</th>
               <th>Target Gross</th>
               <th>Gross Salary Paid</th>
               <th>Employer CPP</th>
               <th>Corp Net Cash</th>
+              ${ffa ? '<th>Adam In</th>' : ''}
               <th class="tax-col">Taxable Income</th>
               <th class="tax-col">Loss Carryforward</th>
               <th class="tax-col">Corp Tax Owed</th>
@@ -3520,7 +3951,7 @@ function renderMonthlyTab() {
               <th>Regime</th>
               <th>Annualized Gross</th>
               <th>Your Net Pay</th>
-              <th>Adam</th>
+              ${ffa ? '' : '<th>Adam</th>'}
               <th>Ashley</th>
               <th>HH Net Total</th>
               <th>HH Burn</th>
@@ -3548,6 +3979,7 @@ function renderMonthlyTab() {
 
 function renderMonthlyTableBody() {
   const result = runSimulation(State.scenario);
+  const ffa = result.isFFA;
   let months = result.months;
 
   if (State.monthlyDetailYearFilter !== 'all') {
@@ -3560,7 +3992,7 @@ function renderMonthlyTableBody() {
   // balance across 12 months would be a meaningless number.
   const FLOW = ['sales','grossCommission','opex','grossSalaryPaid','employerCppPaid',
                 'netCashFlow','taxableIncome','corpTaxOwed','yourNetMonthly','adam',
-                'ashleyMonthly','totalHHNet','hhBurnMonthly','hhSurplus'];
+                'ashleyMonthly','totalHHNet','hhBurnMonthly','hhSurplus','adamIn'];
 
   function subtotalRow(chunk, label) {
     const t = {};
@@ -3569,12 +4001,14 @@ function renderMonthlyTableBody() {
     return `<tr class="subtotal-row">
       <td class="lbl">${label}</td>
       <td>${fmtNum1(t.sales)}</td>
+      ${ffa ? `<td>${fmtNum1(last.ttmSales)}</td>` : ''}
       <td>${fmtCurrency(t.grossCommission)}</td>
       <td>${fmtCurrency(t.opex)}</td>
       <td class="na">—</td>
       <td>${fmtCurrency(t.grossSalaryPaid)}</td>
       <td>${fmtCurrency(t.employerCppPaid)}</td>
       <td>${fmtCurrency(t.netCashFlow)}</td>
+      ${ffa ? `<td>${fmtCurrency(t.adamIn)}</td>` : ''}
       <td class="tax-col">${fmtCurrency(t.taxableIncome)}</td>
       <td class="tax-col na">—</td>
       <td class="tax-col">${t.corpTaxOwed > 0 ? fmtCurrency(t.corpTaxOwed) : '—'}</td>
@@ -3582,7 +4016,7 @@ function renderMonthlyTableBody() {
       <td class="na">—</td>
       <td class="na">—</td>
       <td>${fmtCurrency(t.yourNetMonthly)}</td>
-      <td>${fmtCurrency(t.adam)}</td>
+      ${ffa ? '' : `<td>${fmtCurrency(t.adam)}</td>`}
       <td>${fmtCurrency(t.ashleyMonthly)}</td>
       <td>${fmtCurrency(t.totalHHNet)}</td>
       <td>${fmtCurrency(t.hhBurnMonthly)}</td>
@@ -3591,19 +4025,30 @@ function renderMonthlyTableBody() {
     </tr>`;
   }
 
+  // FFA renewal marker on each anniversary month: ✓ renewed, ½ reduced, ✗ declined.
+  const renewalMark = {};
+  if (ffa) (result.fundingYears || []).forEach(f => {
+    if (f.year > 1 && f.cap > 0) {
+      renewalMark[(f.year - 1) * 12 + 1] = f.status === 'renewed' ? ' ✓' : f.status === 'reduced' ? ' ½' : f.status === 'declined' ? ' ✗' : '';
+    }
+  });
+
   const monthRow = m => {
-    const isCliff = m.month === 13;
+    // The month support stops (was hard-coded to 13; now follows the actual funding).
+    const isCliff = m.month === result.cliffMonth;
     const isYearEnd = m.corpTaxOwed > 0;
     const rowClass = isCliff ? 'cliff-row' : (isYearEnd ? 'yearend-row' : '');
     return `<tr class="${rowClass}">
-      <td>Month ${m.month}${isCliff ? ' ⚠' : ''}${isYearEnd ? ' 🧾' : ''}${m.reviewed ? ' ⟳' : ''}</td>
+      <td>Month ${m.month}${isCliff ? ' ⚠' : ''}${isYearEnd ? ' 🧾' : ''}${m.reviewed ? ' ⟳' : ''}${renewalMark[m.month] || ''}</td>
       <td>${fmtNum1(m.sales)}</td>
+      ${ffa ? `<td>${fmtNum1(m.ttmSales)}</td>` : ''}
       <td>${fmtCurrency(m.grossCommission)}</td>
       <td>${fmtCurrency(m.opex)}</td>
       <td>${fmtCurrency(m.targetGross)}</td>
       <td>${fmtCurrency(m.grossSalaryPaid)}</td>
       <td>${fmtCurrency(m.employerCppPaid)}</td>
       <td>${fmtCurrency(m.netCashFlow)}</td>
+      ${ffa ? `<td>${m.adamIn > 0.5 ? fmtCurrency(m.adamIn) : '—'}</td>` : ''}
       <td class="tax-col">${fmtCurrency(m.taxableIncome)}</td>
       <td class="tax-col">${fmtCurrency(m.lossCarryforward)}</td>
       <td class="tax-col">${m.corpTaxOwed > 0 ? fmtCurrency(m.corpTaxOwed) : '—'}</td>
@@ -3611,7 +4056,7 @@ function renderMonthlyTableBody() {
       <td><span class="pill ${regimePillClass(m.regime)}">${regimeLabel(m.regime)}</span></td>
       <td>${fmtCurrency(m.annualizedGross)}</td>
       <td>${fmtCurrency(m.yourNetMonthly)}</td>
-      <td>${fmtCurrency(m.adam)}</td>
+      ${ffa ? '' : `<td>${fmtCurrency(m.adam)}</td>`}
       <td>${fmtCurrency(m.ashleyMonthly)}</td>
       <td>${fmtCurrency(m.totalHHNet)}</td>
       <td>${fmtCurrency(m.hhBurnMonthly)}</td>
