@@ -689,29 +689,22 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
 <canvas id="ch-balance" height="80" style="margin-bottom:.75rem;display:none;"></canvas>
 <div id="bal-history"></div>
 </div>
-  <!-- 4. Budget Variance -->
-  <div class="chart-box" style="margin-bottom:1.5rem;">
-<div style="margin-bottom:1.5rem;">
-<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;">Budget Variance (Prior 3 Month Avg vs Budget) <span id="range-variance" style="font-weight:400;text-transform:none;letter-spacing:0;">(Apr–Jun 2026)</span></div>
-<div class="act-wrap" id="variance-table"><div style="display:flex;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);"><div style="flex:1;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 0;">Category</div><div style="flex:0 0 90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 8px;">Budget/mo</div><div style="flex:0 0 90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 8px;">3mo avg</div><div style="flex:0 0 90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 8px;">Variance</div><div style="flex:0 0 90px;text-align:right;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:7px 8px;white-space:nowrap;">%</div></div><div onclick="toggleVarGroup(0)" style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;"><div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="font-size:11px;color:var(--text3);width:12px;">▸</span><span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">Household (Fixed)</span></div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$3,669</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$3,618</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--green);font-weight:500;">$-51</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--green);font-weight:500;">-1.4%</div></div><div onclick="toggleVarGroup(1)" style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;"><div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="font-size:11px;color:var(--text3);width:12px;">▸</span><span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">Household (Variable)</span></div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$3,843</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$5,537</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+$1,693</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+44.1%</div></div><div onclick="toggleVarGroup(2)" style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;"><div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="font-size:11px;color:var(--text3);width:12px;">▸</span><span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">Bryan</span></div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$269</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$404</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+$135</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+50.1%</div></div><div onclick="toggleVarGroup(3)" style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;"><div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="font-size:11px;color:var(--text3);width:12px;">▸</span><span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">Ashley</span></div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$67</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$99</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+$32</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--red);font-weight:500;">+48.1%</div></div><div onclick="toggleVarGroup(4)" style="display:flex;align-items:center;padding:0 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;"><div style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="font-size:11px;color:var(--text3);width:12px;">▸</span><span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;">Kids</span></div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$1,246</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--text2);">$1,110</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--green);font-weight:500;">$-136</div><div style="flex:0 0 90px;text-align:right;font-size:12px;font-family:var(--mono);padding:8px;color:var(--green);font-weight:500;">-10.9%</div></div></div>
-</div>
-</div>
-  <!-- 5. Spend by group -->
-  <div>
-<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;">Spend by group</div>
-<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
-<div class="chart-box" style="margin-bottom:0;">
-<div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 3 Month Avg<br/><span class="range-3" style="font-size:10px;font-weight:400;color:var(--text3);">Apr–Jun 2026</span></div>
-<canvas id="pie-grp-3" height="220"></canvas>
-<div id="leg-grp-3" style="margin-top:.75rem;"><div class="pie-legend"><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#60A5FA"></div><span class="pie-leg-name">Household (Variable)</span><span class="pie-leg-vals">$5,537  51.4%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#185FA5"></div><span class="pie-leg-name">Household (Fixed)</span><span class="pie-leg-vals">$3,618  33.6%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#EAB308"></div><span class="pie-leg-name">Kids</span><span class="pie-leg-vals">$1,110  10.3%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#16A34A"></div><span class="pie-leg-name">Bryan</span><span class="pie-leg-vals">$404  3.8%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#9333EA"></div><span class="pie-leg-name">Ashley</span><span class="pie-leg-vals">$99  0.9%</span></div></div></div>
-</div>
-<div class="chart-box" style="margin-bottom:0;">
-<div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Prior 12 Month Avg<br/><span class="range-12" style="font-size:10px;font-weight:400;color:var(--text3);">Jul 2025 – Jun 2026</span></div>
-<canvas id="pie-grp-12" height="220"></canvas>
-<div id="leg-grp-12" style="margin-top:.75rem;"><div class="pie-legend"><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#60A5FA"></div><span class="pie-leg-name">Household (Variable)</span><span class="pie-leg-vals">$4,024  44.2%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#185FA5"></div><span class="pie-leg-name">Household (Fixed)</span><span class="pie-leg-vals">$3,579  39.3%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#EAB308"></div><span class="pie-leg-name">Kids</span><span class="pie-leg-vals">$1,069  11.7%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#16A34A"></div><span class="pie-leg-name">Bryan</span><span class="pie-leg-vals">$348  3.8%</span></div><div class="pie-leg-row"><div class="pie-leg-swatch" style="background:#9333EA"></div><span class="pie-leg-name">Ashley</span><span class="pie-leg-vals">$76  0.8%</span></div></div></div>
-</div>
-</div>
-</div>
+  <!-- 4. Spend — 6-month avg (line item + budget category) -->
+  <div style="margin-bottom:0;">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;">Spend breakdown &middot; 6-month avg <span class="range-6" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);"></span></div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
+      <div class="chart-box" style="margin-bottom:0;">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">By line item</div>
+        <canvas id="pie-line-6" height="220"></canvas>
+        <div id="leg-line-6" style="margin-top:.75rem;"></div>
+      </div>
+      <div class="chart-box" style="margin-bottom:0;">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">By budget category</div>
+        <canvas id="pie-cat-6" height="220"></canvas>
+        <div id="leg-cat-6" style="margin-top:.75rem;"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- PROJECTION (income what-if) -->
@@ -3030,7 +3023,6 @@ function renderYearEnd(allMonths){
 var VAR_EXPANDED={};
 function toggleVarGroup(idx){
   VAR_EXPANDED[idx]=!VAR_EXPANDED[idx];
-  renderVarianceTable();
 }
 function renderVarianceTable(){
   var el=document.getElementById('variance-table');if(!el)return;
@@ -3107,6 +3099,32 @@ var GROUP_COLOURS_DASH={
 };
 
 // Generate shades within each group for line-item pies
+// ── Classic budget-category grouping (for dashboard category pie) ──
+var CAT_ORDER=['Housing','Utilities','Groceries','Transportation','Insurance','Health','Childcare & Kids','Personal & Fun','Savings & Investments','Miscellaneous'];
+var CAT_COLOURS={'Housing':'#185FA5','Utilities':'#38BDF8','Groceries':'#16A34A','Transportation':'#CA8A04','Insurance':'#7C3AED','Health':'#DC2626','Childcare & Kids':'#EAB308','Personal & Fun':'#EC4899','Savings & Investments':'#0D9488','Miscellaneous':'#94A3B8'};
+var CAT_MAP={
+  'House Mortgage':'Housing','HELOC':'Housing','Property Taxes (Jan-Oct)':'Housing','Household & Home Improvement':'Housing',
+  'Home Internet':'Utilities','Cell Phones (Bryan & Ashley)':'Utilities','London Hydro':'Utilities','Enbridge Gas':'Utilities',
+  'Grocery':'Groceries',
+  'Gas':'Transportation',
+  'Life Insurance (Bryan & Ashley)':'Insurance','Home & Auto Ins (Aug Rewl)':'Insurance',
+  'Medical & Dental':'Health','Gym Membership':'Health',
+  'Regan Daycare':'Childcare & Kids','Harrison Daycare':'Childcare & Kids','Kids Budget':'Childcare & Kids',
+  'Streaming Services':'Personal & Fun','Amazon / Online Shopping':'Personal & Fun','Restaurants & Coffee':'Personal & Fun','Clothing & Personal':'Personal & Fun','Recreation & Entertainment':'Personal & Fun','Travel / Vacations':'Personal & Fun','Apple iCloud (x2) / G-Drive':'Personal & Fun','Software & AI Subscriptions':'Personal & Fun',
+  'Retirement Saving (TFSA)':'Savings & Investments','Regan RESP':'Savings & Investments','Harrison RESP':'Savings & Investments',
+  'Miscellaneous & Gifts':'Miscellaneous'
+};
+function catAggregate(avg){
+  var tot={};CAT_ORDER.forEach(function(k){tot[k]=0;});
+  LINES.forEach(function(l){
+    var v=(avg&&avg.byLine[l.id])?avg.byLine[l.id]:0;
+    var cat=CAT_MAP[l.name]||'Miscellaneous';
+    if(tot[cat]===undefined)tot[cat]=0;
+    tot[cat]+=v;
+  });
+  return {names:CAT_ORDER.slice(),values:CAT_ORDER.map(function(k){return tot[k];}),colours:CAT_ORDER.map(function(k){return CAT_COLOURS[k];})};
+}
+
 function lineColours(){
   // Map each line to a colour derived from its group, varied by index within group
   var palettes={
@@ -3259,8 +3277,13 @@ function renderDashboard(){
   var avg12=getAvgActuals(months12);
   buildPie('pie-line-3','leg-line-3',lineNames,lineVals(avg3),lineCols);
   buildPie('pie-line-12','leg-line-12',lineNames,lineVals(avg12),lineCols);
-  buildGroupPieWithCallouts('pie-grp-3','leg-grp-3',groups,grpVals(avg3),grpCols);
-  buildGroupPieWithCallouts('pie-grp-12','leg-grp-12',groups,grpVals(avg12),grpCols);
+  // 6-month avg row: line item + classic budget category
+  var months6=[];for(var j6=6;j6>=1;j6--)months6.push(xym(todIdx-j6));
+  document.querySelectorAll('.range-6').forEach(function(el){el.textContent=monthRangeLabel(months6);});
+  var avg6=getAvgActuals(months6);
+  buildPie('pie-line-6','leg-line-6',lineNames,lineVals(avg6),lineCols);
+  var cat6=catAggregate(avg6);
+  buildPie('pie-cat-6','leg-cat-6',cat6.names,cat6.values,cat6.colours);
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
