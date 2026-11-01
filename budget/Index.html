@@ -496,9 +496,9 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
   <button class="tab on" id="t-track" onclick="showTab('track')">Track</button>
   <button class="tab" id="t-budget" onclick="showTab('budget')">Budget</button>
   <button class="tab" id="t-income" onclick="showTab('income')">Income</button>
-  <button class="tab" id="t-table" onclick="showTab('table')">Month detail</button>
-  <button class="tab" id="t-proj" onclick="showTab('proj')">Monthly Summary</button>
   <button class="tab" id="t-dash" onclick="showTab('dash')">Dashboard</button>
+  <button class="tab" id="t-proj" onclick="showTab('proj')">Monthly Summary</button>
+  <button class="tab" id="t-table" onclick="showTab('table')">Month detail</button>
   <button class="tab" id="t-scenario" onclick="showTab('scenario')">Projection</button>
 </div>
 
@@ -3108,6 +3108,35 @@ var CAT_MAP={
   'Retirement Saving (TFSA)':'Savings & Investments','Regan RESP':'Savings & Investments','Harrison RESP':'Savings & Investments',
   'Miscellaneous & Gifts':'Miscellaneous'
 };
+var CAT_IDEAL={'Housing':25,'Utilities':5,'Groceries':12,'Transportation':15,'Insurance':10,'Health':5,'Childcare & Kids':null,'Personal & Fun':10,'Savings & Investments':15,'Miscellaneous':5};
+function buildCategoryPie(canvasId,legId,cat){
+  if(PIE_CHARTS[canvasId]){PIE_CHARTS[canvasId].destroy();delete PIE_CHARTS[canvasId];}
+  var total=cat.values.reduce(function(s,v){return s+v;},0);
+  var legEl=document.getElementById(legId);
+  if(!total){var cv=document.getElementById(canvasId);if(cv)cv.getContext('2d').clearRect(0,0,cv.width,cv.height);if(legEl)legEl.innerHTML='<div class="pie-empty">No transactions logged yet</div>';return;}
+  var f={labels:[],values:[],colours:[]};
+  cat.names.forEach(function(n,i){if(cat.values[i]>0){f.labels.push(n);f.values.push(cat.values[i]);f.colours.push(cat.colours[i]);}});
+  PIE_CHARTS[canvasId]=new Chart(document.getElementById(canvasId).getContext('2d'),{
+    type:'doughnut',data:{labels:f.labels,datasets:[{data:f.values,backgroundColor:f.colours,borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:function(ctx){var tot=ctx.dataset.data.reduce(function(s,x){return s+x;},0);var g=CAT_IDEAL[ctx.label];return ctx.label+': '+fmtR(ctx.parsed)+' ('+(ctx.parsed/tot*100).toFixed(1)+'%'+((g===null||g===undefined)?'':' · guide '+g+'%')+')';}}}}}
+  });
+  var items=f.labels.map(function(l,i){return{l:l,v:f.values[i],c:f.colours[i]};}).sort(function(a,b){return b.v-a.v;});
+  var html='<div style="display:flex;flex-direction:column;gap:1px;">';
+  items.forEach(function(it){
+    var pct=it.v/total*100, ideal=CAT_IDEAL[it.l], guide;
+    if(ideal===null||ideal===undefined){guide='<span style="font-size:10px;color:var(--text3);white-space:nowrap;">guide&nbsp;&mdash;</span>';}
+    else{var diff=pct-ideal, col=(diff>0.5)?'var(--red)':'var(--green)';guide='<span style="font-size:10px;color:var(--text3);white-space:nowrap;">guide '+ideal+'% <span style="color:'+col+';font-weight:600;">('+(diff>=0?'+':'')+diff.toFixed(0)+')</span></span>';}
+    html+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;color:var(--text2);min-width:0;">'+
+      '<div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:'+it.c+'"></div>'+
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;">'+it.l+'</span>'+
+      '<span style="font-family:var(--mono);color:var(--text3);white-space:nowrap;font-size:10px;">'+fmtR(it.v)+' '+pct.toFixed(1)+'%</span>'+
+      guide+'</div>';
+  });
+  html+='</div><div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.4;">Guideline = typical share of take-home pay; (±) is your share minus the guideline. Childcare varies by family, so no guideline shown.</div>';
+  if(legEl)legEl.innerHTML=html;
+}
+
 function catAggregate(avg){
   var tot={};CAT_ORDER.forEach(function(k){tot[k]=0;});
   LINES.forEach(function(l){
@@ -3277,7 +3306,7 @@ function renderDashboard(){
   var avg6=getAvgActuals(months6);
   buildPie('pie-line-6','leg-line-6',lineNames,lineVals(avg6),lineCols);
   var cat12=catAggregate(avg12);
-  buildPie('pie-cat-12','leg-cat-12',cat12.names,cat12.values,cat12.colours);
+  buildCategoryPie('pie-cat-12','leg-cat-12',cat12);
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
