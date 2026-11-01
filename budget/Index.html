@@ -3273,7 +3273,7 @@ function renderTrendTable(a3,a6,a12){
   if(!rows.length){el.innerHTML='<div class="pie-empty">No transactions logged yet</div>';return;}
   var GC='grid-template-columns:1fr 50px 50px 50px 16px;';
   var hd='<div style="display:grid;'+GC+'gap:4px;padding:4px 2px;border-bottom:1px solid var(--border);font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;">'+
-    '<span>Line item</span><span style="text-align:right;">3-mo</span><span style="text-align:right;">6-mo</span><span style="text-align:right;">12-mo</span><span></span></div>';
+    '<span>Line item</span><span style="text-align:right;">12-mo</span><span style="text-align:right;">6-mo</span><span style="text-align:right;">3-mo</span><span></span></div>';
   var body=rows.map(function(r){
     var tr,col;
     if(r.v12<=0){tr=r.v3>0?'\u25B2':'';col='var(--text3)';}
@@ -3282,9 +3282,9 @@ function renderTrendTable(a3,a6,a12){
     else{tr='\u2013';col='var(--text3)';}
     return '<div style="display:grid;'+GC+'gap:4px;padding:3px 2px;border-bottom:1px solid var(--border);font-size:10px;align-items:center;">'+
       '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);">'+r.name+'</span>'+
-      '<span style="text-align:right;font-family:var(--mono);color:var(--text3);">'+fmtR(r.v3)+'</span>'+
+      '<span style="text-align:right;font-family:var(--mono);color:var(--text);font-weight:600;">'+fmtR(r.v12)+'</span>'+
       '<span style="text-align:right;font-family:var(--mono);color:var(--text3);">'+fmtR(r.v6)+'</span>'+
-      '<span style="text-align:right;font-family:var(--mono);color:var(--text);font-weight:500;">'+fmtR(r.v12)+'</span>'+
+      '<span style="text-align:right;font-family:var(--mono);color:var(--text3);">'+fmtR(r.v3)+'</span>'+
       '<span style="text-align:center;color:'+col+';font-size:9px;">'+tr+'</span></div>';
   }).join('');
   el.innerHTML=hd+body+'<div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.4;">Arrow = 3-mo avg vs 12-mo avg: <span style="color:#C77A2E;">\u25B2 spending up</span> / <span style="color:var(--green);">\u25BC down</span> vs the yearly norm.</div>';
