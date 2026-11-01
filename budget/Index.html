@@ -687,9 +687,8 @@ button.range-btn.on{background:var(--accent);color:#fff;border-color:var(--accen
         <div id="leg-line-12" style="margin-top:.75rem;"></div>
       </div>
       <div class="chart-box" style="margin-bottom:0;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Budget category &middot; 12-mo avg<br/><span class="range-12" style="font-size:10px;font-weight:400;color:var(--text3);"></span></div>
-        <canvas id="pie-cat-12" height="220"></canvas>
-        <div id="leg-cat-12" style="margin-top:.75rem;"></div>
+        <div style="font-size:12px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:.75rem;">Line item trend &middot; 3 / 6 / 12-mo avg</div>
+        <div id="trend-table"></div>
       </div>
     </div>
   </div>
@@ -3265,6 +3264,32 @@ function buildPie(canvasId, legId, labels, values, colours, title){
   buildPieLegend(legId, filtered.labels, filtered.values, filtered.colours);
 }
 
+function renderTrendTable(a3,a6,a12){
+  var el=document.getElementById('trend-table'); if(!el)return;
+  var rows=LINES.map(function(l){
+    return {name:l.name,v3:(a3&&a3.byLine[l.id])||0,v6:(a6&&a6.byLine[l.id])||0,v12:(a12&&a12.byLine[l.id])||0};
+  }).filter(function(r){return r.v3>0||r.v6>0||r.v12>0;})
+    .sort(function(a,b){return (b.v12||b.v3)-(a.v12||a.v3);});
+  if(!rows.length){el.innerHTML='<div class="pie-empty">No transactions logged yet</div>';return;}
+  var GC='grid-template-columns:1fr 50px 50px 50px 16px;';
+  var hd='<div style="display:grid;'+GC+'gap:4px;padding:4px 2px;border-bottom:1px solid var(--border);font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;">'+
+    '<span>Line item</span><span style="text-align:right;">3-mo</span><span style="text-align:right;">6-mo</span><span style="text-align:right;">12-mo</span><span></span></div>';
+  var body=rows.map(function(r){
+    var tr,col;
+    if(r.v12<=0){tr=r.v3>0?'\u25B2':'';col='var(--text3)';}
+    else if(r.v3>r.v12*1.05){tr='\u25B2';col='#C77A2E';}
+    else if(r.v3<r.v12*0.95){tr='\u25BC';col='var(--green)';}
+    else{tr='\u2013';col='var(--text3)';}
+    return '<div style="display:grid;'+GC+'gap:4px;padding:3px 2px;border-bottom:1px solid var(--border);font-size:10px;align-items:center;">'+
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);">'+r.name+'</span>'+
+      '<span style="text-align:right;font-family:var(--mono);color:var(--text3);">'+fmtR(r.v3)+'</span>'+
+      '<span style="text-align:right;font-family:var(--mono);color:var(--text3);">'+fmtR(r.v6)+'</span>'+
+      '<span style="text-align:right;font-family:var(--mono);color:var(--text);font-weight:500;">'+fmtR(r.v12)+'</span>'+
+      '<span style="text-align:center;color:'+col+';font-size:9px;">'+tr+'</span></div>';
+  }).join('');
+  el.innerHTML=hd+body+'<div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.4;">Arrow = 3-mo avg vs 12-mo avg: <span style="color:#C77A2E;">\u25B2 spending up</span> / <span style="color:var(--green);">\u25BC down</span> vs the yearly norm.</div>';
+}
+
 function renderDashboard(){
   var seed=parseFloat(document.getElementById('seed').value)||0;
   var allMonths=computeProjection(seed);
@@ -3305,8 +3330,7 @@ function renderDashboard(){
   document.querySelectorAll('.range-6').forEach(function(el){el.textContent=monthRangeLabel(months6);});
   var avg6=getAvgActuals(months6);
   buildPie('pie-line-6','leg-line-6',lineNames,lineVals(avg6),lineCols);
-  var cat12=catAggregate(avg12);
-  buildCategoryPie('pie-cat-12','leg-cat-12',cat12);
+  renderTrendTable(avg3,avg6,avg12);
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
